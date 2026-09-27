@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Publicis Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="/runtime.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+:root{
+  --bg:#FFFFFF; --bg-2:#F5F5F7; --panel:#FFFFFF; --panel-2:#F5F5F7; --ink:#1D1D1F; --muted:#6E6E73; --line:#D2D2D7;
+  --accent:#0071E3; --accent-ink:#FFFFFF; --accent-soft:#E8F1FC; --link:#0066CC; --ok:#248A3D; --warn:#B25000;
+  --nav:rgba(251,251,253,.8);
+  --d-strategy:#0071E3; --d-creative:#E30B5C; --d-digital:#00A3A1; --d-finance:#B8860B; --d-production:#8E44EC; --d-seo:#28A745;
+  --radius-s:12px; --radius-m:22px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Inter","Helvetica Neue","IBM Plex Sans Arabic",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#000000; --bg-2:#101012; --panel:#1C1C1E; --panel-2:#2C2C2E; --ink:#F5F5F7; --muted:#A1A1A6; --line:#38383C;
+    --accent:#2997FF; --accent-ink:#FFFFFF; --accent-soft:#0B2340; --link:#2997FF; --ok:#30D158; --warn:#FF9F0A; --nav:rgba(22,22,23,.8);
+    --d-strategy:#2997FF; --d-creative:#FF375F; --d-digital:#40C8E0; --d-finance:#FFD60A; --d-production:#BF5AF2; --d-seo:#30D158;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#000000; --bg-2:#101012; --panel:#1C1C1E; --panel-2:#2C2C2E; --ink:#F5F5F7; --muted:#A1A1A6; --line:#38383C;
+  --accent:#2997FF; --accent-ink:#FFFFFF; --accent-soft:#0B2340; --link:#2997FF; --ok:#30D158; --warn:#FF9F0A; --nav:rgba(22,22,23,.8);
+  --d-strategy:#2997FF; --d-creative:#FF375F; --d-digital:#40C8E0; --d-finance:#FFD60A; --d-production:#BF5AF2; --d-seo:#30D158;
+}
+:root{box-sizing:border-box;padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:calc(52px + env(safe-area-inset-top,0px))}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.47;letter-spacing:-.022em;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit;letter-spacing:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* Global nav */
+.gnav{position:sticky;top:0;z-index:50;background:var(--nav);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent);padding-top:env(safe-area-inset-top,0px)}
+.gnav-in{max-width:1180px;margin:0 auto;height:52px;display:flex;align-items:center;gap:22px;padding:0 22px}
+.wordmark{border:0;background:none;font-weight:600;font-size:17px;letter-spacing:-.02em;cursor:pointer;padding:0;white-space:nowrap}
+#nav{display:flex;gap:4px;flex:1;justify-content:center;overflow-x:auto;scrollbar-width:none}
+#nav::-webkit-scrollbar{display:none}
+#nav button{border:0;background:none;font-size:13px;letter-spacing:-.01em;color:var(--ink);opacity:.8;padding:6px 10px;border-radius:999px;cursor:pointer;white-space:nowrap}
+#nav button:hover{opacity:1}
+#nav button[aria-current="page"]{opacity:1;background:var(--panel-2)}
+#clientSel{font-size:13px;border:0;background:var(--panel-2);padding:6px 12px;border-radius:999px;max-width:180px}
+#mobNav{display:none}
+/* Page */
+main{min-height:calc(100vh - 52px)}
+.head{text-align:center;padding:64px 22px 8px;max-width:900px;margin:0 auto}
+.head h1{margin:0;font-size:clamp(40px,6vw,64px);line-height:1.06;font-weight:700;letter-spacing:-.035em}
+.head h1 .bar{display:none}
+.head p{margin:14px auto 0;color:var(--muted);font-size:clamp(19px,2.2vw,24px);line-height:1.35;letter-spacing:-.015em;max-width:40ch}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;padding:28px 22px 0;max-width:1180px;margin:0 auto}
+.tabs button{border:0;background:var(--panel-2);padding:8px 16px;border-radius:999px;cursor:pointer;font-size:14px}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.work,.cmd,.lib{max-width:1180px;margin:0 auto;display:grid;gap:22px;padding:32px 22px 80px}
+.work{grid-template-columns:minmax(300px,400px) 1fr}
+.cmd{grid-template-columns:minmax(320px,440px) 1fr}
+.lib{grid-template-columns:minmax(280px,380px) 1fr}
+.card{background:var(--bg-2);border-radius:var(--radius-m)}
+.form{padding:26px;align-self:start}
+.form h2{margin:0 0 4px;font-size:24px;font-weight:600;letter-spacing:-.025em}
+.form .desc{margin:0 0 20px;color:var(--muted);font-size:15px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--muted)}
+.field input,.field select,.field textarea{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:var(--radius-s);background:var(--panel);font-size:15px}
+.field textarea{min-height:120px;resize:vertical}
+.field textarea.tall{min-height:200px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{border:0;background:transparent;color:var(--link);padding:10px 18px;border-radius:999px;cursor:pointer;font-size:15px;font-weight:400}
+.btn:hover{text-decoration:underline}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{text-decoration:none;filter:brightness(1.08)}
+.btn.outline{border:1px solid var(--accent);color:var(--accent)}
+.btn.outline:hover{text-decoration:none;background:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.4;cursor:default;text-decoration:none}
+.btn.small{padding:6px 12px;font-size:14px}
+.actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.out{display:flex;flex-direction:column;min-height:520px;background:var(--panel);border:1px solid var(--line)}
+.out-bar{display:flex;align-items:center;gap:4px;padding:12px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.out-bar .status{font-size:13px;color:var(--muted);margin-right:auto}
+.out-body{padding:28px 32px;overflow:auto;flex:1}
+.empty{color:var(--muted);max-width:52ch}
+.empty strong{color:var(--ink);font-weight:600;font-size:21px;display:block;margin-bottom:6px;letter-spacing:-.02em}
+.refine{border-top:1px solid var(--line);padding:12px 14px;display:flex;gap:8px}
+.refine input{flex:1;padding:11px 16px;border:1px solid var(--line);border-radius:999px;background:var(--bg-2);font-size:15px}
+.md{max-width:78ch;font-size:16px}
+.md h1{font-size:30px;margin:0 0 14px;letter-spacing:-.03em;line-height:1.15}.md h2{font-size:22px;margin:28px 0 10px;letter-spacing:-.025em}.md h3{font-size:18px;margin:20px 0 6px}
+.md p{margin:0 0 12px}.md ul,.md ol{margin:0 0 14px;padding-inline-start:22px}.md li{margin:4px 0}
+.md table{border-collapse:collapse;margin:10px 0 18px;font-size:14px;display:block;overflow-x:auto;max-width:100%}
+.md th,.md td{border-bottom:1px solid var(--line);padding:8px 12px;text-align:start;vertical-align:top}
+.md th{font-weight:600;color:var(--muted);font-size:13px}
+.md code{background:var(--bg-2);padding:2px 6px;border-radius:6px;font-size:14px}
+.md pre{background:var(--bg-2);padding:14px;border-radius:var(--radius-s);overflow-x:auto;white-space:pre-wrap}
+.md blockquote{margin:0 0 12px;padding-inline-start:14px;border-inline-start:3px solid var(--line);color:var(--muted)}
+.plan{padding:0;background:var(--panel);border:1px solid var(--line)}
+.plan-head{padding:24px 26px;border-bottom:1px solid var(--line)}
+.plan-head h2{margin:0;font-size:24px;font-weight:600;letter-spacing:-.025em}
+.plan-head p{margin:6px 0 0;color:var(--muted);font-size:15px}
+.task{border-bottom:1px solid var(--line)}
+.task:last-child{border-bottom:0}
+.task-row{display:grid;grid-template-columns:28px 1fr auto;gap:12px;padding:16px 26px;align-items:start}
+.task-num{font-size:15px;color:var(--muted);font-weight:600}
+.task-title{font-weight:600}
+.task-meta{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap}
+.task-ins{font-size:14px;color:var(--muted);margin-top:6px}
+.task-out{padding:0 26px 20px 66px}
+.task-out .md{font-size:15px;border-inline-start:2px solid var(--line);padding-inline-start:16px}
+.pill{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px}
+.pill.done{color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}
+.pill.run{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
+.list{padding:6px 0;overflow:hidden}
+.list-item{display:block;width:100%;text-align:left;border:0;background:none;padding:14px 22px;cursor:pointer;border-radius:0}
+.list-item:hover{background:color-mix(in srgb,var(--ink) 4%,transparent)}
+.list-item .t{font-weight:500;font-size:15px}
+.list-item .m{font-size:13px;color:var(--muted)}
+.sec-title{font-size:13px;color:var(--muted);padding:14px 22px 4px;margin:0;font-weight:500}
+.filters{display:flex;gap:8px;padding:12px 16px}
+.filters select{flex:1;padding:9px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel);font-size:14px}
+.notice{max-width:1136px;margin:24px auto 0;padding:14px 20px;border-radius:var(--radius-s);background:var(--accent-soft);font-size:15px;text-align:center}
+.toast{position:fixed;bottom:calc(24px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+/* Attachments */
+.drop{border:1.5px dashed var(--line);border-radius:var(--radius-s);padding:14px;text-align:center;margin-bottom:14px;background:var(--panel);transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop p{margin:6px 0 0;font-size:13px;color:var(--muted)}
+.chips{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.chip{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-s);padding:8px 10px 8px 14px;font-size:14px}
+.chip .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip .sz{font-size:12px;color:var(--muted);white-space:nowrap}
+.chip .sz.bad{color:var(--warn)}
+.chip button{border:0;background:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:2px 6px;border-radius:999px}
+.chip button:hover{background:var(--panel-2);color:var(--ink)}
+/* Home */
+.hero{text-align:center;padding:96px 22px 40px;max-width:1000px;margin:0 auto}
+.hero h1{margin:0;font-size:clamp(48px,9vw,96px);line-height:1.02;font-weight:700;letter-spacing:-.045em;
+  background:linear-gradient(100deg,var(--d-strategy) 0%,var(--d-production) 40%,var(--d-creative) 75%,#FF9500 100%);-webkit-background-clip:text;background-clip:text;color:transparent;padding-bottom:.06em}
+.hero p{font-size:clamp(21px,2.8vw,28px);line-height:1.3;letter-spacing:-.02em;color:var(--ink);margin:18px auto 0;max-width:30ch;font-weight:500}
+.hero .sub{color:var(--muted);font-weight:400;font-size:clamp(17px,1.8vw,21px);max-width:44ch;margin-top:14px}
+.hero .actions{justify-content:center;margin-top:30px;gap:14px}
+.hero .btn{font-size:17px;padding:12px 24px}
+.tiles{max-width:1180px;margin:0 auto;padding:40px 22px 24px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.tile{background:var(--bg-2);border-radius:var(--radius-m);padding:34px 30px 30px;text-align:left;border:0;cursor:pointer;min-height:260px;display:flex;flex-direction:column;transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+.tile:hover{transform:scale(1.015)}
+.tile .k{width:36px;height:36px;border-radius:10px;margin-bottom:22px}
+.tile h3{margin:0;font-size:26px;font-weight:700;letter-spacing:-.03em;line-height:1.12}
+.tile p{margin:10px 0 0;color:var(--muted);font-size:15px;flex:1}
+.tile .go{margin-top:18px;color:var(--link);font-size:15px}
+.sec{max-width:1180px;margin:0 auto;padding:80px 22px 20px;text-align:center}
+.sec h2{margin:0;font-size:clamp(34px,5vw,56px);font-weight:700;letter-spacing:-.035em;line-height:1.07}
+.sec p.lead{color:var(--muted);font-size:clamp(18px,2vw,21px);max-width:46ch;margin:14px auto 0}
+.engines{max-width:1180px;margin:0 auto;padding:36px 22px 40px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px;text-align:left}
+.eng{background:var(--bg-2);border-radius:var(--radius-m);padding:26px}
+.eng h4{margin:0 0 4px;font-size:13px;font-weight:600;color:var(--muted)}
+.eng .n{font-size:21px;font-weight:600;letter-spacing:-.02em}
+.eng ul{list-style:none;padding:0;margin:14px 0 0;font-size:15px}
+.eng li{padding:7px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px}
+.st{font-size:12px;padding:2px 9px;border-radius:999px;white-space:nowrap;align-self:center}
+.st.live{color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}
+.st.prompt{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.st.next{color:var(--muted);background:color-mix(in srgb,var(--muted) 14%,transparent)}
+.foot{max-width:1180px;margin:0 auto;padding:30px 22px 50px;font-size:12px;color:var(--muted);border-top:1px solid var(--line)}
+@media (max-width:980px){
+  .work,.cmd,.lib{grid-template-columns:1fr}
+  .tiles,.engines{grid-template-columns:1fr 1fr}
+}
+@media (max-width:760px){
+  #nav{display:none}
+  #mobNav{display:block;font-size:13px;border:0;background:var(--panel-2);padding:6px 10px;border-radius:999px;margin-left:auto}
+  .gnav-in{gap:10px;padding:0 14px}
+  #clientSel{max-width:120px}
+  .wordmark{font-size:15px}
+  .tiles,.engines{grid-template-columns:1fr}
+  .row2{grid-template-columns:1fr}
+  .head{padding-top:44px}
+  .hero{padding-top:64px}
+  .out-body{padding:22px 20px}
+  .task-out{padding-left:26px}
+  .form{padding:22px}
+}
+@media (prefers-reduced-motion:reduce){.toast,.tile{transition:none}.tile:hover{transform:none}}
+</style>
+</head>
+<body>
+<header class="gnav"><div class="gnav-in">
+  <button class="wordmark" data-home>Publicis Intelligence</button>
+  <nav id="nav" aria-label="Sections"></nav>
+  <select id="mobNav" aria-label="Go to"></select>
+  <select id="clientSel" aria-label="Client workspace"></select>
+</div></header>
+<main id="main"></main>
+<footer class="foot"><span id="foot">Connecting…</span> · Publicis Media Qatar</footer>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ---------- Agent catalogue ---------- */
+const F = {
+  area:(key,label,ph,tall)=>({key,label,type:'textarea',ph,tall}),
+  text:(key,label,ph)=>({key,label,type:'text',ph}),
+  sel:(key,label,options)=>({key,label,type:'select',options}),
+  row:(...items)=>({type:'row',items:items.map(([key,label,ph])=>({key,label,type:'text',ph}))})
+};
+const DEPTS = [
+ {id:'strategy',name:'Strategy & Research',color:'var(--d-strategy)',desc:'Market research, competitor intelligence, audience insight, communications strategy and pitch storylines.',agents:[
+  {id:'research',name:'Deep research',tier:'complex',blurb:'A structured research report on any market, category or question.',
+   fields:[F.area('brief','Research question','e.g. How are GCC banks using gaming and esports to reach Gen Z?',true),F.sel('depth','Depth',['Deep dive','Executive overview'])],
+   task:'Produce a research report: executive summary, market context, key findings grouped by theme, notable brand examples, data points (each marked with a confidence level and the kind of source to verify it against), implications for the client, and open questions. Mark every figure as an estimate unless it is well established.'},
+  {id:'competitor',name:'Competitor intelligence',tier:'complex',blurb:'Positioning, messaging, channels and gaps across named competitors.',
+   fields:[F.text('competitors','Competitors','e.g. Commercial Bank, Doha Bank, Dukhan Bank'),F.area('brief','Focus','What do you want to understand?')],
+   task:'Build a competitor intelligence brief: a comparison table (positioning, key messages, hero products, channel presence, creative style, likely media weight), each competitor\'s strengths and weaknesses, white space the client can own, and threats to watch.'},
+  {id:'audience',name:'Audience insight',tier:'default',blurb:'Personas, motivations, barriers and media habits in Qatar and the GCC.',
+   fields:[F.text('audience','Audience','e.g. Qatari women 25-40, working professionals'),F.area('brief','Product or context','What are we selling to them?')],
+   task:'Create an audience insight pack: 3 personas (who they are, motivations, barriers, a day in their media life in Qatar), key consumer moments and cultural calendar touchpoints, platform and media habits, and 3 sharp insight statements written as "I..." truths.'},
+  {id:'comms',name:'Communications strategy',tier:'complex',blurb:'From business problem to strategic idea, channel roles and KPIs.',
+   fields:[F.area('brief','Brief','Paste the client brief',true)],
+   task:'Write the communications strategy: business problem, objectives, audience, insight, strategic idea, role of communications, channel roles across the funnel, campaign phasing, and a KPI framework table (stage, KPI, target, measurement source).'},
+  {id:'pitch',name:'Pitch storyline',tier:'complex',blurb:'Slide-by-slide narrative for a pitch or RFP response.',
+   fields:[F.area('brief','RFP or pitch brief','Paste the RFP summary or brief',true),F.text('slides','Slide count','e.g. 20')],
+   task:'Build the pitch storyline: the one-line winning thought, then a slide-by-slide table (slide number, title, key message, content, suggested visual), followed by an opening line for the presenter and a closing line.'}
+ ]},
+ {id:'creative',name:'Creative & Content',color:'var(--d-creative)',desc:'Copy, art direction, video, audio, adaptations and brand checks, in English and Arabic.',agents:[
+  {id:'copy',name:'Copywriter',tier:'default',blurb:'Creative routes with headlines, body copy and CTAs per channel.',
+   fields:[F.area('brief','Brief','What is the campaign and message?',true),F.text('channels','Channels','e.g. Instagram, Snapchat, OOH, radio')],
+   task:'Write 3 distinct creative routes. For each: route name, the idea in one sentence, a campaign line, 3 headline options, body copy, CTAs, and channel-specific versions for every channel requested. Arabic must be native, natural Gulf-appropriate marketing Arabic, never a literal translation.'},
+  {id:'visual',name:'Art director',tier:'default',blurb:'Visual concepts and production-ready image generation prompts.',
+   fields:[F.area('brief','Concept or brief','Describe the concept'),F.text('formats','Formats','e.g. 9:16, 1:1, 16:9 DOOH'),F.sel('engine','Target image engine',['Midjourney','Flux','GPT Image','Imagen','Ideogram','Firefly'])],
+   task:'Deliver art direction: visual concept, mood, composition, lighting, palette drawn from the brand guidelines, and for each format a production-ready image generation prompt written in the syntax and conventions of the selected target engine (including its parameters where it uses them) plus a negative prompt if the engine supports one. Logos, product packshots and all on-image text are composited afterwards, so never ask the model to render text or logos; instead specify where copy and logo will sit.'},
+  {id:'video',name:'Video scriptwriter',tier:'default',blurb:'Scripts, storyboards, shot lists and AI video prompts.',
+   fields:[F.area('brief','Brief','What is the film about?'),F.sel('duration','Duration',['6s','15s','30s','60s']),F.text('platform','Platform','e.g. TikTok, YouTube, TV'),F.sel('engine','Target video engine',['Seedance','Veo','Kling','Runway','Sora','Hailuo'])],
+   task:'Write the video script as a table (timecode, visual, VO English, VO Arabic, super, sound). Then give storyboard frame descriptions, a shot list, and one AI video generation prompt per shot, written for the selected target engine: subject, action, camera move, lens, lighting, style and duration per shot, respecting the typical clip length of that engine. Keep VO word counts realistic for the duration.'},
+  {id:'audio',name:'Audio producer',tier:'default',blurb:'Radio spots, voiceover and podcast ad scripts.',
+   fields:[F.area('brief','Brief','What is the message?'),F.sel('format','Format',['Radio spot','Podcast ad read','Voiceover','Jingle or music track','Sonic identity brief']),F.sel('duration','Duration',['15s','20s','30s','45s','60s']),F.sel('engine','Target audio engine',['ElevenLabs (voice)','Suno (music)','Udio (music)'])],
+   task:'Write the audio script in English and Arabic with timings and word counts matched to duration, voice casting direction (age, tone, accent), music and sound design direction, and a mandatory line checklist. Then give ready-to-paste generation inputs for the selected target engine: for a voice engine, the voice description and script with pacing and emotion tags; for a music engine, the style prompt (genre, tempo, instruments, mood, vocal type) plus structured lyrics with section tags such as [Verse] and [Chorus] if the format needs lyrics.'},
+  {id:'adapt',name:'Adaptation matrix',tier:'default',blurb:'One master idea adapted to every platform, size and language.',
+   fields:[F.area('brief','Master copy or concept','Paste the approved master',true),F.text('platforms','Platforms','e.g. Meta, TikTok, Snap, Google Display, DOOH')],
+   task:'Build an adaptation matrix table: platform, placement, dimensions, safe zone notes, character limits, adapted copy in English, adapted copy in Arabic, and 2 A/B variants per placement.'},
+  {id:'guardian',name:'Brand guardian',tier:'default',blurb:'Review any copy or concept against brand, culture and compliance.',
+   fields:[F.area('brief','Content to review','Paste copy or describe the creative',true)],
+   task:'Review the content against the client brand profile, tone of voice, cultural sensitivity for Qatar and the GCC, and category compliance (for example banking, health or food claims). Give a scorecard table (area, rating, issue, fix), then a corrected version of the content.'}
+ ]},
+ {id:'digital',name:'Digital Marketing',color:'var(--d-digital)',desc:'Online and offline media planning, platform build sheets, optimization, reporting and analysis.',agents:[
+  {id:'plan',name:'Media planner',tier:'complex',blurb:'Integrated plans with budget split, flighting and KPIs.',
+   fields:[F.area('brief','Objective and brief','What must the campaign achieve?'),F.row(['budget','Budget (QAR)','e.g. 750000'],['duration','Duration','e.g. 8 weeks']),F.sel('mix','Media mix',['Integrated (online and offline)','Online only','Offline only']),F.text('audience','Audience','Who are we reaching?')],
+   task:'Build the media plan: strategy summary, channel roles, a budget table (channel, platform or vendor, buying model, budget QAR, share %, estimated CPM or CPC range for Qatar, estimated impressions, KPI), a weekly flighting table, and the measurement plan. Offline channels can include TV, radio, OOH, DOOH, print, cinema and malls. Label all cost benchmarks as estimates to be confirmed against current rate cards.'},
+  {id:'setup',name:'Campaign setup',tier:'default',blurb:'Platform build sheets ready for trafficking.',
+   fields:[F.text('platforms','Platforms','e.g. Meta, Google Ads, TikTok, Snap, DV360'),F.area('brief','Campaign details','Objective, audience, budget, dates, creatives')],
+   task:'For each platform produce a build sheet: campaign, ad set and ad structure as a table, naming convention, objective and optimization event, bidding, budget split, targeting, placements, tracking (pixel events, conversion API, UTMs), and a pre-launch QA checklist.'},
+  {id:'optimize',name:'Optimization analyst',tier:'complex',blurb:'Paste live performance data and get prioritized actions.',
+   fields:[F.area('data','Performance data','Paste the export or table',true),F.text('goals','Targets','e.g. CPA under QAR 40, CTR above 0.8%')],
+   task:'Diagnose performance against the targets, then give a prioritized action table (action, reason, expected impact, effort, when), a budget reallocation recommendation, and what to test next.'},
+  {id:'report',name:'Report writer',tier:'default',blurb:'Client-ready performance reports from raw data.',
+   fields:[F.area('data','Performance data','Paste the data',true),F.text('period','Period','e.g. September 2026')],
+   task:'Write the client performance report: headline summary, KPI versus target table, channel and platform performance, what worked and what did not, insights, and next-period actions.'},
+  {id:'analyst',name:'Data analyst',tier:'complex',blurb:'Ask any question of your campaign data.',
+   fields:[F.area('data','Data','Paste the data',true),F.text('question','Question','e.g. Why did CPA rise in week 3?')],
+   task:'Answer the question with clear analysis: the answer first, the evidence from the data, likely causes ranked by probability, and what to do about it.'}
+ ]},
+ {id:'finance',name:'Finance',color:'var(--d-finance)',desc:'Fee proposals, retainer models, budget reconciliation, invoicing and profitability.',agents:[
+  {id:'fee',name:'Fee estimator',tier:'complex',blurb:'FTE-based retainer and project fee proposals.',
+   fields:[F.area('brief','Scope of work','Describe the scope',true),F.row(['duration','Duration','e.g. 12 months'],['model','Commercial model','e.g. retainer plus commission'])],
+   task:'Build the fee proposal: a resource table (role, seniority, allocation %, monthly hours, hourly rate QAR, monthly cost), monthly and total fee, optional media commission and tactical fees, payment terms, and a scope and assumptions section. Mark rates as adjustable assumptions.'},
+  {id:'reconcile',name:'Budget reconciliation',tier:'default',blurb:'Planned versus actual spend with variance flags.',
+   fields:[F.area('data','Planned vs actual','Paste plan and delivered spend',true)],
+   task:'Reconcile planned versus actual: a variance table (line, planned, actual, variance, variance %, flag), a summary of over and under delivery, likely reasons, and actions including make-goods or credits to request.'},
+  {id:'invoice',name:'Invoice drafter',tier:'quick',blurb:'Invoice line items and the cover email.',
+   fields:[F.area('brief','Billing details','Client, PO, services, amounts, period',true)],
+   task:'Draft the invoice content (header details, line item table, subtotal, VAT or tax line if applicable, total, payment terms) and a short professional cover email.'},
+  {id:'profit',name:'Profitability check',tier:'complex',blurb:'Margin by client or project from fees, hours and costs.',
+   fields:[F.area('data','Fees, hours and costs','Paste the numbers',true)],
+   task:'Calculate profitability: margin table, effective hourly rate, over-servicing flags, and actions to protect margin.'}
+ ]},
+ {id:'production',name:'Production',color:'var(--d-production)',desc:'Job planning, specs, vendor briefs and delivery.',agents:[
+  {id:'job',name:'Job planner',tier:'default',blurb:'Job bag, timeline and owners from an approved brief.',
+   fields:[F.area('brief','Approved brief','Paste the brief',true),F.text('deadline','Go-live date','e.g. 20 October 2026')],
+   task:'Create the job bag: deliverables list, a timeline table working back from the go-live date (task, owner role, start, due, dependency), approval gates, and risks with mitigations.'},
+  {id:'specs',name:'Spec checker',tier:'default',blurb:'Delivery specs for every platform and screen.',
+   fields:[F.area('brief','Deliverables','List platforms, placements, screens')],
+   task:'Produce a spec sheet table: platform, placement, dimensions, aspect ratio, duration, file type, max file size, safe zones, character limits. Add a note that specs should be confirmed against each platform\'s latest documentation before final delivery.'},
+  {id:'vendor',name:'Vendor brief',tier:'default',blurb:'Shoot and production briefs with RFQ.',
+   fields:[F.area('brief','Production need','What needs producing?',true)],
+   task:'Write the production brief and RFQ: overview, deliverables, creative references to describe, crew and talent needs, locations and permits in Qatar, schedule, budget line items for vendors to quote against, and submission instructions.'}
+ ]},
+ {id:'seo',name:'SEO, AEO & Local SEO',color:'var(--d-seo)',desc:'Search, AI answer visibility and local search across English and Arabic.',agents:[
+  {id:'audit',name:'SEO audit',tier:'complex',blurb:'Prioritized fixes from page content and site details.',
+   fields:[F.area('data','Page content or site details','Paste the page text, meta tags, structure',true)],
+   task:'Audit the page: a findings table (area, issue, priority, fix) covering titles, meta, headings, content depth, internal links, schema, Arabic and hreflang handling, and technical signals visible in the input. Then give rewritten title, meta description and H1.'},
+  {id:'keywords',name:'Keyword strategy',tier:'complex',blurb:'English and Arabic keyword clusters mapped to pages.',
+   fields:[F.area('brief','Business and topic','What does the client offer?'),F.text('market','Market','e.g. Qatar')],
+   task:'Build keyword clusters in English and Arabic: a table (cluster, primary keyword, secondary keywords, intent, relative priority, target page). Volumes must be marked as estimates to validate in a keyword tool.'},
+  {id:'aeo',name:'AEO optimizer',tier:'complex',blurb:'Get the brand cited by ChatGPT, Gemini, Claude and Perplexity.',
+   fields:[F.area('brief','Brand and category','Who is the brand and what should AI assistants say about it?')],
+   task:'Build the answer engine optimization plan: the questions people ask AI assistants in this category (English and Arabic), the answer the brand should own for each, content and page structure fixes, FAQ blocks, schema types, entity and third-party citation sources to build, and a monthly visibility tracking method.'},
+  {id:'local',name:'Local SEO',tier:'default',blurb:'Google Business Profile, reviews and local rankings.',
+   fields:[F.area('brief','Business and locations','Brand, branches, areas served')],
+   task:'Build the local SEO plan: Google Business Profile optimization (categories, descriptions in English and Arabic, attributes, photos), a monthly posts calendar, review response templates for positive, neutral and negative reviews, local citation sources in Qatar, and tracking.'},
+  {id:'content',name:'SEO content writer',tier:'default',blurb:'Search and AI-ready articles and pages.',
+   fields:[F.text('topic','Topic','e.g. How to choose a credit card in Qatar'),F.text('keyword','Primary keyword','e.g. best credit card Qatar'),F.sel('length','Length',['800 words','1200 words','1800 words'])],
+   task:'Write the full article: meta title, meta description, H1, structured body with H2 and H3, a direct answer paragraph at the top for AI assistants, an FAQ section, and a suggested schema type.'}
+ ]}
+];
+</script>
+<script>
+const SHORT={strategy:'Strategy',creative:'Creative',digital:'Media',finance:'Finance',production:'Production',seo:'Search'};
+const NAV = [{id:'home',name:'Overview'},{id:'command',name:'Command'},...DEPTS.map(d=>({id:d.id,name:SHORT[d.id],color:d.color})),{id:'library',name:'Library'},{id:'clients',name:'Clients'}];
+const LANGS = ['English','Arabic','Bilingual (English and Arabic)'];
+const HOUSE = `House rules:
+- Write as the agency presenting finished, client-ready work. Do not address the reader as "you should"; present the plan as the agency's plan.
+- Human, confident, professional tone. Never use em dashes.
+- Use Markdown: clear headings, short paragraphs, and tables for plans, budgets, schedules and comparisons.
+- Default market is Qatar and the wider GCC; default currency is QAR. Respect the local cultural calendar (Ramadan, Eid, National Day) where relevant.
+- Never present an invented statistic as fact. Mark estimates as estimates. If key inputs are missing, make sensible assumptions and list them in a short "Assumptions" section at the end.`;
+
+/* ---------- State ---------- */
+const S = { db:null, sample:null, downloads:null, clients:[], outputs:[], projects:[],
+  clientId: lsGet('aos.client') || '', view: lsGet('pi.view') || 'home', agent:{}, drafts:{},
+  current:null, ctl:null, running:false, project:null, planRun:null };
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function md(t){ try{ if(window.marked&&window.DOMPurify) return DOMPurify.sanitize(marked.parse(t||'')); }catch(e){} return '<pre>'+esc(t)+'</pre>'; }
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),2200)}
+function client(){return S.clients.find(c=>c.id===S.clientId)||null}
+function dept(id){return DEPTS.find(d=>d.id===id)}
+function agentOf(d,a){return dept(d)?.agents.find(x=>x.id===a)}
+function fmtDate(ms){try{return new Date(ms).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}catch(e){return ''}}
+const ERR = {not_granted:'Claude access was declined for this page. Reload and allow it to run agents.',rate_limited:'Too many requests at once. Wait a moment and run again.',prompt_too_large:'The input is too long. Shorten the pasted data and run again.',refused:'Claude declined this request. Rephrase the brief and run again.',invalid_json:'The plan came back in the wrong format. Run it again.',sampling_disabled:'Running agents is turned off for this account.',session_expired:'Your session expired. Reload the page.',empty_completion:'No answer came back. Shorten the request and run again.'};
+function errMsg(e){return ERR[e?.code]||'The run was interrupted. Run it again.'}
+
+/* ---------- Attachments ---------- */
+const DOC_BUDGET=36000;
+const ACCEPT='.pdf,.docx,.xlsx,.xls,.csv,.pptx,.txt,.md,.json,.tsv,.html,.htm,image/png,image/jpeg,image/webp,image/gif';
+function decodeXml(t){return t.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&')}
+async function extractFile(file){
+  const name=file.name, ext=(name.split('.').pop()||'').toLowerCase();
+  if(file.type.startsWith('image/')) return {name,kind:'image',blob:file,size:file.size};
+  let text='';
+  if(['txt','md','csv','json','tsv','html','htm'].includes(ext)) text=await file.text();
+  else if(ext==='docx'){ if(!window.mammoth) throw new Error('Word reader did not load'); text=(await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()})).value; }
+  else if(ext==='pdf'){
+    if(!window.pdfjsLib) throw new Error('PDF reader did not load');
+    try{ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'; }catch(e){}
+    const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false}).promise;
+    const pages=[]; for(let i=1;i<=Math.min(pdf.numPages,300);i++){ const pg=await pdf.getPage(i); const c=await pg.getTextContent(); pages.push(c.items.map(it=>it.str+(it.hasEOL?'\n':' ')).join('')); }
+    text=pages.map((t,i)=>`[Page ${i+1}]\n${t.trim()}`).join('\n\n');
+    if(!pages.join('').trim()) throw new Error('This PDF is scanned with no text layer. Upload screenshots of the pages instead.');
+  }
+  else if(['xlsx','xls'].includes(ext)){ if(!window.XLSX) throw new Error('Excel reader did not load'); const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}); text=wb.SheetNames.map(n=>`[Sheet: ${n}]\n`+XLSX.utils.sheet_to_csv(wb.Sheets[n],{blankrows:false})).join('\n\n'); }
+  else if(ext==='pptx'){ if(!window.JSZip) throw new Error('PowerPoint reader did not load'); const zip=await JSZip.loadAsync(await file.arrayBuffer());
+    const slides=Object.keys(zip.files).filter(f=>/^ppt\/slides\/slide\d+\.xml$/.test(f)).sort((a,b)=>+a.match(/(\d+)\.xml$/)[1]-+b.match(/(\d+)\.xml$/)[1]);
+    const out=[]; for(const f of slides){ const xml=await zip.file(f).async('string'); const paras=xml.split(/<\/a:p>/).map(pp=>[...pp.matchAll(/<a:t(?:\s[^>]*)?>([\s\S]*?)<\/a:t>/g)].map(m=>decodeXml(m[1])).join('')).filter(Boolean); out.push(`[Slide ${out.length+1}]\n`+paras.join('\n')); }
+    text=out.join('\n\n'); }
+  else if(['doc','ppt'].includes(ext)) throw new Error('Old .'+ext+' files are not supported. Save as .'+ext+'x and upload again.');
+  else throw new Error('This file type is not supported.');
+  text=text.replace(/\n{3,}/g,'\n\n').trim();
+  if(!text) throw new Error('No readable text was found in this file.');
+  return {name,kind:'doc',text,size:file.size};
+}
+function docsBlock(files,budget){
+  const docs=(files||[]).filter(f=>f.kind==='doc'); if(!docs.length) return '';
+  const per=Math.floor((budget||DOC_BUDGET)/docs.length);
+  return 'Attached documents. Read them fully and use them as the primary source for this task:\n\n'+docs.map(f=>{const cut=f.text.length>per; return `=== ${f.name} ===\n${f.text.slice(0,per)}${cut?'\n[Document shortened to fit. The remainder was not included.]':''}`}).join('\n\n');
+}
+function fmtSize(f){ if(f.kind==='image') return 'Image'; const k=f.text.length; return (k>999?Math.round(k/1000)+'k':k)+' characters'; }
+function attachHTML(files,id){
+  return `<div class="drop" id="drop_${id}"><input type="file" id="file_${id}" multiple accept="${ACCEPT}" hidden>
+    <button type="button" class="btn outline small" id="pick_${id}">Attach documents</button><p>PDF, Word, Excel, PowerPoint, CSV, text or images. Drop files here.</p></div>
+    <div class="chips" id="chips_${id}"></div>`;
+}
+function bindAttach(id,vals){
+  vals.files=vals.files||[];
+  const input=$('#file_'+id), drop=$('#drop_'+id), chips=$('#chips_'+id);
+  const paint=()=>{ chips.innerHTML=vals.files.map((f,i)=>`<div class="chip"><span class="nm" title="${esc(f.name)}">${esc(f.name)}</span><span class="sz ${f.err?'bad':''}">${f.err?esc(f.err):(f.loading?'Reading…':fmtSize(f))}</span><button type="button" aria-label="Remove ${esc(f.name)}" data-rm="${i}">×</button></div>`).join('');
+    chips.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{vals.files.splice(+b.dataset.rm,1);paint()}); };
+  const add=async list=>{
+    for(const file of list){
+      if(file.size>50*1024*1024){ vals.files.push({name:file.name,err:'Over 50 MB'}); paint(); continue; }
+      const slot={name:file.name,loading:true}; vals.files.push(slot); paint();
+      try{ Object.assign(slot,await extractFile(file)); slot.loading=false; }
+      catch(e){ slot.loading=false; slot.err=e?.message||'Could not read this file'; }
+      paint();
+    }
+    vals.files=vals.files.filter(f=>!f.err||true);
+  };
+  $('#pick_'+id).onclick=()=>input.click();
+  input.onchange=()=>{ add([...input.files]); input.value=''; };
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')}));
+  drop.addEventListener('drop',e=>{ if(e.dataTransfer?.files?.length) add([...e.dataTransfer.files]); });
+  paint();
+}
+function readyDocs(vals){ return (vals.files||[]).filter(f=>!f.err&&!f.loading); }
+function stillReading(vals){ return (vals.files||[]).some(f=>f.loading); }
+async function imageOpts(vals){
+  const imgs=readyDocs(vals).filter(f=>f.kind==='image').map(f=>f.blob); if(!imgs.length) return {};
+  try{ const lim=await S.sample.limits(); if(!lim?.images){ toast('Images cannot be read in this view. Documents were still used.'); return {}; } return {images:imgs.slice(0,lim.images.maxCount||imgs.length)}; }catch(e){ return {}; }
+}
+
+/* ---------- Prompt building ---------- */
+function clientBlock(){
+  const c=client();
+  if(!c) return 'Client: none selected. Treat this as a general brief for the Qatar market.';
+  const cut=s=>String(s||'').slice(0,6000);
+  return `Client profile:
+Name: ${c.name}
+Industry: ${c.industry||'-'}
+Markets: ${c.markets||'-'}
+Languages: ${c.languages||'-'}
+Tone of voice: ${cut(c.tone)||'-'}
+Core audience: ${cut(c.audience)||'-'}
+Brand guidelines: ${cut(c.brand)||'-'}
+Competitors: ${c.competitors||'-'}
+Benchmarks, rate cards and notes: ${cut(c.notes)||'-'}`;
+}
+function buildPrompt(d,a,vals,lang,extra){
+  const inputs = a.fields.flatMap(f=>f.type==='row'?f.items:[f]).map(f=>`${f.label}: ${(vals[f.key]||'').trim()||'(not provided)'}`).join('\n');
+  const imgNote = readyDocs(vals).some(f=>f.kind==='image')?'Attached images are included with this request. Read them as part of the brief.':'';
+  return [`You are the ${a.name} agent in the ${d.name} department of Publicis Intelligence, the agency platform of Publicis Media Qatar in Doha.`,
+    clientBlock(), HOUSE, `Output language: ${lang}.`, `Task: ${a.task}`, extra||'', `Inputs:\n${inputs}`, docsBlock(readyDocs(vals), vals.docBudget), imgNote].filter(Boolean).join('\n\n');
+}
+
+/* ---------- Navigation ---------- */
+function renderNav(){
+  const nav=$('#nav');
+  nav.innerHTML = NAV.filter(n=>n.id!=='home').map(n=>`<button data-go="${n.id}" ${S.view===n.id?'aria-current="page"':''}>${esc(n.name)}</button>`).join('');
+  nav.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
+  document.querySelector('[data-home]').onclick=()=>go('home');
+  const mob=$('#mobNav'); mob.innerHTML=NAV.map(n=>`<option value="${n.id}" ${S.view===n.id?'selected':''}>${esc(n.name)}</option>`).join('');
+  mob.onchange=()=>go(mob.value);
+}
+function renderClientSel(){
+  const sel=$('#clientSel');
+  sel.innerHTML = `<option value="">All clients</option>`+S.clients.map(c=>`<option value="${c.id}" ${c.id===S.clientId?'selected':''}>${esc(c.name)}</option>`).join('');
+  sel.onchange=()=>{S.clientId=sel.value;lsSet('aos.client',S.clientId);S.project=null;render()};
+}
+function go(v){ if(S.running&&!confirm('An agent is still running. Leave this view and stop it?')) {renderNav();return;} stopRun(); S.view=v; lsSet('pi.view',v); S.current=null; render(); window.scrollTo(0,0); }
+function stopRun(){ try{S.ctl?.abort()}catch(e){} S.running=false; }
+
+function render(){
+  renderNav(); renderClientSel();
+  const v=S.view;
+  if(v==='home') return renderHome();
+  if(v==='command') return renderCommand();
+  if(v==='library') return renderLibrary();
+  if(v==='clients') return renderClients();
+  if(dept(v)) return renderDept(dept(v));
+  S.view='home'; renderHome();
+}
+function capNotice(){
+  if(S.sample===false) return `<div class="notice">The AI engine is not reachable. Check the server and its API key.</div>`;
+  return '';
+}
+
+/* ---------- Department view ---------- */
+function fieldHTML(f,vals){
+  if(f.type==='row') return `<div class="row2">${f.items.map(x=>fieldHTML(x,vals)).join('')}</div>`;
+  const v=vals[f.key]??'';
+  const id='f_'+f.key;
+  if(f.type==='textarea') return `<div class="field"><label for="${id}">${esc(f.label)}</label><textarea id="${id}" data-k="${f.key}" dir="auto" class="${f.tall?'tall':''}" placeholder="${esc(f.ph||'')}">${esc(v)}</textarea></div>`;
+  if(f.type==='select') return `<div class="field"><label for="${id}">${esc(f.label)}</label><select id="${id}" data-k="${f.key}">${f.options.map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('')}</select></div>`;
+  return `<div class="field"><label for="${id}">${esc(f.label)}</label><input id="${id}" data-k="${f.key}" dir="auto" value="${esc(v)}" placeholder="${esc(f.ph||'')}"></div>`;
+}
+function renderDept(d){
+  const aid = S.agent[d.id] || d.agents[0].id; S.agent[d.id]=aid;
+  const a = agentOf(d.id,aid);
+  const dk = d.id+'/'+a.id;
+  const vals = S.drafts[dk] || (S.drafts[dk]={lang:LANGS[0]});
+  $('#main').innerHTML = `
+    <div class="head"><h1>${esc(d.name)}.</h1><p>${esc(d.desc)}</p></div>
+    ${capNotice()}
+    <div class="tabs" role="tablist">${d.agents.map(x=>`<button role="tab" aria-selected="${x.id===aid}" data-a="${x.id}">${esc(x.name)}</button>`).join('')}</div>
+    <div class="work">
+      <div class="card form">
+        <h2>${esc(a.name)}</h2><p class="desc">${esc(a.blurb)}</p>
+        ${a.fields.map(f=>fieldHTML(f,vals)).join('')}
+        ${attachHTML(vals.files,'dept')}
+        <div class="field"><label for="f_lang">Output language</label><select id="f_lang" data-k="lang">${LANGS.map(l=>`<option ${l===vals.lang?'selected':''}>${esc(l)}</option>`).join('')}</select></div>
+        <div class="actions"><button class="btn primary" id="runBtn">Run ${esc(a.name.toLowerCase())}</button><button class="btn" id="stopBtn" hidden>Stop</button></div>
+      </div>
+      <div class="card out" id="outCard"></div>
+    </div>`;
+  document.querySelectorAll('.tabs [data-a]').forEach(b=>b.onclick=()=>{ if(S.running) stopRun(); S.agent[d.id]=b.dataset.a; S.current=null; renderDept(d); });
+  document.querySelectorAll('.form [data-k]').forEach(el=>el.addEventListener('input',()=>{vals[el.dataset.k]=el.value}));
+  bindAttach('dept',vals);
+  $('#runBtn').onclick=()=>runAgent(d,a,vals);
+  $('#stopBtn').onclick=()=>stopRun();
+  renderOut(S.current && S.current.key===dk ? S.current : null, d, a);
+}
+function renderOut(cur,d,a){
+  const box=$('#outCard'); if(!box) return;
+  if(!cur){
+    box.innerHTML=`<div class="out-bar"><span class="status">Output</span></div><div class="out-body"><div class="empty"><strong>Fill in the brief and run the agent.</strong><br>The result appears here, saves to the ${client()?esc(client().name)+' ':''}library, and can be refined with follow-up instructions.</div></div>`;
+    return;
+  }
+  box.innerHTML=`<div class="out-bar"><span class="status" id="outStatus">${esc(cur.status||'')}</span>
+      <button class="btn small" id="copyBtn">Copy</button><button class="btn small" id="dlBtn">Download .md</button></div>
+    <div class="out-body"><div class="md" id="outMd" dir="auto">${cur.text?md(cur.text):'<p class="empty">Thinking…</p>'}</div></div>
+    <div class="refine"><input id="refIn" dir="auto" placeholder="Refine it, e.g. make the Arabic headlines punchier" aria-label="Refine instruction"><button class="btn" id="refBtn">Refine</button></div>`;
+  $('#copyBtn').onclick=()=>copyText(cur.text);
+  $('#dlBtn').onclick=()=>downloadMd(cur.title,cur.text);
+  const doRef=()=>{const v=$('#refIn').value.trim(); if(v&&!S.running) refine(d,a,cur,v)};
+  $('#refBtn').onclick=doRef; $('#refIn').onkeydown=e=>{if(e.key==='Enter')doRef()};
+}
+function setRunning(on){
+  S.running=on; const r=$('#runBtn'),s=$('#stopBtn'),rf=$('#refBtn');
+  if(r) r.disabled=on; if(s) s.hidden=!on; if(rf) rf.disabled=on;
+}
+let rafPending=false;
+function paint(cur){ if(rafPending) return; rafPending=true; requestAnimationFrame(()=>{rafPending=false; const el=$('#outMd'); if(el&&S.current===cur) el.innerHTML=md(cur.text)}); }
+
+async function runAgent(d,a,vals){
+  if(!S.sample){toast('The AI engine is not reachable');return}
+  const main = a.fields.flatMap(f=>f.type==='row'?f.items:[f])[0];
+  if(stillReading(vals)){toast('Still reading your documents');return}
+  if(!(vals[main.key]||'').trim() && !readyDocs(vals).length){toast(main.label+' is empty. Type it or attach a document.');$('#f_'+main.key)?.focus();return}
+  const prompt = buildPrompt(d,a,vals,vals.lang);
+  const title = `${a.name}: ${(vals.brief||vals.topic||vals.question||vals.data||'').trim().split('\n')[0].slice(0,70)}`;
+  const cur = S.current = {key:d.id+'/'+a.id,title:title.endsWith(': ')?title+(readyDocs(vals)[0]?.name||''):title,text:'',status:'Thinking…',turns:[{role:'user',content:prompt}],dept:d.id,agent:a.id,inputs:{...vals},opts:await imageOpts(vals)};
+  renderOut(cur,d,a); await stream(cur,a);
+}
+async function refine(d,a,cur,instr){
+  if(!S.sample) return;
+  const turns=[...cur.turns,{role:'assistant',content:cur.text},{role:'user',content:`Revise the full output with this change, keeping everything else intact and following the same house rules: ${instr}`}];
+  const next = S.current = {...cur,text:'',status:'Refining…',turns,outputId:null};
+  renderOut(next,d,a); await stream(next,a);
+}
+async function stream(cur,a){
+  S.ctl=new AbortController(); setRunning(true);
+  try{
+    const {text,truncated} = await S.sample(cur.turns.length===1?cur.turns[0].content:cur.turns,{...(cur.opts||{}),route:cur.dept+'/'+cur.agent,signal:S.ctl.signal,modelTier:a.tier||'default',cache:false,onText:({text})=>{cur.text=text;cur.status='Writing…';const st=$('#outStatus');if(st&&S.current===cur)st.textContent='Writing…';paint(cur)}});
+    cur.text=text; cur.turns=[...cur.turns]; cur.status=truncated?'Cut short. Refine with "continue" to finish.':'Done';
+    paint(cur); const st=$('#outStatus'); if(st&&S.current===cur) st.textContent=cur.status;
+    await saveOutput(cur);
+  }catch(e){
+    if(e?.text){cur.text=e.text;paint(cur)}
+    cur.status = e?.code==='cancelled'?'Stopped':errMsg(e);
+    const st=$('#outStatus'); if(st&&S.current===cur) st.textContent=cur.status;
+  }finally{ setRunning(false); }
+}
+
+/* ---------- Persistence ---------- */
+async function saveOutput(cur,projectId){
+  if(!S.db||!cur.text) return null;
+  try{
+    const ref = S.db.collection('outputs').doc();
+    await ref.set({clientId:S.clientId||'',dept:cur.dept,agent:cur.agent,title:cur.title.slice(0,140),text:cur.text.slice(0,200000),projectId:projectId||'',createdAt:Date.now()});
+    cur.outputId=ref.id;
+    const st=$('#outStatus'); if(st&&S.current===cur) st.textContent=cur.status+' · Saved to library';
+    return ref.id;
+  }catch(e){ toast(e?.code==='quota_exceeded'?'Library is full. Delete old items to save more.':'Could not save to the library'); return null; }
+}
+function copyText(t){ try{navigator.clipboard.writeText(t||'').then(()=>toast('Copied'),()=>toast('Copy was blocked. Select the text instead.'))}catch(e){toast('Copy was blocked. Select the text instead.')} }
+async function downloadMd(title,text){
+  if(!S.downloads){toast('Downloads are not available here. Use Copy.');return}
+  const name=(title||'output').replace(/[^\w\u0600-\u06FF\- ]+/g,'').trim().slice(0,60).replace(/\s+/g,'-')||'output';
+  try{ const r=await S.downloads.save({filename:name+'.md',data:text||''}); if(r?.status==='saved') toast('Saved'); }
+  catch(e){ if(e?.code!=='cancelled'&&e?.code!=='declined') toast('The download did not complete'); }
+}
+
+/* ---------- Command centre ---------- */
+function agentCatalogue(){
+  return DEPTS.map(d=>d.agents.map(a=>`${d.id}/${a.id}: ${a.name} (${d.name}). ${a.blurb}`).join('\n')).join('\n');
+}
+function renderCommand(){
+  const c=client();
+  const projects = S.projects.filter(p=>(p.clientId||'')===(S.clientId||''));
+  const P = S.project;
+  const vals = S.drafts.__cmd || (S.drafts.__cmd={brief:'',lang:LANGS[0]});
+  $('#main').innerHTML = `
+    <div class="head"><h1>Command.</h1>
+      <p>One brief in. Every department working in sequence, each building on the last.</p></div>
+    ${capNotice()}
+    <div class="cmd">
+      <div style="display:grid;gap:20px;align-content:start">
+        <div class="card form">
+          <h2>New brief${c?' for '+esc(c.name):''}.</h2>
+          <p class="desc">Paste the client brief or RFP summary.</p>
+          <div class="field"><label for="c_brief">Brief</label><textarea id="c_brief" class="tall" dir="auto" placeholder="e.g. Launch the new travel credit card to affluent Qatari nationals ahead of summer. Budget QAR 1.2M, 8 weeks.">${esc(vals.brief)}</textarea></div>
+          ${attachHTML(vals.files,'cmd')}
+          <div class="field"><label for="c_lang">Output language</label><select id="c_lang">${LANGS.map(l=>`<option ${l===vals.lang?'selected':''}>${esc(l)}</option>`).join('')}</select></div>
+          <div class="actions"><button class="btn primary" id="planBtn">Plan the work</button><button class="btn" id="cStop" hidden>Stop</button><span class="status" id="cStatus" style="font-size:13px;color:var(--muted)"></span></div>
+        </div>
+        <div class="card list">
+          <p class="sec-title">Recent projects${c?' for '+esc(c.name):''}</p>
+          ${projects.length?projects.slice(0,12).map(p=>`<button class="list-item" data-p="${p.id}"><div class="t">${esc((p.brief||'').split('\n')[0].slice(0,80))}</div><div class="m">${(p.tasks||[]).filter(t=>t.outputId).length} of ${(p.tasks||[]).length} tasks done · ${fmtDate(p.createdAt)}</div></button>`).join(''):'<div class="list-item" style="cursor:default"><div class="m">Planned briefs appear here.</div></div>'}
+        </div>
+      </div>
+      <div class="card plan" id="planCard">${P?planHTML(P):`<div class="out-body"><div class="empty"><strong>No plan yet.</strong><br>Plan a brief to see the tasks each department will deliver.</div></div>`}</div>
+    </div>`;
+  $('#c_brief').oninput=e=>vals.brief=e.target.value;
+  $('#c_lang').onchange=e=>vals.lang=e.target.value;
+  bindAttach('cmd',vals);
+  $('#planBtn').onclick=()=>planBrief(vals);
+  $('#cStop').onclick=()=>{S.planRun&&(S.planRun.stop=true);stopRun()};
+  document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{S.project=S.projects.find(p=>p.id===b.dataset.p)||null;renderCommand()});
+  bindPlan();
+}
+function planHTML(P){
+  const tasks=P.tasks||[];
+  return `<div class="plan-head"><h2>The plan.</h2><p>${esc(P.summary||'')}</p>
+      <div class="actions" style="margin-top:12px"><button class="btn primary small" id="runAll">Run all remaining</button><span style="font-size:13px;color:var(--muted)">${tasks.filter(t=>t.outputId).length} of ${tasks.length} done</span></div></div>
+    ${tasks.map((t,i)=>{
+      const d=dept(t.dept), a=agentOf(t.dept,t.agent);
+      const out = t.outputId ? S.outputs.find(o=>o.id===t.outputId) : null;
+      const live = S.planRun && S.planRun.idx===i ? S.planRun : null;
+      const state = live?'<span class="pill run">Running</span>':(t.outputId?'<span class="pill done">Done</span>':'');
+      return `<div class="task"><div class="task-row"><div class="task-num">${i+1}</div>
+        <div><div class="task-title">${esc(t.title)}</div>
+        <div class="task-meta"><span class="dot" style="width:8px;height:8px;border-radius:2px;background:${d?.color}"></span>${esc(d?.name||'')} · ${esc(a?.name||'')} ${state}</div>
+        <div class="task-ins" dir="auto">${esc(t.instructions)}</div></div>
+        <div class="actions">${t.outputId?`<button class="btn small" data-view="${i}">${S.open===i?'Hide':'View'}</button>`:''}<button class="btn small" data-run="${i}">${t.outputId?'Rerun':'Run'}</button></div></div>
+        ${live?`<div class="task-out"><div class="md" id="liveMd" dir="auto">${live.text?md(live.text):'<p class="empty">Thinking…</p>'}</div></div>`:''}
+        ${(!live && S.open===i && out)?`<div class="task-out"><div class="md" dir="auto">${md(out.text)}</div><div class="actions" style="margin-top:10px"><button class="btn small" data-copy="${i}">Copy</button><button class="btn small" data-dl="${i}">Download .md</button></div></div>`:''}
+      </div>`}).join('')}`;
+}
+function bindPlan(){
+  const P=S.project; if(!P) return;
+  $('#runAll')?.addEventListener('click',()=>runPlan(P,null));
+  document.querySelectorAll('[data-run]').forEach(b=>b.onclick=()=>runPlan(P,+b.dataset.run));
+  document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{S.open=S.open===+b.dataset.view?null:+b.dataset.view;refreshPlan()});
+  document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{const o=S.outputs.find(x=>x.id===P.tasks[+b.dataset.copy].outputId);copyText(o?.text)});
+  document.querySelectorAll('[data-dl]').forEach(b=>b.onclick=()=>{const t=P.tasks[+b.dataset.dl];const o=S.outputs.find(x=>x.id===t.outputId);downloadMd(t.title,o?.text)});
+  const busy=S.running; document.querySelectorAll('[data-run],#runAll,#planBtn').forEach(b=>b.disabled=busy);
+  const cs=$('#cStop'); if(cs) cs.hidden=!busy;
+}
+function refreshPlan(){ const pc=$('#planCard'); if(pc&&S.project){ pc.innerHTML=planHTML(S.project); bindPlan(); } }
+async function planBrief(vals){
+  if(!S.sample){toast('The AI engine is not reachable');return}
+  if(stillReading(vals)){toast('Still reading your documents');return}
+  const docs=readyDocs(vals).filter(f=>f.kind==='doc');
+  if(!vals.brief.trim()&&!readyDocs(vals).length){toast('Brief is empty. Type it or attach a document.');$('#c_brief').focus();return}
+  const docText=docsBlock(docs,30000);
+  S.ctl=new AbortController(); S.running=true; bindPlanButtons(true); $('#cStatus').textContent='Planning…';
+  const prompt = `You are the orchestrator (account director) of Publicis Intelligence, the agency platform of Publicis Media Qatar. Break the brief below into a work plan across departments.
+
+${clientBlock()}
+
+Available agents (id: name. purpose):
+${agentCatalogue()}
+
+Brief:
+${vals.brief||'(See the attached documents.)'}
+
+${docText}
+
+Return only JSON in this shape:
+{"summary":"two sentences on the approach","tasks":[{"agent":"strategy/research","title":"short task title","instructions":"specific instructions for this agent, 2-4 sentences, including every relevant detail from the brief"}]}
+Use between 4 and 10 tasks, ordered so research and strategy come first, then creative, media, production, SEO and finance as relevant. Only include agents the brief genuinely needs. Use only agent ids from the list. Never use em dashes.`;
+  try{
+    const res = await S.sample.json(prompt,{...(await imageOpts(vals)),route:'orchestrator',signal:S.ctl.signal,modelTier:'complex',cache:false});
+    const tasks=(Array.isArray(res?.tasks)?res.tasks:[]).map(t=>{const [dd,aa]=String(t.agent||'').split('/');return {dept:dd,agent:aa,title:String(t.title||'').slice(0,120),instructions:String(t.instructions||'').slice(0,1500)}}).filter(t=>agentOf(t.dept,t.agent));
+    if(!tasks.length) throw {code:'invalid_json'};
+    const P={clientId:S.clientId||'',brief:vals.brief||('Brief supplied in '+docs.map(f=>f.name).join(', ')),docs:docs.map(f=>({name:f.name,kind:'doc',text:f.text.slice(0,Math.floor(60000/Math.max(docs.length,1)))})),lang:vals.lang,summary:String(res.summary||'').slice(0,600),tasks,createdAt:Date.now()};
+    if(S.db){ try{ const ref=S.db.collection('projects').doc(); await ref.set(P); P.id=ref.id; }catch(e){ toast('Plan created but not saved'); } }
+    S.project=P; S.open=null; $('#cStatus').textContent='';
+  }catch(e){ $('#cStatus').textContent = e?.code==='cancelled'?'Stopped':errMsg(e); }
+  finally{ S.running=false; if(S.view==='command'){ renderCommand(); } }
+}
+function bindPlanButtons(busy){document.querySelectorAll('[data-run],#runAll,#planBtn').forEach(b=>b.disabled=busy);const cs=$('#cStop');if(cs)cs.hidden=!busy}
+function priorContext(P,upto){
+  const parts=[]; let total=0;
+  P.tasks.forEach((t,i)=>{ if(i===upto||!t.outputId) return; const o=S.outputs.find(x=>x.id===t.outputId); if(!o) return;
+    const chunk=`### ${t.title} (${agentOf(t.dept,t.agent)?.name})\n${o.text.slice(0,3000)}`; if(total+chunk.length>16000) return; total+=chunk.length; parts.push(chunk); });
+  return parts.length?`Work already produced by other departments on this brief. Stay consistent with it:\n\n${parts.join('\n\n')}`:'';
+}
+async function runPlan(P,only){
+  if(!S.sample){toast('The AI engine is not reachable');return}
+  if(S.running) return;
+  const queue = only!=null ? [only] : P.tasks.map((t,i)=>i).filter(i=>!P.tasks[i].outputId);
+  if(!queue.length){toast('Every task is done');return}
+  S.running=true; S.planRun={stop:false,idx:null,text:''};
+  for(const i of queue){
+    if(S.planRun.stop) break;
+    const t=P.tasks[i], d=dept(t.dept), a=agentOf(t.dept,t.agent);
+    S.planRun.idx=i; S.planRun.text=''; S.open=null; if(S.view==='command') refreshPlan();
+    const vals={brief:`${t.instructions}\n\nOriginal client brief:\n${P.brief}`,files:P.docs||[],docBudget:22000};
+    a.fields.flatMap(f=>f.type==='row'?f.items:[f]).forEach(f=>{ if(f.key!=='brief'&&!vals[f.key]) vals[f.key]= f.type==='select'?f.options[0]:(f.type==='textarea'?'(See the task instructions and attached documents.)':''); });
+    const prompt=buildPrompt(d,a,vals,P.lang||LANGS[0],priorContext(P,i));
+    S.ctl=new AbortController();
+    try{
+      const {text}=await S.sample(prompt,{route:t.dept+'/'+t.agent,signal:S.ctl.signal,modelTier:a.tier||'default',cache:false,onText:({text})=>{S.planRun.text=text;const el=$('#liveMd');if(el&&!rafPending){rafPending=true;requestAnimationFrame(()=>{rafPending=false;const e2=$('#liveMd');if(e2)e2.innerHTML=md(S.planRun.text)})}}});
+      const cur={dept:t.dept,agent:t.agent,title:t.title,text};
+      const id=await saveOutput(cur,P.id);
+      if(id){ S.outputs.unshift({id,clientId:P.clientId,dept:t.dept,agent:t.agent,title:t.title,text,projectId:P.id||'',createdAt:Date.now()}); t.outputId=id;
+        if(S.db&&P.id){ try{ await S.db.doc('projects/'+P.id).update({tasks:P.tasks}); }catch(e){} } }
+    }catch(e){
+      if(e?.code!=='cancelled') toast(errMsg(e));
+      break;
+    }
+  }
+  S.running=false; S.planRun=null; if(S.view==='command') refreshPlan();
+}
+
+
+/* ---------- Home ---------- */
+const ENGINES=[
+ {h:'Thinking and writing',n:'Reasoning core',items:[['Claude','live'],['GPT','next'],['Gemini','next']]},
+ {h:'Research',n:'Deep research',items:[['Claude research agents','live'],['Perplexity live search','next'],['Genspark-style agent reports','next']]},
+ {h:'Images',n:'Visual generation',items:[['Midjourney, Flux, GPT Image','prompt'],['Imagen, Ideogram, Firefly','prompt'],['Direct in-app generation','next']]},
+ {h:'Video',n:'Motion generation',items:[['Seedance, Veo, Kling','prompt'],['Runway, Sora, Hailuo','prompt'],['Direct in-app generation','next']]},
+ {h:'Audio',n:'Voice and music',items:[['ElevenLabs voice','prompt'],['Suno, Udio music','prompt'],['Direct in-app generation','next']]},
+ {h:'Media platforms',n:'Buying and data',items:[['Build sheets and plans','live'],['Meta, Google, TikTok, Snap APIs','next'],['DV360 and GA4 reporting','next']]}
+];
+const STL={live:'Live',prompt:'Prompt-ready',next:'Next build'};
+function renderHome(){
+  const c=client();
+  $('#main').innerHTML = `
+    ${capNotice()}
+    <section class="hero">
+      <h1>Publicis Intelligence.</h1>
+      <p>One brief. Every department. Minutes, not weeks.</p>
+      <p class="sub">Strategy, creative, media, finance, production and search, working as one agency${c?' for '+esc(c.name):''}.</p>
+      <div class="actions"><button class="btn primary" data-go2="command">Start a brief</button><button class="btn outline" data-go2="clients">${c?'Edit '+esc(c.name):'Set up a client'}</button></div>
+    </section>
+    <section class="tiles">
+      ${DEPTS.map(d=>`<button class="tile" data-go2="${d.id}"><span class="k" style="background:${d.color}"></span><h3>${esc(d.name)}</h3><p>${esc(d.desc)}</p><span class="go">${d.agents.length} agents</span></button>`).join('')}
+    </section>
+    <section class="sec">
+      <h2>The best engines.<br>One platform.</h2>
+      <p class="lead">Every department routes to the engine best suited to the job. Live today, prompt-ready for the leading generators, with direct connections in the next build.</p>
+    </section>
+    <section class="engines">
+      ${ENGINES.map(e=>`<div class="eng"><h4>${esc(e.h)}</h4><div class="n">${esc(e.n)}</div><ul>${e.items.map(([t,s])=>`<li><span>${esc(t)}</span><span class="st ${s}">${STL[s]}</span></li>`).join('')}</ul></div>`).join('')}
+    </section>
+    <section class="sec" style="padding-bottom:90px">
+      <h2>Brief it once.</h2>
+      <p class="lead">The Command centre plans the work, runs each department in order and hands every output to the next.</p>
+      <div class="actions" style="justify-content:center;margin-top:26px"><button class="btn primary" data-go2="command">Open Command</button></div>
+    </section>`;
+  document.querySelectorAll('[data-go2]').forEach(b=>b.onclick=()=>go(b.dataset.go2));
+}
+
+/* ---------- Library ---------- */
+function renderLibrary(){
+  const f = S.libFilter || (S.libFilter={dept:''});
+  const items = S.outputs.filter(o=>(o.clientId||'')===(S.clientId||'') && (!f.dept||o.dept===f.dept));
+  const sel = S.libOpen ? S.outputs.find(o=>o.id===S.libOpen) : null;
+  $('#main').innerHTML = `
+    <div class="head"><h1>Library.</h1><p>Everything produced for ${client()?esc(client().name):'general work'}, in one place.</p></div>
+    <div class="lib">
+      <div class="card list" style="align-self:start">
+        <div class="filters"><select id="libDept" aria-label="Filter by department"><option value="">All departments</option>${DEPTS.map(d=>`<option value="${d.id}" ${f.dept===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}</select></div>
+        ${items.length?items.slice(0,200).map(o=>`<button class="list-item" data-o="${o.id}" ${o.id===S.libOpen?'style="background:var(--panel-2)"':''}><div class="t" dir="auto">${esc(o.title)}</div><div class="m">${esc(dept(o.dept)?.name||'')} · ${fmtDate(o.createdAt)}</div></button>`).join(''):'<div class="list-item" style="cursor:default"><div class="m">Nothing saved yet. Run any agent and the result lands here.</div></div>'}
+      </div>
+      <div class="card out">${sel?`<div class="out-bar"><span class="status">${esc(dept(sel.dept)?.name||'')} · ${esc(agentOf(sel.dept,sel.agent)?.name||'')}</span><button class="btn small" id="lCopy">Copy</button><button class="btn small" id="lDl">Download .md</button><button class="btn small" id="lDel">Delete</button></div><div class="out-body"><div class="md" dir="auto">${md(sel.text)}</div></div>`:`<div class="out-body"><div class="empty">Select an item to read it.</div></div>`}</div>
+    </div>`;
+  $('#libDept').onchange=e=>{f.dept=e.target.value;renderLibrary()};
+  document.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>{S.libOpen=b.dataset.o;renderLibrary()});
+  if(sel){ $('#lCopy').onclick=()=>copyText(sel.text); $('#lDl').onclick=()=>downloadMd(sel.title,sel.text);
+    $('#lDel').onclick=async()=>{ if(!confirm('Delete this item from the library?')) return; try{await S.db.doc('outputs/'+sel.id).delete(); S.libOpen=null; toast('Deleted')}catch(e){toast('Could not delete')} }; }
+}
+
+/* ---------- Clients ---------- */
+const CF=[['name','Client name','text','e.g. QNB'],['industry','Industry','text','e.g. Banking'],['markets','Markets','text','e.g. Qatar, KSA'],['languages','Languages','text','e.g. Arabic and English'],
+  ['tone','Tone of voice','textarea','How does the brand speak?'],['audience','Core audience','textarea','Who does the brand serve?'],['brand','Brand guidelines','textarea','Colours, fonts, logo rules, do and don\'t'],
+  ['competitors','Competitors','text','Comma separated'],['notes','Benchmarks, rate cards and notes','textarea','KPIs, CPM benchmarks, rate cards, anything every agent should know']];
+function renderClients(){
+  const editing = S.editClient!==undefined ? S.editClient : (client()?client().id:'__new');
+  const c = editing==='__new' ? {} : (S.clients.find(x=>x.id===editing)||{});
+  $('#main').innerHTML = `
+    <div class="head"><h1>Clients.</h1><p>Every brand, fully separated. Every agent briefed before it starts.</p></div>
+    <div class="lib">
+      <div class="card list" style="align-self:start">
+        <button class="list-item" data-c="__new" ${editing==='__new'?'style="background:var(--panel-2)"':''}><div class="t">Add a client</div><div class="m">Create a new workspace</div></button>
+        ${S.clients.map(x=>`<button class="list-item" data-c="${x.id}" ${editing===x.id?'style="background:var(--panel-2)"':''}><div class="t">${esc(x.name)}</div><div class="m">${esc(x.industry||'')}</div></button>`).join('')}
+      </div>
+      <div class="card form">
+        <h2>${editing==='__new'?'New client':'Edit '+esc(c.name||'')}</h2><p class="desc">The more specific this is, the sharper every agent's output.</p>
+        ${CF.map(([k,l,t,ph])=>t==='textarea'?`<div class="field"><label for="cl_${k}">${l}</label><textarea id="cl_${k}" dir="auto" placeholder="${esc(ph)}">${esc(c[k]||'')}</textarea></div>`:`<div class="field"><label for="cl_${k}">${l}</label><input id="cl_${k}" dir="auto" value="${esc(c[k]||'')}" placeholder="${esc(ph)}"></div>`).join('')}
+        <div class="actions"><button class="btn primary" id="clSave">${editing==='__new'?'Create client':'Save changes'}</button>${editing!=='__new'?'<button class="btn" id="clDel">Delete client</button>':''}</div>
+      </div>
+    </div>`;
+  document.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{S.editClient=b.dataset.c;renderClients()});
+  $('#clSave').onclick=async()=>{
+    if(!S.db){toast('Client storage is not available in this view');return}
+    const data={}; CF.forEach(([k])=>data[k]=$('#cl_'+k).value.trim().slice(0,20000));
+    if(!data.name){toast('Client name is empty');$('#cl_name').focus();return}
+    try{
+      if(editing==='__new'){ const ref=S.db.collection('clients').doc(); await ref.set({...data,createdAt:Date.now()}); S.clientId=ref.id; lsSet('aos.client',ref.id); S.editClient=ref.id; toast('Client created'); }
+      else { await S.db.doc('clients/'+editing).update(data); toast('Saved'); }
+    }catch(e){ toast(e?.code==='invalid_argument'?'You have view-only access to this workspace':'Could not save the client'); }
+  };
+  $('#clDel')?.addEventListener('click',async()=>{ if(!confirm('Delete this client workspace? Saved outputs stay in storage but will no longer be listed.')) return;
+    try{ await S.db.doc('clients/'+editing).delete(); if(S.clientId===editing){S.clientId='';lsSet('aos.client','')} S.editClient='__new'; toast('Client deleted'); }catch(e){toast('Could not delete the client')} });
+}
+
+/* ---------- Boot ---------- */
+function footer(){
+  const bits=[]; bits.push(S.sample?'Engines online':'Engines offline'); bits.push(S.db?'Workspace synced':'Not saving');
+  $('#foot').textContent=bits.join(' · ');
+}
+render(); 
+(async()=>{
+  const has = window.claude && typeof window.claude.use==='function';
+  const [sample,db,downloads] = has ? await Promise.all([claude.use('sample'),claude.use('db'),claude.use('downloads')]) : [null,null,null];
+  S.sample = sample || false; S.db = db; S.downloads = downloads; footer();
+  if(db){
+    db.collection('clients').onSnapshot(s=>{ S.clients=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+      if(S.clientId && !S.clients.find(c=>c.id===S.clientId)){S.clientId='';}
+      renderClientSel(); if(S.view==='clients'&&!S.running) renderClients(); },()=>{});
+    db.collection('outputs').orderBy('createdAt','desc').limit(300).onSnapshot(s=>{ S.outputs=s.docs.map(d=>({id:d.id,...d.data()}));
+      if(S.view==='library') renderLibrary(); else if(S.view==='command'&&!S.running) refreshPlan(); },()=>{});
+    db.collection('projects').orderBy('createdAt','desc').limit(100).onSnapshot(s=>{ S.projects=s.docs.map(d=>({id:d.id,...d.data()}));
+      if(S.project?.id){ const fresh=S.projects.find(p=>p.id===S.project.id); if(fresh&&!S.running) S.project=fresh; }
+      if(S.view==='command'&&!S.running) renderCommand(); },()=>{});
+  }
+  if(!S.running) render();
+})();
+</script>
+</body>
+</html>
