@@ -1,0 +1,9 @@
+{
+  "name": "publicis-intelligence",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Publicis Intelligence: the agency platform for Publicis Media Qatar, running on open-source AI models.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=22.13" }
+}
