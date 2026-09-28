@@ -2,58 +2,88 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
 <title>Sign in · Publicis Intelligence</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23111114'/%3E%3Cpath d='M11 23V9h6.2a4.6 4.6 0 010 9.2H11' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#FFFFFF;--bg-2:#F5F5F7;--ink:#1D1D1F;--muted:#6E6E73;--line:#D2D2D7;--accent:#0071E3;--bad:#C4262E;
-  --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","Inter","Helvetica Neue",Arial,sans-serif}
-@media (prefers-color-scheme: dark){:root{--bg:#000;--bg-2:#1C1C1E;--ink:#F5F5F7;--muted:#A1A1A6;--line:#38383C;--accent:#2997FF;--bad:#FF6961}}
+:root{--ink:#111114;--ink-2:#3C3C43;--muted:#86868B;--hair:rgba(17,17,20,.1);--bad:#C8243B;--ease:cubic-bezier(.2,.8,.2,1);--display:"Inter Tight","Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 *{box-sizing:border-box}
-body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--ink);font-family:var(--font);letter-spacing:-.022em;-webkit-font-smoothing:antialiased;padding:24px 16px}
-main{width:100%;max-width:400px;text-align:center}
-h1{font-size:clamp(34px,7vw,48px);line-height:1.05;font-weight:700;letter-spacing:-.04em;margin:0;
-  background:linear-gradient(100deg,#0071E3 0%,#8E44EC 45%,#E30B5C 80%,#FF9500 100%);-webkit-background-clip:text;background-clip:text;color:transparent;padding-bottom:.06em}
-p.sub{color:var(--muted);font-size:19px;margin:10px 0 34px}
-form{text-align:left}
-label{display:block;font-size:13px;color:var(--muted);font-weight:500;margin:0 0 6px}
-input{width:100%;font:inherit;font-size:17px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--bg-2);color:var(--ink);margin-bottom:14px}
-input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-button{width:100%;font:inherit;font-size:17px;padding:14px;border:0;border-radius:999px;background:var(--accent);color:#fff;cursor:pointer;margin-top:6px}
-button:disabled{opacity:.5;cursor:default}
-.err{color:var(--bad);font-size:14px;min-height:20px;margin:10px 0 0;text-align:center}
-.foot{color:var(--muted);font-size:12px;margin-top:40px}
+html,body{margin:0;min-height:100%;background:#fff;color:var(--ink);font:15px/1.5 "Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+body{display:grid;grid-template-columns:1.15fr 1fr;min-height:100vh}
+.stage{position:relative;overflow:hidden;background:#FAFAFB;display:flex;flex-direction:column;justify-content:space-between;padding:44px 56px}
+.orb{position:absolute;border-radius:50%;filter:blur(60px);opacity:.55;animation:drift 18s var(--ease) infinite alternate}
+.o1{width:520px;height:520px;background:radial-gradient(circle,#7B8CFF 0%,transparent 65%);top:-140px;left:-120px}
+.o2{width:460px;height:460px;background:radial-gradient(circle,#FF9A6B 0%,transparent 65%);bottom:-160px;right:-80px;animation-delay:-6s}
+.o3{width:380px;height:380px;background:radial-gradient(circle,#3CCFB4 0%,transparent 65%);top:40%;left:40%;animation-delay:-12s;opacity:.4}
+@keyframes drift{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(60px,40px,0) scale(1.12)}}
+.brand{position:relative;display:flex;align-items:center;gap:11px;font-family:var(--display);font-size:17px;letter-spacing:-.02em}
+.mark{width:34px;height:34px;border-radius:10px;background:var(--ink);display:grid;place-items:center}
+.mark svg{width:22px;height:22px}
+.hero{position:relative;max-width:560px}
+.hero h1{font-family:var(--display);font-weight:800;font-size:clamp(40px,5.2vw,72px);line-height:1.02;letter-spacing:-.045em;margin:0 0 20px;opacity:0;transform:translateY(18px);animation:rise .9s var(--ease) .1s forwards}
+.hero h1 span{background:linear-gradient(92deg,#4F5BFF 0%,#B34DFF 45%,#FF6B3D 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{font-size:18px;color:var(--ink-2);max-width:44ch;margin:0;opacity:0;transform:translateY(18px);animation:rise .9s var(--ease) .25s forwards}
+.pills{position:relative;display:flex;flex-wrap:wrap;gap:8px;opacity:0;animation:rise .9s var(--ease) .4s forwards}
+.pills span{font-size:13px;font-weight:500;padding:7px 14px;border-radius:999px;background:rgba(255,255,255,.7);border:1px solid var(--hair);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+@keyframes rise{to{opacity:1;transform:none}}
+.side{display:grid;place-items:center;padding:40px 28px}
+form{width:100%;max-width:380px;opacity:0;transform:translateY(12px);animation:rise .8s var(--ease) .2s forwards}
+form h2{font-family:var(--display);font-size:30px;letter-spacing:-.035em;margin:0 0 6px;font-weight:700}
+form .sub{color:var(--muted);margin:0 0 28px}
+label{display:block;font-size:13px;font-weight:600;color:var(--ink-2);margin:0 0 7px}
+input{width:100%;font:inherit;font-size:16px;padding:13px 15px;border:1px solid rgba(17,17,20,.16);border-radius:14px;background:#fff;color:var(--ink);transition:border-color .2s,box-shadow .2s;margin-bottom:16px}
+input:hover{border-color:rgba(17,17,20,.28)}
+input:focus{outline:none;border-color:#2F6BFF;box-shadow:0 0 0 4px rgba(47,107,255,.14)}
+button{width:100%;font:inherit;font-weight:600;font-size:15.5px;padding:14px;border:0;border-radius:14px;background:var(--ink);color:#fff;cursor:pointer;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:10px;transition:transform .15s,background .2s;box-shadow:0 10px 30px rgba(79,91,255,.22)}
+button:hover{background:#2B2B31}
+button:active{transform:scale(.985)}
+button:disabled{opacity:.6;cursor:default}
+.spin{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.err{color:var(--bad);font-size:14px;min-height:22px;margin:12px 0 0}
+.foot{color:var(--muted);font-size:12.5px;margin-top:28px}
+.stage .foot{position:relative;margin:0}
+@media (max-width:900px){body{grid-template-columns:1fr}.stage{padding:28px 24px 40px;min-height:auto;gap:28px}.hero h1{font-size:42px}.hero p{font-size:16px}.side{padding:36px 22px 56px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;opacity:1!important;transform:none!important}}
 </style>
 </head>
 <body>
-<main>
-  <h1>Publicis Intelligence.</h1>
-  <p class="sub">Sign in to your workspace.</p>
+<section class="stage" aria-hidden="true">
+  <div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+  <div class="brand"><span class="mark"><svg viewBox="0 0 32 32"><path d="M11 23V9h6.2a4.6 4.6 0 010 9.2H11" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><b>Publicis</b> Intelligence</span></div>
+  <div class="hero"><h1>The whole agency.<br><span>In one mind.</span></h1><p>Strategy, creative, media, finance, production and search, working together on every brief.</p></div>
+  <div class="pills"><span>Strategy</span><span>Creative</span><span>Media</span><span>Finance</span><span>Production</span><span>Search</span></div>
+</section>
+<main class="side">
   <form id="f" novalidate>
-    <label for="email">Email</label>
-    <input id="email" type="email" autocomplete="username" required autofocus>
+    <h2>Sign in</h2>
+    <p class="sub">Use the login your admin gave you.</p>
+    <label for="email">Username or email</label>
+    <input id="email" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" required autofocus>
     <label for="pw">Password</label>
     <input id="pw" type="password" autocomplete="current-password" required>
-    <button id="go" type="submit">Sign in</button>
+    <button id="go" type="submit">Continue</button>
     <p class="err" id="err" role="alert"></p>
+    <p class="foot">Publicis Media Qatar · Internal</p>
   </form>
-  <p class="foot">Publicis Media Qatar. Accounts are created by your admin.</p>
 </main>
 <script>
-document.getElementById('f').addEventListener('submit', async e => {
-  e.preventDefault();
-  const b = document.getElementById('go'), er = document.getElementById('err');
+const f = document.getElementById('f'), err = document.getElementById('err'), go = document.getElementById('go');
+f.addEventListener('submit', async e => {
+  e.preventDefault(); err.textContent = '';
   const email = document.getElementById('email').value.trim(), password = document.getElementById('pw').value;
-  if (!email || !password) { er.textContent = 'Enter your email and password.'; return; }
-  b.disabled = true; er.textContent = '';
+  if (!email || !password) { err.textContent = 'Enter your username and password.'; return; }
+  go.disabled = true; go.innerHTML = '<span class="spin"></span>Signing in';
   try {
-    const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-PI': '1' }, body: JSON.stringify({ email, password }) });
     if (r.ok) { location.href = '/'; return; }
-    let m = ''; try { m = (await r.json()).error } catch (_) {}
-    er.textContent = m || 'Sign in failed. Try again.';
-  } catch (_) { er.textContent = 'The server could not be reached.'; }
-  b.disabled = false;
+    let m = ''; try { m = (await r.json()).error; } catch (_) {}
+    err.textContent = m || 'Sign in failed (' + r.status + ').';
+  } catch (_) { err.textContent = 'The server could not be reached.'; }
+  go.disabled = false; go.textContent = 'Continue';
 });
 </script>
 </body>
