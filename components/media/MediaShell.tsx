@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
-  LayoutDashboard, Boxes, Map as MapIcon, Building2, Users, Home, Zap, MessageCircle, Compass, Sparkles,
+  LayoutDashboard, FileStack, Boxes, Map as MapIcon, Building2, Users, Home, Zap, MessageCircle, Compass, Sparkles,
   Megaphone, Wallet, Clapperboard, Search, Library, Gauge, ShieldCheck, LogOut, Menu,
 } from "lucide-react";
 
@@ -29,6 +29,7 @@ const pillars: { id: string; href: string; label: string; icon: Ico; color: stri
 // The OOH planner lives inside the Media module.
 const mediaTools = [
   { href: "/media/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/media/plans", label: "Media plans", icon: FileStack },
   { href: "/media/inventory", label: "Inventory", icon: Boxes },
   { href: "/media/map", label: "Map", icon: MapIcon },
   { href: "/media/suppliers", label: "Suppliers", icon: Building2 },
