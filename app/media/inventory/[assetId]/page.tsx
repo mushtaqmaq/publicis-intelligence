@@ -311,7 +311,7 @@ export default async function AssetDetailPage({
               {bookings.map((b, i) => (
                 <tr key={i} className="border-b border-border">
                   <td className="py-2 pr-4">
-                    <Link href={`/media/media-plans/${b.planId}`} className="text-accent underline">
+                    <Link href={`/media/plans/${b.planId}`} className="text-accent underline">
                       {b.campaignName}
                     </Link>
                   </td>

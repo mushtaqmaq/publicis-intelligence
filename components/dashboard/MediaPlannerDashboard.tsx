@@ -43,7 +43,7 @@ export async function MediaPlannerDashboard({ user }: { user: SessionUser }) {
           <ul className="space-y-1.5">
             {awaitingApproval.map((p) => (
               <li key={p.id} className="text-sm">
-                <Link href={`/media/media-plans/${p.id}`} className="text-accent underline">
+                <Link href={`/media/plans/${p.id}`} className="text-accent underline">
                   {p.campaignName}
                 </Link>{" "}
                 <span className="text-muted">— {p.client.name}</span>
@@ -70,7 +70,7 @@ export async function MediaPlannerDashboard({ user }: { user: SessionUser }) {
             {plans.map((p) => (
               <tr key={p.id} className="border-b border-border">
                 <td className="py-2 pr-4">
-                  <Link href={`/media/media-plans/${p.id}`} className="font-medium text-foreground hover:underline">
+                  <Link href={`/media/plans/${p.id}`} className="font-medium text-foreground hover:underline">
                     {p.campaignName}
                   </Link>
                 </td>
@@ -89,7 +89,7 @@ export async function MediaPlannerDashboard({ user }: { user: SessionUser }) {
         </table>
         {plans.length === 0 && (
           <div className="text-center text-muted text-sm py-12">
-            No media plans yet. <Link href="/media/new-media-plan" className="text-accent underline">Create one →</Link>
+            No media plans yet. <Link href="/media/plans/new" className="text-accent underline">Create one →</Link>
           </div>
         )}
       </section>
