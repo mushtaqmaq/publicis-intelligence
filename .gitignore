@@ -23,3 +23,8 @@ data/
 *.db
 *.db-wal
 *.db-shm
+
+# Next.js
+.next/
+next-env.d.ts
+*.tsbuildinfo
