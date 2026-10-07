@@ -7,6 +7,10 @@ const SEO = require('./lib/dataforseo');
 const PAGE = require('./lib/webpage');
 const MMM = require('./lib/mmm');
 
+// The platform shares the planner's `users` / `sessions` tables. This projection keeps the API's
+// original user shape (pass, active, created_at, role admin|member) so callers are unchanged.
+const uCols = a => { const t = a ? a + '.' : ''; return `${t}id, ${t}email, COALESCE(${t}name,'') AS name, ${t}"passwordHash" AS pass, CASE WHEN ${t}role::text IN ('SUPER_ADMIN','ADMIN') THEN 'admin' ELSE 'member' END AS role, ${t}role::text AS planner_role, ${t}credits, CASE WHEN ${t}"isActive" THEN 1 ELSE 0 END AS active, (EXTRACT(EPOCH FROM ${t}"createdAt")*1000)::bigint AS created_at`; };
+const UTC_NOW = "(now() AT TIME ZONE 'UTC')";
 const PORT = +process.env.PORT || 7860;
 const PUB = path.join(__dirname, 'public');
 
@@ -33,13 +37,19 @@ const saveSettings = async s => (await db.prepare('INSERT INTO settings(key,valu
 async function bootstrap() {
   const email = (process.env.ADMIN_EMAIL || '').trim().toLowerCase(), pw = process.env.ADMIN_PASSWORD || '';
   if (!email || !pw) { if (!(await db.prepare('SELECT COUNT(*) AS n FROM users').get()).n) console.warn('Set ADMIN_EMAIL and ADMIN_PASSWORD to create the first admin.'); return; }
-  const u = await db.prepare('SELECT id FROM users WHERE email=?').get(email);
+  const u = await db.prepare('SELECT id, credits FROM users WHERE email=?').get(email);
+  const startCredits = +process.env.ADMIN_START_CREDITS || 100000;
   if (!u) {
-    const id = A.newId(), credits = +process.env.ADMIN_START_CREDITS || 100000;
-    const ins = await db.prepare('INSERT INTO users(id,email,name,pass,role,credits,created_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(email) DO NOTHING').run(id, email, process.env.ADMIN_NAME || 'Admin', A.hash(pw), 'admin', credits, Date.now());
-    if (ins.rowCount) { await db.prepare('INSERT INTO ledger(user_id,ts,kind,credits,balance_after,note) VALUES(?,?,?,?,?,?)').run(id, Date.now(), 'topup', credits, credits, 'Opening balance'); console.log('Created admin account', email); }
-  } else if (process.env.RESET_ADMIN_PASSWORD === '1') {
-    await db.prepare("UPDATE users SET pass=?, role='admin', active=1 WHERE id=?").run(A.hash(pw), u.id); console.log('Admin password reset for', email);
+    const id = A.newId();
+    const ins = await db.prepare(`INSERT INTO users(id,email,name,"passwordHash",role,credits,"isActive","createdAt","updatedAt") VALUES(?,?,?,?,'SUPER_ADMIN'::"UserRole",?,true,${UTC_NOW},${UTC_NOW}) ON CONFLICT(email) DO NOTHING`).run(id, email, process.env.ADMIN_NAME || 'Admin', A.hash(pw), startCredits);
+    if (ins.rowCount) { await db.prepare('INSERT INTO ledger(user_id,ts,kind,credits,balance_after,note) VALUES(?,?,?,?,?,?)').run(id, Date.now(), 'topup', startCredits, startCredits, 'Opening balance'); console.log('Created admin account', email); }
+  } else {
+    // An existing planner account becomes the platform admin: give it opening credits once, never touch its password or role.
+    if (!u.credits && !(await db.prepare('SELECT 1 FROM ledger WHERE user_id=? LIMIT 1').get(u.id))) {
+      await db.prepare(`UPDATE users SET credits=? WHERE id=?`).run(startCredits, u.id);
+      await db.prepare('INSERT INTO ledger(user_id,ts,kind,credits,balance_after,note) VALUES(?,?,?,?,?,?)').run(u.id, Date.now(), 'topup', startCredits, startCredits, 'Opening balance');
+    }
+    if (process.env.RESET_ADMIN_PASSWORD === '1') { await db.prepare(`UPDATE users SET "passwordHash"=?, role='SUPER_ADMIN'::"UserRole", "isActive"=true, "updatedAt"=${UTC_NOW} WHERE id=?`).run(A.hash(pw), u.id); console.log('Admin password reset for', email); }
   }
 }
 // Schema + first admin, once per instance. Every request waits on this.
@@ -57,7 +67,7 @@ const fail = (res, code, error) => send(res, code, { error });
 const round = (x, d = 2) => Math.round((+x || 0) * 10 ** d) / 10 ** d;
 function body(req, limit) { if (req.body !== undefined && req.body !== null) { const b = req.body; return Promise.resolve(Buffer.isBuffer(b) ? b.toString('utf8') : typeof b === 'string' ? b : JSON.stringify(b)); } return new Promise((ok, no) => { let n = 0; const c = []; req.on('data', d => { n += d.length; if (n > limit) { no(Object.assign(new Error('The upload is too large.'), { status: 413 })); req.destroy(); } else c.push(d); }); req.on('end', () => ok(Buffer.concat(c).toString('utf8'))); req.on('error', no); }); }
 async function json(req, limit = 4e6) { const t = await body(req, limit); try { return t ? JSON.parse(t) : {}; } catch (_) { throw Object.assign(new Error('Bad JSON'), { status: 400 }); } }
-async function me(req) { const tok = A.parseCookies(req).pi_session; if (!tok) return null; return (await db.prepare('SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires_at>? AND u.active=1').get(tok, Date.now())) || null; }
+async function me(req) { const tok = A.parseCookies(req).pi_session; if (!tok) return null; return (await db.prepare(`SELECT ${uCols('u')} FROM sessions s JOIN users u ON u.id=s."userId" WHERE s.id=? AND s."expiresAt" > ${UTC_NOW} AND u."isActive"`).get(tok)) || null; }
 const pub = u => ({ id: u.id, email: u.email, name: u.name, role: u.role, credits: round(u.credits), active: !!u.active, createdAt: u.created_at });
 const balance = async id => (await db.prepare('SELECT credits FROM users WHERE id=?').get(id)).credits;
 
@@ -252,11 +262,11 @@ async function route(req, res) {
   if (p === '/api/login' && req.method === 'POST') {
     const b = await json(req); const email = String(b.email || '').trim().toLowerCase(), k = ip + '|' + email;
     if (await throttled(k)) return fail(res, 429, 'Too many attempts. Try again in 15 minutes.');
-    const u = (await db.prepare('SELECT * FROM users WHERE email=?').get(email));
+    const u = (await db.prepare(`SELECT ${uCols()} FROM users WHERE email=?`).get(email));
     if (!u || !u.active || !A.verify(b.password || '', u.pass)) { await recordFail(k); return fail(res, 401, 'Email or password is incorrect.'); }
     await clearFail(k);
-    const tok = A.newToken(); (await db.prepare('INSERT INTO sessions(token,user_id,expires_at) VALUES(?,?,?)').run(tok, u.id, Date.now() + A.SESSION_DAYS * 864e5));
-    (await db.prepare('DELETE FROM sessions WHERE expires_at<?').run(Date.now()));
+    const tok = A.newToken(); (await db.prepare(`INSERT INTO sessions(id,"userId","expiresAt") VALUES(?,?,to_timestamp(?::float8/1000.0) AT TIME ZONE 'UTC')`).run(tok, u.id, Date.now() + A.SESSION_DAYS * 864e5));
+    (await db.prepare(`DELETE FROM sessions WHERE "expiresAt" < ${UTC_NOW}`).run());
     res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': A.sessionCookie(req, tok, A.SESSION_DAYS * 86400) }); return res.end('{"ok":true}');
   }
   const user = await me(req);
@@ -275,13 +285,13 @@ async function route(req, res) {
   const fd = /^\/api\/files\/([\w-]{8,40})$/.exec(p);
   if (fd && req.method === 'DELETE') { const r = (await db.prepare('SELECT * FROM files WHERE id=?').get(fd[1])); if (r && (r.owner === user.id || user.role === 'admin')) { (await db.prepare('DELETE FROM files WHERE id=?').run(r.id)); } res.writeHead(204); return res.end(); }
 
-  if (p === '/api/logout' && req.method === 'POST') { (await db.prepare('DELETE FROM sessions WHERE token=?').run(A.parseCookies(req).pi_session || '')); res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': A.sessionCookie(req, '', 0) }); return res.end('{"ok":true}'); }
+  if (p === '/api/logout' && req.method === 'POST') { (await db.prepare('DELETE FROM sessions WHERE id=?').run(A.parseCookies(req).pi_session || '')); res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': A.sessionCookie(req, '', 0) }); return res.end('{"ok":true}'); }
   if (p === '/api/me') { const s = (await settings()), i = P.info(); return send(res, 200, { ...pub(user), creditsPerUSD: s.creditsPerUSD, imageCredits: s.imageCredits, audioCredits: s.audioCredits, caps: { research: i.openrouter.configured, images: i.openai.configured, banana: i.openrouter.configured, audio: i.replicate.configured, seo: SEO.configured(), ai: i.openrouter.configured || i.hf.configured } }); }
   if (p === '/api/me/password' && req.method === 'POST') {
     const b = await json(req);
     if (!A.verify(b.current || '', user.pass)) return fail(res, 400, 'Current password is incorrect.');
     if (String(b.next || '').length < 8) return fail(res, 400, 'New password must be at least 8 characters.');
-    (await db.prepare('UPDATE users SET pass=? WHERE id=?').run(A.hash(b.next), user.id)); return send(res, 200, { ok: true });
+    (await db.prepare(`UPDATE users SET "passwordHash"=?, "updatedAt"=${UTC_NOW} WHERE id=?`).run(A.hash(b.next), user.id)); return send(res, 200, { ok: true });
   }
   if (p === '/api/usage/me') {
     const days = Math.min(365, Math.max(1, +url.searchParams.get('days') || 30));
@@ -314,7 +324,7 @@ async function route(req, res) {
     if (user.role !== 'admin') return fail(res, 403, 'Admins only');
     if (p === '/api/admin/users' && req.method === 'GET') {
       const spent = Object.fromEntries((await db.prepare("SELECT user_id, -SUM(credits) AS c FROM ledger WHERE kind='usage' AND ts>=? GROUP BY user_id").all(Date.now() - 30 * 864e5)).map(r => [r.user_id, r.c]));
-      return send(res, 200, (await db.prepare('SELECT * FROM users ORDER BY created_at').all()).map(u => ({ ...pub(u), spent30: round(spent[u.id] || 0) })));
+      return send(res, 200, (await db.prepare(`SELECT ${uCols()} FROM users ORDER BY "createdAt"`).all()).map(u => ({ ...pub(u), spent30: round(spent[u.id] || 0) })));
     }
     if (p === '/api/admin/users' && req.method === 'POST') {
       const b = await json(req), email = String(b.email || '').trim().toLowerCase();
@@ -322,21 +332,21 @@ async function route(req, res) {
       if (String(b.password || '').length < 8) return fail(res, 400, 'Password must be at least 8 characters.');
       if ((await db.prepare('SELECT 1 FROM users WHERE email=?').get(email))) return fail(res, 400, 'That login already exists.');
       const id = A.newId(), credits = b.credits !== '' && b.credits != null ? Math.max(0, +b.credits || 0) : (await settings()).newUserCredits;
-      (await db.prepare('INSERT INTO users(id,email,name,pass,role,credits,created_at) VALUES(?,?,?,?,?,?,?)').run(id, email, String(b.name || '').slice(0, 80), A.hash(b.password), b.role === 'admin' ? 'admin' : 'member', 0, Date.now()));
+      (await db.prepare(`INSERT INTO users(id,email,name,"passwordHash",role,credits,"isActive","createdAt","updatedAt") VALUES(?,?,?,?,?::"UserRole",0,true,${UTC_NOW},${UTC_NOW})`).run(id, email, String(b.name || '').slice(0, 80), A.hash(b.password), b.role === 'admin' ? 'ADMIN' : 'PLANNER'));
       if (credits) await ledger(id, { kind: 'topup', credits, note: 'Opening balance', by: user.id });
       return send(res, 200, { id });
     }
     const um = /^\/api\/admin\/users\/([\w-]{1,80})(\/credits)?$/.exec(p);
     if (um) {
-      const t = (await db.prepare('SELECT * FROM users WHERE id=?').get(um[1])); if (!t) return fail(res, 404, 'User not found');
+      const t = (await db.prepare(`SELECT ${uCols()} FROM users WHERE id=?`).get(um[1])); if (!t) return fail(res, 404, 'User not found');
       const b = await json(req);
       if (um[2] && req.method === 'POST') { const amt = +b.amount; if (!isFinite(amt) || !amt) return fail(res, 400, 'Enter an amount.'); return send(res, 200, { balance: round(await ledger(t.id, { kind: amt > 0 ? 'topup' : 'adjust', credits: amt, note: String(b.note || '').slice(0, 200), by: user.id })) }); }
       if (!um[2] && req.method === 'PATCH') {
         if (t.id === user.id && (b.active === false || b.role === 'member')) return fail(res, 400, 'You cannot demote or disable your own account.');
-        if (b.name != null) (await db.prepare('UPDATE users SET name=? WHERE id=?').run(String(b.name).slice(0, 80), t.id));
-        if (b.role) (await db.prepare('UPDATE users SET role=? WHERE id=?').run(b.role === 'admin' ? 'admin' : 'member', t.id));
-        if (b.active != null) { (await db.prepare('UPDATE users SET active=? WHERE id=?').run(b.active ? 1 : 0, t.id)); if (!b.active) (await db.prepare('DELETE FROM sessions WHERE user_id=?').run(t.id)); }
-        if (b.password) { if (String(b.password).length < 8) return fail(res, 400, 'Password must be at least 8 characters.'); (await db.prepare('UPDATE users SET pass=? WHERE id=?').run(A.hash(b.password), t.id)); (await db.prepare('DELETE FROM sessions WHERE user_id=?').run(t.id)); }
+        if (b.name != null) (await db.prepare(`UPDATE users SET name=?, "updatedAt"=${UTC_NOW} WHERE id=?`).run(String(b.name).slice(0, 80), t.id));
+        if (b.role) { const keep = t.planner_role === 'SUPER_ADMIN' && b.role === 'admin'; if (!keep) (await db.prepare(`UPDATE users SET role=?::"UserRole", "updatedAt"=${UTC_NOW} WHERE id=?`).run(b.role === 'admin' ? 'ADMIN' : 'PLANNER', t.id)); }
+        if (b.active != null) { (await db.prepare(`UPDATE users SET "isActive"=?::boolean, "updatedAt"=${UTC_NOW} WHERE id=?`).run(!!b.active, t.id)); if (!b.active) (await db.prepare('DELETE FROM sessions WHERE "userId"=?').run(t.id)); }
+        if (b.password) { if (String(b.password).length < 8) return fail(res, 400, 'Password must be at least 8 characters.'); (await db.prepare(`UPDATE users SET "passwordHash"=?, "updatedAt"=${UTC_NOW} WHERE id=?`).run(A.hash(b.password), t.id)); (await db.prepare('DELETE FROM sessions WHERE "userId"=?').run(t.id)); }
         return send(res, 200, { ok: true });
       }
     }

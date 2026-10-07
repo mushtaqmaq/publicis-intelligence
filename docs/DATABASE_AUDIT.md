@@ -1,24 +1,32 @@
 # Database Audit
 
-Engine: **Neon Postgres** (since 2026-10-07; previously SQLite on the Hugging Face Space). Connection via `DATABASE_URL`, driver `pg`, pooled connection string on Vercel. Schema is created idempotently on each cold start (`lib/db.js`, guarded by a transaction-level advisory lock). There is no migration framework.
+## Target state: one database for the whole platform
+Publicis Intelligence and the OOH planner share **one Postgres database (Neon)**, with one set of identity tables. The planner's production database (`ooh-media-planner-db`) is the one to keep; the empty platform database (`neon-coral-pillar`) is retired at cutover.
 
-## Tables
-| Table | Purpose | Key columns |
+Schema is owned by **Prisma** (`prisma/schema.prisma`, `prisma/migrations`). The first 19 migrations are the planner's, copied verbatim. `*_platform_merge` is the only new one and is **additive**: it adds `users.credits` (default 0) and six new tables. No existing column, table or row is changed, so the live planner keeps working until it is retired. Nothing creates tables at runtime any more; the app refuses to start on an unmigrated database.
+
+## Identity (merged)
+| Concern | Before | Now |
 |---|---|---|
-| users | accounts | id, email (unique), pass (scrypt), role, credits (double), active |
-| sessions | login sessions | token, user_id -> users (CASCADE), expires_at |
-| ledger | credit and usage history | user_id, ts (ms), kind, model, route, tokens, usd, credits, balance_after |
-| docs | JSON document store (library, clients, projects) | (col, id), owner, data (JSON text) |
-| conversations | assistant chats | id, user_id -> users (CASCADE), messages (JSON text) |
-| settings | admin settings | key, value (JSON text) |
-| files | generated and uploaded media | id, owner, name, mime, size, kind, data (BYTEA) |
-| login_fails | login throttle (10 per 15 min per IP+email) | k, n, t |
+| Users | planner `users` (cuid id, `passwordHash`, role enum) vs platform `users` (credits, admin/member) | planner `users` + `credits`. Roles `SUPER_ADMIN`/`ADMIN` appear as `admin` in the platform, everything else as `member`. New admin-created users: admin -> `ADMIN`, member -> `PLANNER`. |
+| Sessions | two `sessions` tables | planner `sessions` (`id` = token). Each app keeps its own cookie name (`pi_session`, `ooh_session`). |
+| Passwords | two scrypt formats | planner format `salt:key`. Old platform-format hashes still verify. |
+| First admin | env `ADMIN_EMAIL`/`ADMIN_PASSWORD` | Creates a `SUPER_ADMIN` if the email is new. If the email already exists (e.g. the planner owner) it is **not** modified except for one-time opening credits. |
 
-## Security rules
-No row-level security; authorization is enforced in application code (owner or admin checks in `server.js`). The database is reachable only with the connection string, which lives in Vercel environment variables.
+## Platform tables (new, from `platform_merge`)
+`ledger` (credit history), `docs` (library, clients, projects JSON), `conversations` (assistant chats, FK users), `settings` (admin settings JSON), `files` (generated media, BYTEA), `login_fails` (login throttle). Timestamps here are epoch milliseconds.
 
-## Backup strategy
-Neon provides point-in-time restore on the project's history window (shorter on the free plan). Before importing any Space data, create a Neon branch or snapshot. Production data currently consists only of the admin account created on first boot. The Space's SQLite data has **not** been imported.
+## Planner tables (unchanged)
+34 models: suppliers, rate cards and versions, assets with locations, images, specs, rates and fees, packages, media plans with versions and items, clients, reconciliations, audit logs, AVR schemes, retainer fees and others. See `prisma/schema.prisma`.
+
+## Cutover runbook (not yet executed; needs owner approval)
+1. Back up the planner database first (Neon branch or `pg_dump`, run by the owner).
+2. Apply the one new migration with the **unpooled** URL: `DATABASE_URL_UNPOOLED=<planner unpooled url> npx prisma migrate deploy`. It reports exactly one migration to apply.
+3. In Vercel project `publicis-intelligence`, point `DATABASE_URL` at the planner database (pooled URL), keep `ADMIN_EMAIL`/`ADMIN_NAME`/`ADMIN_PASSWORD`, and redeploy.
+4. Verify sign-in with the planner owner's existing password and that the planner's data is intact.
+5. Retire `neon-coral-pillar` once verified.
+
+Rollback: redeploy the previous Vercel deployment. The migration is additive, so the old planner app continues to work against the migrated database.
 
 ## Rules
-Local development must use a separate Neon branch, never the production connection string. No destructive migrations run automatically.
+Local development must never use the production connection string; use a local Postgres or a Neon branch. Production schema changes go through `prisma migrate deploy` by the owner, never at build or boot time. No destructive migrations.

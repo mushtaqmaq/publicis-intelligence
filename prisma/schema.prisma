@@ -1,0 +1,1109 @@
+// OOH Media Planner — normalized schema
+// See /docs/data-model.md (README) for the rationale behind each entity.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+// SUPER_ADMIN and ACCOUNT_MANAGER added for the RBAC rollout — ADMIN/PLANNER/
+// VIEWER are untouched (PLANNER is displayed as "Media Planner" in the UI;
+// no enum rename, so no data migration risk for existing rows). Only
+// SUPER_ADMIN can manage other users' roles/permissions; ADMIN gets the full
+// commercial dashboard but not user management.
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  ACCOUNT_MANAGER
+  PLANNER
+  VIEWER
+}
+
+// The medium a supplier sells inventory in. Not to be confused with
+// Asset.mediaType (a free-text OOH sub-type like "MUPI") — this is a
+// higher-level enum: which channel the supplier itself operates in.
+// OOH remains the default and the only channel with dedicated
+// physical-spec fields on Asset (faces, screens, physical dimensions,
+// etc.) — a non-OOH asset simply leaves those null rather than the
+// schema pretending a radio spot has a screen resolution. Added per
+// the user's explicit request to plan across all media, not just OOH.
+enum MediaChannel {
+  OOH
+  RADIO
+  TV
+  PRINT
+  CINEMA
+  SMS
+  DIGITAL
+}
+
+enum AssetFormat {
+  STATIC
+  DIGITAL
+}
+
+enum IndoorOutdoor {
+  INDOOR
+  OUTDOOR
+}
+
+enum SingleDoubleSided {
+  SINGLE
+  DOUBLE
+}
+
+enum PricingBasis {
+  PER_DAY
+  PER_FACE
+  PER_SCREEN
+  PER_SCREEN_BUNDLE // e.g. Scoop "rate per 4 screens" quoted as one bundle price
+  PER_POLE
+  PER_CIRCUIT
+  PER_NETWORK
+  PER_SPOT // radio/TV: one on-air commercial airing, priced by duration + daypart
+  PER_INSERTION // print: one appearance in one publication run
+  PER_MESSAGE // SMS: one message sent to the recipient database
+  PER_1000_IMPRESSIONS // digital: CPM — cost per thousand impressions
+  PER_CLICK // digital: CPC — cost per click
+  PER_WEEK
+  PER_2_WEEKS
+  PER_4_WEEKS
+  PER_3_MONTHS
+  PER_6_MONTHS
+  PER_12_MONTHS
+  FIXED_PACKAGE
+  CUSTOM
+}
+
+enum PricingCalculationMethod {
+  FIXED // exact package price, never pro-rated
+  PRO_RATA // legacy Excel behaviour: rate * (days / period)
+  DAILY
+  PER_FACE_DAILY
+  PER_FACE // period-locked unit price x quantity, not pro-rated by days
+  PER_CIRCUIT
+  PER_SPOT // same shape as PER_CIRCUIT: rate x quantity, not pro-rated by days
+  PER_INSERTION
+  PER_MESSAGE
+  PER_SCREEN
+  PER_NETWORK
+  PER_POLE
+  CPM // digital: rate x (impressions / 1000), not pro-rated by days
+  CPC // digital: rate x clicks, not pro-rated by days
+  MONTHLY
+  CUSTOM
+}
+
+enum MoneyStatus {
+  KNOWN // a real numeric value is present
+  TBD
+  NOT_APPLICABLE
+  ON_REQUEST
+  POA
+  TO_BE_CONFIRMED
+}
+
+enum RateCardFileType {
+  PDF
+  XLSX
+  XLS
+  CSV
+}
+
+enum RateCardStatus {
+  UPLOADED
+  PARSING
+  PARSED
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+  FAILED
+}
+
+enum ExtractionConfidence {
+  HIGH
+  MEDIUM
+  LOW
+  MANUAL
+}
+
+enum RateChangeType {
+  NEW
+  CHANGED
+  UNCHANGED
+  CONFLICT
+  LOW_CONFIDENCE
+  REMOVED
+}
+
+enum RateDecision {
+  PENDING
+  PUBLISHED
+  REJECTED
+  EDITED
+  MERGED_INTO_EXISTING
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  PROPOSED
+  ON_HOLD
+  BOOKED
+  UNAVAILABLE
+  MAINTENANCE
+  UNKNOWN
+}
+
+enum MediaPlanStatus {
+  DRAFT
+  INTERNAL_REVIEW
+  CLIENT_SHARED
+  APPROVED
+  BOOKED
+  COMPLETED
+  CANCELLED
+  // Added for the campaign-workflow expansion — additive, existing values
+  // and any plan already carrying them are untouched.
+  PLANNING
+  AWAITING_ARTWORK
+  SCHEDULED
+  LIVE
+}
+
+enum ArtworkStatus {
+  NOT_SUBMITTED
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum BoPoStatus {
+  NOT_REQUIRED
+  PENDING
+  ISSUED
+}
+
+enum SupplierConfirmationStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+}
+
+enum ImportSourceType {
+  EXCEL_MIGRATION
+  RATE_CARD_UPLOAD
+  MANUAL
+}
+
+enum ImportJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum ReconciliationAction {
+  KEEP_EXCEL
+  USE_RATE_CARD
+  MANUAL_VALUE
+  NEEDS_DISCUSSION
+}
+
+enum ReconciliationStatus {
+  OPEN
+  RESOLVED
+  IGNORED
+}
+
+// ---------------------------------------------------------------------------
+// Identity & access
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  role         UserRole @default(VIEWER)
+  isActive     Boolean  @default(true)
+  // Publicis Intelligence AI credits (spent per agent run; see ledger).
+  credits      Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  conversations Conversation[]
+  auditLogs         AuditLog[]
+  importJobs        ImportJob[]
+  mediaPlansCreated MediaPlan[]        @relation("PlanCreatedBy")
+  rateOverrides     RateOverride[]
+  reconciliations   Reconciliation[]   @relation("ReconciliationResolvedBy")
+  planVersions      MediaPlanVersion[]
+  sessions          Session[]
+  proofOfPostings   ProofOfPosting[]
+  kmzImportBatches  KmzImportBatch[]
+  permissionOverrides UserPermissionOverride[]
+  clientsManaged      Client[]                 @relation("ClientAccountManager")
+
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Permissions (RBAC) — a role's access is its RolePermission defaults, with
+// UserPermissionOverride letting an Admin grant or revoke individual
+// permissions for one specific user without inventing a whole new role.
+// Every sensitive query checks this server-side (src/lib/auth/permissions.ts)
+// — a missing nav link is never treated as access control on its own.
+// ---------------------------------------------------------------------------
+
+model Permission {
+  id       String @id @default(cuid())
+  key      String @unique // e.g. "dashboard.avr.view"
+  label    String
+  category String // "dashboard" | "clients" | "campaigns" | "admin"
+
+  rolePermissions RolePermission[]
+  userOverrides   UserPermissionOverride[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  role         UserRole
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([role, permissionId])
+  @@map("role_permissions")
+}
+
+model UserPermissionOverride {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  granted      Boolean // true = explicit grant beyond role default, false = explicit revoke
+  createdAt    DateTime   @default(now())
+
+  @@unique([userId, permissionId])
+  @@map("user_permission_overrides")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ---------------------------------------------------------------------------
+// Suppliers & rate-card documents
+// ---------------------------------------------------------------------------
+
+model Supplier {
+  id                 String       @id @default(cuid())
+  name               String       @unique
+  mediaChannel       MediaChannel @default(OOH)
+  legacyNames        String[] // e.g. ["ELAN DECAUX"], for fuzzy-match during import
+  contactName        String?
+  contactEmail       String?
+  contactPhone       String?
+  website            String?
+  notes              String?
+  defaultDiscountPct Decimal?     @db.Decimal(6, 4)
+  isActive           Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  assets          Asset[]
+  rateCards       RateCard[]
+  kmzImportBatches KmzImportBatch[]
+  avrSchemes      AvrScheme[]
+  buyingEntityFor MediaPlanItem[] @relation("MediaPlanItemBuyingEntity")
+
+  @@map("suppliers")
+}
+
+model RateCard {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  title      String // e.g. "Greater Doha OOH Rate Card"
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  versions RateCardVersion[]
+
+  @@map("rate_cards")
+}
+
+// One uploaded file = one version. Re-uploading an identical file (same
+// checksum) is rejected as a duplicate rather than re-processed.
+model RateCardVersion {
+  id               String           @id @default(cuid())
+  rateCardId       String
+  rateCard         RateCard         @relation(fields: [rateCardId], references: [id], onDelete: Cascade)
+  versionLabel     String // "V1", "V2", "2026 Revised V2" ...
+  rateYear         Int
+  effectiveFrom    DateTime
+  effectiveTo      DateTime?
+  fileType         RateCardFileType
+  originalFilename String
+  storageUrl       String // Supabase Storage (or local path in dev) to the original file
+  checksumSha256   String           @unique
+  fileSizeBytes    Int
+  status           RateCardStatus   @default(UPLOADED)
+  uploadedById     String?
+  publishedAt      DateTime?
+  archivedAt       DateTime?
+  assetsExtracted  Int              @default(0)
+  warningsCount    Int              @default(0)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  assetRates      AssetRate[]
+  importJobs      ImportJob[]
+  reconciliations Reconciliation[]
+  rateChanges     RateChange[]
+
+  @@index([rateYear])
+  @@map("rate_card_versions")
+}
+
+// ---------------------------------------------------------------------------
+// Inventory
+// ---------------------------------------------------------------------------
+
+// Admin-managed, not a fixed enum — Settings > Asset Categories lets an
+// Admin add, rename, or retire categories (a category in use can be
+// deactivated but never deleted, so existing assets never dangle).
+model AssetCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assets Asset[]
+
+  @@map("asset_categories")
+}
+
+model Asset {
+  id                String             @id @default(cuid())
+  assetCode         String             @unique // internal permanent code, e.g. OOH-000123
+  supplierId        String
+  supplier          Supplier           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierAssetCode String?
+  assetName         String
+  mediaCategoryId   String
+  mediaCategory     AssetCategory      @relation(fields: [mediaCategoryId], references: [id], onDelete: Restrict)
+  mediaType         String? // free-text supplier vocabulary (e.g. "MUPI", "Sandwich Board")
+  format            AssetFormat? // OOH-only concept (static vs digital sign); null for non-OOH media
+  indoorOutdoor     IndoorOutdoor      @default(OUTDOOR)
+  singleDoubleSided SingleDoubleSided?
+  status            String             @default("ACTIVE") // ACTIVE | RETIRED | PENDING_REVIEW
+
+  // location
+  locationName  String
+  area          String?
+  municipality  String?
+  street        String?
+  landmark      String?
+  latitude      Decimal? @db.Decimal(10, 7)
+  longitude     Decimal? @db.Decimal(10, 7)
+  googleMapsUrl String?
+  assetUrl      String?
+  supplierUrl   String?
+
+  // quantities
+  numberOfFaces     Int?
+  numberOfScreens   Int?
+  numberOfPoles     Int?
+  numberOfNetworks  Int?
+  numberOfCircuits  Int? // max circuits sellable, e.g. Full Assets!CIRCUITS
+  facesPerCircuit   Int?
+  screensPerNetwork Int?
+
+  // physical / technical
+  physicalWidth          Decimal? @db.Decimal(8, 3)
+  physicalHeight         Decimal? @db.Decimal(8, 3)
+  physicalUnit           String?  @default("m")
+  screenResolutionWidth  Int?
+  screenResolutionHeight Int?
+  fileFormat             String?
+  material               String?
+  dpi                    Int?
+  slotDurationSeconds    Int?
+  loopDurationSeconds    Int?
+  shareOfVoice           Decimal? @db.Decimal(6, 4)
+  illumination           String?
+
+  installationRequirements String?
+  productionRequirements   String?
+  startingDayRules         String?
+  minimumDuration          String?
+  bookingConditions        String?
+  notes                    String?
+
+  pricingCalculationMethod PricingCalculationMethod @default(PRO_RATA)
+
+  primaryImageId          String?
+  locationMapImageId      String?
+  technicalSpecDocumentId String?
+
+  extraAttributes Json? // anything supplier-specific that doesn't fit above
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  images              AssetImage[]
+  specs               AssetSpec[]
+  rates               AssetRate[]
+  audienceMetrics     AudienceMetric[]
+  planItems           MediaPlanItem[]
+  availabilities      AssetAvailability[]
+  rateChanges         RateChange[]
+  packageComponents   AssetPackageComponent[] @relation("PackageComponents")
+  componentOfPackages AssetPackageComponent[] @relation("PackageComponentLink")
+  locations           AssetLocation[]
+
+  @@index([supplierId])
+  @@index([mediaCategoryId])
+  @@index([area])
+  @@index([latitude, longitude])
+  @@map("assets")
+}
+
+// A network/multi-circuit asset — one Elan "MUPIS" row can genuinely
+// cover hundreds of physical panels citywide, one KMZ placemark each,
+// not one location. Asset.latitude/longitude remains the single point
+// for the common case (one asset = one physical thing); the moment a
+// second point is ever assigned to the same asset (via the KMZ review
+// screen), both points move here so nothing is lost and the Map plots
+// every real location instead of picking just one.
+model AssetLocation {
+  id        String   @id @default(cuid())
+  assetId   String
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  label     String // the source placemark name, e.g. "SE-009"
+  latitude  Decimal  @db.Decimal(10, 7)
+  longitude Decimal  @db.Decimal(10, 7)
+  createdAt DateTime @default(now())
+
+  @@index([assetId])
+  @@map("asset_locations")
+}
+
+// One uploaded KMZ/KML file = one batch. Every placemark the automatic
+// matcher couldn't confidently resolve is kept here (never discarded)
+// so an Admin can review and assign it — individually, or in bulk by
+// prefix, since a supplier's own numbering (e.g. "SE-009", "MU-114")
+// usually groups many physical units under one product-type asset.
+model KmzImportBatch {
+  id           String    @id @default(cuid())
+  filename     String
+  supplierId   String? // null when imported in "all suppliers combined" mode
+  supplier     Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  uploadedById String?
+  uploadedBy   User?     @relation(fields: [uploadedById], references: [id])
+  pending      Json // Array<{ name: string; lat: number; lon: number; reason: string }>
+  resolved     String[] @default([]) // placemark names already assigned or dismissed
+  createdAt    DateTime  @default(now())
+
+  @@map("kmz_import_batches")
+}
+
+// Rows from an external asset spreadsheet (e.g. a master OOH database
+// compiled outside this app) that carry real data — coordinates, audience
+// metrics, pricing — but didn't fuzzy-match an existing asset confidently
+// enough to auto-apply. Reviewed the same way KMZ placemarks are: assign to
+// an existing asset, create as a new asset, or dismiss — never guessed.
+model OohEnrichmentBatch {
+  id          String   @id @default(cuid())
+  sourceLabel String // e.g. "Master_Qatar_OOH_Asset_Database (27.09.2026).xlsx"
+  pending     Json // Array<EnrichmentRow> — see src/lib/ingestion/oohEnrichmentRow.ts
+  resolved    String[] @default([]) // "<supplier>::<row>" keys already assigned/created/dismissed
+  createdAt   DateTime @default(now())
+
+  @@map("ooh_enrichment_batches")
+}
+
+// A bundle/package asset (e.g. Break Media's "City Centre Domination –
+// 79 Faces" spanning Mupis/Pillars/Dropdowns/Elevators/Bulkheads as one
+// commercial line item) is still a single Asset row with its own rate,
+// but its physical components are recorded here so a planner can see
+// exactly what's inside the package — never just a name and a price.
+// `linkedAssetId` is optional: a component only points to a real
+// catalogued Asset when one genuinely exists and is confidently matched;
+// otherwise it's just a descriptive line (label + quantity + size).
+model AssetPackageComponent {
+  id             String   @id @default(cuid())
+  packageAssetId String
+  packageAsset   Asset    @relation("PackageComponents", fields: [packageAssetId], references: [id], onDelete: Cascade)
+  label          String // e.g. "Mupis", "Pillars", "Dropdowns"
+  quantity       Int?
+  sizeRaw        String?
+  imageUrl       String?
+  linkedAssetId  String?
+  linkedAsset    Asset?   @relation("PackageComponentLink", fields: [linkedAssetId], references: [id])
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  @@index([packageAssetId])
+  @@map("asset_package_components")
+}
+
+model AssetImage {
+  id             String   @id @default(cuid())
+  assetId        String
+  asset          Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  url            String
+  kind           String   @default("gallery") // primary | gallery | location_map | technical_spec
+  caption        String?
+  sourceDocument String?
+  sourcePage     Int?
+  createdAt      DateTime @default(now())
+
+  @@index([assetId])
+  @@map("asset_images")
+}
+
+// Free-form supplementary spec rows (kept alongside the typed columns on
+// Asset so unusual supplier fields are never dropped).
+model AssetSpec {
+  id             String  @id @default(cuid())
+  assetId        String
+  asset          Asset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  label          String
+  value          String
+  sourceDocument String?
+  sourcePage     Int?
+
+  @@index([assetId])
+  @@map("asset_specs")
+}
+
+model AudienceMetric {
+  id             String   @id @default(cuid())
+  assetId        String
+  asset          Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  metricType     String // "impressions_per_2_weeks" | "monthly_footfall" | ...
+  value          Decimal  @db.Decimal(14, 2)
+  unit           String? // "impressions" | "visitors" | ...
+  demographic    String?
+  sourceDocument String?
+  sourcePage     Int?
+  rateYear       Int?
+  createdAt      DateTime @default(now())
+
+  @@index([assetId])
+  @@map("audience_metrics")
+}
+
+model AssetAvailability {
+  id              String             @id @default(cuid())
+  assetId         String
+  asset           Asset              @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  startDate       DateTime
+  endDate         DateTime
+  status          AvailabilityStatus @default(UNKNOWN)
+  notes           String?
+  mediaPlanItemId String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([assetId, startDate, endDate])
+  @@map("asset_availabilities")
+}
+
+// ---------------------------------------------------------------------------
+// Rates — the core of the versioning requirement
+// ---------------------------------------------------------------------------
+
+model AssetRate {
+  id                String          @id @default(cuid())
+  assetId           String
+  asset             Asset           @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  supplierId        String
+  rateCardVersionId String
+  rateCardVersion   RateCardVersion @relation(fields: [rateCardVersionId], references: [id], onDelete: Restrict)
+
+  rateYear      Int
+  currency      String    @default("QAR")
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+
+  pricingBasis  PricingBasis
+  durationValue Decimal?     @db.Decimal(8, 2) // e.g. 2, 4, 3, 6, 12
+  durationUnit  String? // "weeks" | "months" | "package"
+  quantityBasis String? // "per circuit" | "per pole" | "per 4 screens" ...
+
+  grossRateStatus MoneyStatus @default(KNOWN)
+  grossRate       Decimal?    @db.Decimal(14, 2)
+
+  publishedStatus RateDecision @default(PENDING)
+
+  sourcePage     Int?
+  sourceValueRaw String? // e.g. "QAR 120,000" verbatim from the document
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fees AssetFee[]
+
+  @@index([assetId, rateYear])
+  @@index([rateCardVersionId])
+  @@map("asset_rates")
+}
+
+model AssetFee {
+  id             String      @id @default(cuid())
+  assetRateId    String
+  assetRate      AssetRate   @relation(fields: [assetRateId], references: [id], onDelete: Cascade)
+  feeType        String // "production" | "upload" | "installation" | "service" | "other"
+  status         MoneyStatus @default(KNOWN)
+  amount         Decimal?    @db.Decimal(14, 2)
+  perUnit        String? // "per circuit" | "per pole" | "flat" ...
+  sourceValueRaw String?
+
+  @@index([assetRateId])
+  @@map("asset_fees")
+}
+
+// A manual price override on a plan line — always audited.
+model RateOverride {
+  id              String        @id @default(cuid())
+  mediaPlanItemId String
+  planItem        MediaPlanItem @relation(fields: [mediaPlanItemId], references: [id], onDelete: Cascade)
+  originalRate    Decimal       @db.Decimal(14, 2)
+  newRate         Decimal       @db.Decimal(14, 2)
+  reason          String
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  createdAt       DateTime      @default(now())
+
+  @@map("rate_overrides")
+}
+
+// ---------------------------------------------------------------------------
+// Clients & media plans
+// ---------------------------------------------------------------------------
+
+model Client {
+  id                  String   @id @default(cuid())
+  name                String   @unique
+  brand               String?
+  contactName         String?
+  contactEmail        String?
+  defaultDiscountPct  Decimal? @db.Decimal(6, 4)
+  defaultAgencyFeePct Decimal? @db.Decimal(6, 4)
+  currency            String   @default("QAR")
+  notes               String?
+  accountManagerId    String? // null = unassigned; never guessed
+  accountManager      User?    @relation("ClientAccountManager", fields: [accountManagerId], references: [id], onDelete: SetNull)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  mediaPlans   MediaPlan[]
+  retainerFees RetainerFee[]
+
+  @@map("clients")
+}
+
+model MediaPlan {
+  id              String          @id @default(cuid())
+  planCode        String          @unique
+  clientId        String
+  client          Client          @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  campaignName    String
+  campaignId      String?
+  brand           String?
+  campaignStart   DateTime
+  campaignEnd     DateTime
+  budget          Decimal?        @db.Decimal(14, 2)
+  currency        String          @default("QAR")
+  objective       String?
+  targetAudience  String?
+  targetLocations String?
+  notes           String?
+  status          MediaPlanStatus @default(DRAFT)
+  // Real workflow tracking, added alongside status — all optional because a
+  // campaign genuinely has "not tracked yet" as its starting state, never a
+  // guessed default.
+  artworkStatus               ArtworkStatus?
+  boPoStatus                  BoPoStatus?
+  supplierConfirmationStatus  SupplierConfirmationStatus?
+  createdById     String?
+  createdBy       User?           @relation("PlanCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  versions MediaPlanVersion[]
+
+  @@map("media_plans")
+}
+
+model MediaPlanVersion {
+  id            String    @id @default(cuid())
+  mediaPlanId   String
+  mediaPlan     MediaPlan @relation(fields: [mediaPlanId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  label         String // "V1", "V2", "V3 Approved"
+  isLocked      Boolean   @default(false) // true once Approved/Booked — immutable
+  createdById   String?
+  createdBy     User?     @relation(fields: [createdById], references: [id])
+  createdAt     DateTime  @default(now())
+
+  items MediaPlanItem[]
+
+  @@unique([mediaPlanId, versionNumber])
+  @@map("media_plan_versions")
+}
+
+// One line item = one asset booked on one plan version, with a frozen rate
+// snapshot so future rate-card uploads never mutate historical plans.
+model MediaPlanItem {
+  id                 String           @id @default(cuid())
+  mediaPlanVersionId String
+  mediaPlanVersion   MediaPlanVersion @relation(fields: [mediaPlanVersionId], references: [id], onDelete: Cascade)
+  assetId            String
+  asset              Asset            @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  sortOrder          Int              @default(0)
+
+  startDate        DateTime
+  endDate          DateTime
+  selectedCircuits Int?     @default(1)
+  selectedFaces    Int?
+
+  // frozen rate snapshot (never recalculated automatically once created)
+  rateSnapshot Json // { rateId, rateYear, sourceRateCard, sourcePage, pricingBasis, grossRate, fees[], calculationMethod, capturedAt }
+
+  discountPct           Decimal? @db.Decimal(6, 4)
+  additionalDiscountPct Decimal? @db.Decimal(6, 4)
+
+  grossCost       Decimal? @db.Decimal(14, 2)
+  netMedia        Decimal? @db.Decimal(14, 2) // "Net to Media" — the real cost paid to the media owner/platform
+  productionFee   Decimal? @db.Decimal(14, 2)
+  uploadFee       Decimal? @db.Decimal(14, 2)
+  installationFee Decimal? @db.Decimal(14, 2)
+  serviceFee      Decimal? @db.Decimal(14, 2)
+  otherFees       Decimal? @db.Decimal(14, 2)
+  // Real agency commercial fields — distinct from the generic OOH fee
+  // buckets above. agencyFeeAmount is the client-facing management fee;
+  // irAmount is the incentive rebate earned from the supplier (agency
+  // margin carved out of the media budget, never billed to the client).
+  // "Total Revenue" is agencyFeeAmount + irAmount, computed on display —
+  // never stored, so it can't drift from its two real inputs.
+  agencyFeeAmount Decimal? @db.Decimal(14, 2)
+  irAmount        Decimal? @db.Decimal(14, 2)
+  lineTotal       Decimal? @db.Decimal(14, 2) // "Net to Client" — the real total billed to the client
+
+  excludesPendingCost Boolean @default(false) // true when any fee/rate is TBD/POA
+
+  notes String?
+
+  // The real supplier/"seat" that actually executed the buy, when different
+  // from the platform itself — e.g. a Meta campaign run through an agency's
+  // seat (PBQ) rather than a direct Meta relationship. null means bought
+  // direct. Internal tracking only — never shown in a client-facing export.
+  buyingEntityId String?
+  buyingEntity   Supplier? @relation("MediaPlanItemBuyingEntity", fields: [buyingEntityId], references: [id], onDelete: SetNull)
+
+  rateOverrides   RateOverride[]
+  proofOfPostings ProofOfPosting[]
+
+  @@index([mediaPlanVersionId])
+  @@index([assetId])
+  @@index([buyingEntityId])
+  @@map("media_plan_items")
+}
+
+// Evidence that a booked asset was actually installed/posted as
+// contracted — the standard OOH "proof of posting" a client expects
+// before a campaign is considered delivered. Distinct from the plan
+// version's own lock: attaching proof happens *after* a plan is
+// Approved/Booked, and never edits the line item itself.
+model ProofOfPosting {
+  id              String        @id @default(cuid())
+  mediaPlanItemId String
+  mediaPlanItem   MediaPlanItem @relation(fields: [mediaPlanItemId], references: [id], onDelete: Cascade)
+  photoUrl        String
+  postedDate      DateTime
+  notes           String?
+  uploadedById    String?
+  uploadedBy      User?         @relation(fields: [uploadedById], references: [id])
+  createdAt       DateTime      @default(now())
+
+  @@index([mediaPlanItemId])
+  @@map("proof_of_postings")
+}
+
+// ---------------------------------------------------------------------------
+// Ingestion, reconciliation, audit
+// ---------------------------------------------------------------------------
+
+model ImportJob {
+  id                String           @id @default(cuid())
+  sourceType        ImportSourceType
+  rateCardVersionId String?
+  rateCardVersion   RateCardVersion? @relation(fields: [rateCardVersionId], references: [id])
+  status            ImportJobStatus  @default(QUEUED)
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  triggeredById     String?
+  triggeredBy       User?            @relation(fields: [triggeredById], references: [id])
+
+  assetsFound     Int @default(0)
+  suppliersFound  Int @default(0)
+  ratesImported   Int @default(0)
+  feesImported    Int @default(0)
+  missingRates    Int @default(0)
+  duplicateAssets Int @default(0)
+  invalidValues   Int @default(0)
+  conflictsFound  Int @default(0)
+
+  summary      Json? // full structured IMPORT SUMMARY payload
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+
+  rateChanges RateChange[]
+
+  @@map("import_jobs")
+}
+
+// One row per asset/rate diff detected when a new rate-card version (or the
+// initial Excel migration) is compared against what's already published.
+model RateChange {
+  id                   String               @id @default(cuid())
+  importJobId          String
+  importJob            ImportJob            @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+  rateCardVersionId    String
+  rateCardVersion      RateCardVersion      @relation(fields: [rateCardVersionId], references: [id], onDelete: Cascade)
+  assetId              String? // null when the asset is brand new and not yet created
+  asset                Asset?               @relation(fields: [assetId], references: [id])
+  candidateAssetName   String
+  candidateLocation    String?
+  changeType           RateChangeType
+  extractionConfidence ExtractionConfidence @default(MEDIUM)
+  oldValue             Json?
+  newValue             Json?
+  decision             RateDecision         @default(PENDING)
+  decidedById          String?
+  decidedAt            DateTime?
+  notes                String?
+  createdAt            DateTime             @default(now())
+
+  @@index([importJobId])
+  @@map("rate_changes")
+}
+
+// Excel-value vs rate-card-value reconciliation, per your explicit requirement
+// that conflicts are never silently overwritten.
+model Reconciliation {
+  id                 String               @id @default(cuid())
+  assetId            String?
+  candidateAssetName String
+  fieldName          String // "grossRate2Weeks" | "productionFee" | ...
+  excelValue         String?
+  rateCardValue      String?
+  difference         String?
+  sourceDocument     String
+  sourcePage         Int?
+  rateCardVersionId  String?
+  rateCardVersion    RateCardVersion?     @relation(fields: [rateCardVersionId], references: [id])
+  recommendedAction  ReconciliationAction @default(NEEDS_DISCUSSION)
+  status             ReconciliationStatus @default(OPEN)
+  resolvedById       String?
+  resolvedBy         User?                @relation("ReconciliationResolvedBy", fields: [resolvedById], references: [id])
+  resolvedAt         DateTime?
+  resolutionNotes    String?
+  createdAt          DateTime             @default(now())
+
+  @@index([status])
+  @@map("reconciliations")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String // "RATE_CARD_UPLOADED" | "RATE_PUBLISHED" | "PLAN_APPROVED" | ...
+  entityType String // "Asset" | "AssetRate" | "MediaPlan" | ...
+  entityId   String?
+  oldValue   Json?
+  newValue   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Commercial intelligence — revenue targets and supplier AVR schemes are real
+// data the business enters (never simulated). Until entered, the dashboards
+// that read these show an empty "add your real figures" state rather than a
+// fabricated number.
+// ---------------------------------------------------------------------------
+
+model RevenueTarget {
+  id           String   @id @default(cuid())
+  year         Int      @unique
+  targetAmount Decimal  @db.Decimal(14, 2)
+  currency     String   @default("QAR")
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("revenue_targets")
+}
+
+// A real, recurring retainer invoice for one client in one month — entered
+// as it actually happens, never assumed. Real agency revenue is Agency Fee
+// + IR (both on MediaPlanItem) + these retainer fees — never the gross
+// client billing total, which is mostly pass-through media cost.
+model RetainerFee {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  year        Int
+  month       Int // 1-12
+  amount      Decimal  @db.Decimal(14, 2)
+  currency    String   @default("QAR")
+  notes       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([clientId, year, month])
+  @@map("retainer_fees")
+}
+
+// One supplier's real, contracted AVR (Annual Volume Rebate) slab structure —
+// entered once its actual thresholds/percentages are known, then the AVR
+// tracker computes live progress against real spend from MediaPlanItem.
+model AvrScheme {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  // Real supplier AVR files split one supplier into several commercial
+  // categories (e.g. Elan's "Doha OOH", "Greater Doha OOH", "DOOH", "Cinema"
+  // each carry their own slab table) — a supplier is not one scheme.
+  category   String   @default("General")
+  year       Int
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  slabs AvrSlab[]
+
+  @@unique([supplierId, category, year])
+  @@map("avr_schemes")
+}
+
+model AvrSlab {
+  id           String    @id @default(cuid())
+  avrSchemeId  String
+  avrScheme    AvrScheme @relation(fields: [avrSchemeId], references: [id], onDelete: Cascade)
+  thresholdFrom Decimal  @db.Decimal(14, 2) // spend required to reach this slab
+  thresholdTo  Decimal?  @db.Decimal(14, 2) // optional upper bound; null = open-ended (this slab applies at thresholdFrom and above, until a higher slab is reached)
+  rebatePct    Decimal   @db.Decimal(6, 4)
+  sortOrder    Int       @default(0)
+
+  @@map("avr_slabs")
+}
+
+// ---------------------------------------------------------------------------
+// Publicis Intelligence platform tables (agents, credits, workspace documents).
+// Timestamps here are epoch milliseconds (BigInt) because the existing API
+// layer reads and writes them as plain numbers.
+// ---------------------------------------------------------------------------
+
+model Ledger {
+  id           BigInt  @id @default(autoincrement())
+  userId       String  @map("user_id")
+  ts           BigInt
+  kind         String
+  model        String?
+  route        String?
+  inputTokens  Int?    @default(0) @map("input_tokens")
+  outputTokens Int?    @default(0) @map("output_tokens")
+  searches     Int?    @default(0)
+  usd          Float?  @default(0)
+  credits      Float
+  balanceAfter Float   @map("balance_after")
+  note         String?
+  byUser       String? @map("by_user")
+
+  @@index([userId, ts], map: "ledger_user_ts")
+  @@map("ledger")
+}
+
+model Doc {
+  col       String
+  id        String
+  owner     String?
+  data      String
+  updatedAt BigInt  @map("updated_at")
+
+  @@id([col, id])
+  @@map("docs")
+}
+
+model Conversation {
+  id        String  @id
+  userId    String  @map("user_id")
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String  @default("")
+  model     String?
+  messages  String  @default("[]")
+  updatedAt BigInt  @map("updated_at")
+
+  @@index([userId, updatedAt], map: "conv_user")
+  @@map("conversations")
+}
+
+model AppSetting {
+  key   String @id
+  value String
+
+  @@map("settings")
+}
+
+model StoredFile {
+  id        String  @id
+  owner     String?
+  name      String?
+  mime      String?
+  size      Int?
+  kind      String?
+  createdAt BigInt? @map("created_at")
+  data      Bytes
+
+  @@map("files")
+}
+
+model LoginFail {
+  k String @id
+  n Int
+  t BigInt
+
+  @@map("login_fails")
+}

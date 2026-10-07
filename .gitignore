@@ -28,3 +28,6 @@ data/
 .next/
 next-env.d.ts
 *.tsbuildinfo
+
+# Prisma client output
+generated/
