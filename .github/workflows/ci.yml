@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Syntax check (server and client JS)
+        run: |
+          find server.js lib public -name '*.js' -not -path 'public/vendor/*' -print0 | xargs -0 -n1 node --check
+
+      - name: Boot and health check
+        env:
+          PORT: 7861
+          DATA_DIR: ${{ runner.temp }}/pi-data
+        run: |
+          node server.js &
+          for i in $(seq 1 20); do curl -fs localhost:7861/api/health && exit 0; sleep 1; done
+          echo "server did not become healthy"; exit 1
+
+      - name: Docker build
+        run: docker build -t publicis-intelligence:ci .
+
+      - name: Block committed env files
+        run: |
+          if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$'; then
+            echo "Env file committed"; exit 1
+          fi
