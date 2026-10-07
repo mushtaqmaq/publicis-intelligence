@@ -1,4 +1,4 @@
-import { requireSessionUser } from "@/lib/auth/session";
+import { requireMediaUser } from "@/lib/auth/modules";
 import { AdminDashboard } from "@/components/dashboard/AdminDashboard";
 import { AccountManagerDashboard } from "@/components/dashboard/AccountManagerDashboard";
 import { MediaPlannerDashboard } from "@/components/dashboard/MediaPlannerDashboard";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 // restricted widget with its contents hidden; it simply gets a different
 // component tree.
 export default async function DashboardPage() {
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
 
   switch (user.role) {
     case "SUPER_ADMIN":

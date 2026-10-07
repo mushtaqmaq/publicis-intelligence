@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import type { MediaPlanStatus } from "@/generated/prisma/enums";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { requireSessionUser } from "@/lib/auth/session";
+import { requireMediaUser } from "@/lib/auth/modules";
 import { deleteMediaPlanAction } from "./[planId]/actions";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +33,7 @@ export default async function MediaPlansPage({
 }: {
   searchParams: Promise<{ status?: string; year?: string }>;
 }) {
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
   const canDelete = user.role === "SUPER_ADMIN";
 
   const { status: statusParam, year: yearParam } = await searchParams;

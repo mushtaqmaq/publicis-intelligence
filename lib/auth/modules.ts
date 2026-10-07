@@ -22,3 +22,12 @@ export async function hasModule(user: SessionUser, id: ModuleId): Promise<boolea
 }
 
 export { permKey };
+
+// For server actions and route handlers under /media: the signed-in user MUST hold the Media module.
+// (Pages are guarded by the layout, but actions and routes are separate endpoints.)
+export async function requireMediaUser(): Promise<SessionUser> {
+  const { requireSessionUser } = await import("./session");
+  const user = await requireSessionUser();
+  if (!(await hasModule(user, "media"))) throw new Error("You do not have access to the Media module.");
+  return user;
+}

@@ -1,8 +1,12 @@
 "use server";
 
+import { requireMediaUser } from "@/lib/auth/modules";
+
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireSessionUser } from "@/lib/auth/session";
+import type { Prisma } from "@/generated/prisma/client";
+import { newOnlineData } from "@/lib/planning/online";
+
 
 function generatePlanCode(campaignName: string, start: Date): string {
   const slug = campaignName
@@ -14,7 +18,7 @@ function generatePlanCode(campaignName: string, start: Date): string {
 }
 
 export async function createMediaPlanAction(formData: FormData) {
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
   const clientName = (formData.get("clientName") as string)?.trim();
   const campaignName = (formData.get("campaignName") as string)?.trim();
   const campaignStartRaw = formData.get("campaignStart") as string;
@@ -40,12 +44,15 @@ export async function createMediaPlanAction(formData: FormData) {
   });
 
   const budgetRaw = formData.get("budget") as string;
+  const rawType = String(formData.get("planType") ?? "OFFLINE");
+  const planType = ["OFFLINE", "ONLINE", "HYBRID"].includes(rawType) ? rawType : "OFFLINE";
 
   const plan = await prisma.mediaPlan.create({
     data: {
       planCode: generatePlanCode(campaignName, campaignStart),
       clientId: client.id,
       campaignName,
+      planType,
       campaignId: (formData.get("campaignId") as string)?.trim() || null,
       brand: (formData.get("brand") as string)?.trim() || null,
       campaignStart,
@@ -58,7 +65,7 @@ export async function createMediaPlanAction(formData: FormData) {
       notes: (formData.get("notes") as string)?.trim() || null,
       createdById: user.id,
       versions: {
-        create: { versionNumber: 1, label: "V1", createdById: user.id },
+        create: { versionNumber: 1, label: "V1", createdById: user.id, ...(planType !== "OFFLINE" ? { onlineData: newOnlineData() as unknown as Prisma.InputJsonValue } : {}) },
       },
     },
     include: { versions: true },

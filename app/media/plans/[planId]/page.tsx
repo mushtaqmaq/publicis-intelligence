@@ -3,9 +3,11 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { removeItemAction, updateStatusAction, updateWorkflowStatusAction, createNewVersionAction, deleteMediaPlanAction } from "./actions";
+import { OnlineBlockEditor } from "@/components/media/OnlineBlockEditor";
+import { sanitizeOnlineData, onlineTotalQar } from "@/lib/planning/online";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MediumSupplierSelect } from "@/components/MediumSupplierSelect";
-import { requireSessionUser } from "@/lib/auth/session";
+import { requireMediaUser } from "@/lib/auth/modules";
 import { hasPermission } from "@/lib/auth/permissions";
 
 export const dynamic = "force-dynamic";
@@ -50,7 +52,7 @@ export default async function MediaPlanPage({
   const { planId } = await params;
   const search = await searchParams;
 
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
   const canManageWorkflow = await hasPermission(user, "campaigns.manage_status");
 
   const plan = await prisma.mediaPlan.findUnique({
@@ -104,6 +106,12 @@ export default async function MediaPlanPage({
     if (item.excludesPendingCost) anyPending = true;
     supplierIds.add(item.asset.supplierId);
   }
+  // Online/digital block (ONLINE and HYBRID plans): its spend counts toward the plan total.
+  const isOnline = plan.planType !== "OFFLINE";
+  const isOnlineOnly = plan.planType === "ONLINE";
+  const onlineData = isOnline && version.onlineData ? sanitizeOnlineData(version.onlineData) : null;
+  const onlineTotal = onlineData ? onlineTotalQar(onlineData, plan.campaignStart, plan.campaignEnd) : 0;
+  grandTotal += onlineTotal;
   const hasAgencyRevenueData = agencyFeeTotal > 0 || irTotal > 0;
 
   const budget = plan.budget ? Number(plan.budget) : null;
@@ -165,7 +173,7 @@ export default async function MediaPlanPage({
           <div>
             <PageHeader
               title={plan.campaignName}
-              subtitle={`${plan.client.name} · ${fmtDate(plan.campaignStart)} → ${fmtDate(plan.campaignEnd)} · ${plan.currency}`}
+              subtitle={`${plan.client.name} · ${fmtDate(plan.campaignStart)} → ${fmtDate(plan.campaignEnd)} · ${plan.currency}${isOnline ? ` · ${plan.planType === "HYBRID" ? "Hybrid" : "Online"} plan` : ""}`}
             />
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -320,7 +328,10 @@ export default async function MediaPlanPage({
       </div>
 
       <div className="flex-1 overflow-auto px-8 py-5">
-        {!version.isLocked && (
+        {onlineData && (
+          <OnlineBlockEditor planId={planId} versionId={version.id} locked={version.isLocked} initial={onlineData} start={fmtDate(plan.campaignStart)} end={fmtDate(plan.campaignEnd)} />
+        )}
+        {!version.isLocked && !isOnlineOnly && (
           <section className="bg-surface border border-border rounded-lg p-5">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-medium text-foreground">Add assets</h2>
@@ -399,7 +410,7 @@ export default async function MediaPlanPage({
           </section>
         )}
 
-        <section className="mt-6">
+        {!isOnlineOnly && <section className="mt-6">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="text-left text-xs text-muted uppercase tracking-wide border-b border-border">
@@ -475,7 +486,7 @@ export default async function MediaPlanPage({
               No assets added yet — search above to add the first one.
             </div>
           )}
-        </section>
+        </section>}
       </div>
 
       <div className="px-8 py-4 border-t border-border bg-surface">

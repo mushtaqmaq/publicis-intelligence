@@ -28,6 +28,14 @@ export default async function NewMediaPlanPage({
       )}
 
       <form action={createMediaPlanAction} className="mt-6 space-y-4 bg-surface border border-border rounded-lg p-5">
+        <div>
+          <label className="block text-xs font-medium text-muted uppercase tracking-wide mb-1">Plan type</label>
+          <select name="planType" defaultValue="OFFLINE" className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm">
+            <option value="OFFLINE">Offline / OOH (inventory lines)</option>
+            <option value="ONLINE">Online (digital objectives and platforms)</option>
+            <option value="HYBRID">Hybrid (online and offline in one plan)</option>
+          </select>
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-muted uppercase tracking-wide mb-1">
