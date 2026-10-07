@@ -43,7 +43,8 @@ git clone <repository>
 cd publicis-intelligence
 npm install
 cp .env.example .env   # set DATABASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD; .env is git-ignored
-node --env-file=.env server.js
+npx prisma migrate deploy   # create/upgrade tables (never run this against production by hand)
+npm run dev
 ```
 
 Open http://localhost:7860 (or your `PORT`). Variables are documented in `docs/ENVIRONMENT_VARIABLES.md`. Use a separate Neon branch for local work, never the production database.
