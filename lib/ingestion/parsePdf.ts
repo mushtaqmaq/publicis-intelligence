@@ -16,7 +16,6 @@
  * project's own rule that low-confidence extraction must be surfaced, not
  * silently cleaned up into something that looks more certain than it is.
  */
-import { PDFParse } from "pdf-parse";
 import type { ParseResult, ParsedCandidate, CandidateFee, ExtractionConfidence } from "./types";
 
 const NOISE_LINE_PATTERNS = [
@@ -185,6 +184,9 @@ function classifyPage(pageText: string, pageNum: number): ParsedCandidate | null
 }
 
 export async function parsePdfRateCard(buffer: Buffer): Promise<ParseResult> {
+  // Loaded on first use, not at import: pdf-parse needs browser globals (DOMMatrix) that only exist once its optional
+  // canvas package is present, and importing it eagerly crashed every page that merely imported this module.
+  const { PDFParse } = await import("pdf-parse");
   const parser = new PDFParse({ data: buffer });
   try {
     const result = await parser.getText();
