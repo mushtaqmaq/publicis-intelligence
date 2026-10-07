@@ -42,7 +42,7 @@ External Node backend (the existing server.js, Docker, persistent volume)
 - Touches almost every `server.js` route and violates "preserve logic" unless done with extreme care and a data-migration plan (`DATABASE_AUDIT.md`).
 
 ## Recommendation
-**Option 2**, with the backend moved first. The static SPA is trivial for Vercel, and the backend keeps all current behavior. Revisit Option 3 later as separate, reviewed pull requests.
+**DECIDED (owner chose Option 2, backend on Fly.io).** Backend moves first. The static SPA is trivial for Vercel, and the backend keeps all current behavior. Revisit Option 3 later as separate, reviewed pull requests.
 
 ## Decisions needed from the owner
 1. Option 1, 2 or 3?
@@ -50,3 +50,10 @@ External Node backend (the existing server.js, Docker, persistent volume)
 3. Does the live Space hold real user accounts and data that must be carried over? That requires a DB export from the Space's `/data` volume, which I can't reach from the repo.
 
 No Vercel project, backend host or production deployment will be created until these are answered.
+
+## Decision record
+- **Chosen:** Option 2, Vercel frontend + the unchanged Node server on Fly.io (one machine, one `pi_data` volume mounted at `/data`).
+- **Files:** `fly.toml`, `Dockerfile.fly` + `fly-entrypoint.sh` (refuses to start without the volume, so data can never silently land in `/tmp`), `vercel.json`.
+- **Routing:** Vercel serves `public/` and rewrites `/api/*` and `/files/*` to the Fly app. `/login` maps to `login.html`. Because the browser only talks to the Vercel domain, the session cookie is first-party and **`lib/auth.js` is unchanged**.
+- **Placeholder:** `vercel.json` points at `https://REPLACE-ME.invalid`. The owner must replace it with the real Fly URL; the production workflow refuses to deploy while the placeholder is present.
+- **Known risks to test in parity:** (1) Vercel external rewrites have their own timeout; long `/api/ai` and audio calls stream a keepalive every 12 s, but this must be proven with a long agent run. If it fails, serve the API from a custom domain on Fly instead (and revisit cookie settings). (2) `public/` static files (including agent prompts in `js/agents.js`) are served without login, as before for `.js`/`.css`; `index.html` is now also public. (3) Single machine means brief downtime on deploy.
