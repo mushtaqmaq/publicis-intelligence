@@ -1,15 +1,29 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "git": { "deploymentEnabled": false },
+  "git": {
+    "deploymentEnabled": false
+  },
   "framework": null,
   "buildCommand": null,
   "outputDirectory": "public",
   "cleanUrls": false,
   "functions": {
-    "api/[...path].js": { "maxDuration": 300 }
+    "api/index.js": {
+      "maxDuration": 300
+    }
   },
   "rewrites": [
-    { "source": "/files/:path*", "destination": "/api/files/:path*" },
-    { "source": "/login", "destination": "/login.html" }
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index?__p=:path*"
+    },
+    {
+      "source": "/files/:path*",
+      "destination": "/api/index?__p=files/:path*"
+    },
+    {
+      "source": "/login",
+      "destination": "/login.html"
+    }
   ]
 }
