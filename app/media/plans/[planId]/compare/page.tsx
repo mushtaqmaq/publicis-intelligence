@@ -1,3 +1,4 @@
+import { requireMediaUser } from "@/lib/auth/modules";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -38,6 +39,7 @@ export default async function CompareVersionsPage({
   params: Promise<{ planId: string }>;
   searchParams: Promise<{ a?: string; b?: string }>;
 }) {
+  await requireMediaUser();
   const { planId } = await params;
   const search = await searchParams;
 

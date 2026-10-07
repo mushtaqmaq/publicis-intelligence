@@ -1,3 +1,4 @@
+import { requireMediaUser } from "@/lib/auth/modules";
 import { prisma } from "@/lib/prisma";
 import { createMediaPlanAction } from "./actions";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -9,6 +10,7 @@ export default async function NewMediaPlanPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
+  await requireMediaUser();
   const { error } = await searchParams;
   const clients = await prisma.client.findMany({ orderBy: { name: "asc" }, select: { name: true } });
 

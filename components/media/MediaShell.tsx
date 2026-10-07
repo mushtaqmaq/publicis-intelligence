@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   LayoutDashboard, FileStack, Boxes, Map as MapIcon, Building2, Users, Home, Zap, MessageCircle, Compass, Sparkles,
-  Megaphone, Wallet, Clapperboard, Search, Library, Gauge, ShieldCheck, LogOut, Menu,
+  Megaphone, Wallet, Clapperboard, Search, Library, Gauge, ShieldCheck, LogOut, Menu, BarChart3, Settings, ChevronDown, ChevronRight,
 } from "lucide-react";
 
 type U = { name: string | null; email: string; role: string };
@@ -33,7 +33,26 @@ const mediaTools = [
   { href: "/media/inventory", label: "Inventory", icon: Boxes },
   { href: "/media/map", label: "Map", icon: MapIcon },
   { href: "/media/suppliers", label: "Suppliers", icon: Building2 },
+  { href: "/media/reports", label: "Reports", icon: BarChart3 },
   { href: "/media/clients", label: "Client accounts", icon: Users },
+];
+// Media settings (rate cards, imports, fees, locations ...). Items with a permission are hidden unless granted.
+const settingsNav: { href: string; label: string; permission?: string }[] = [
+  { href: "/media/settings/rate-cards", label: "Rate cards" },
+  { href: "/media/settings/import-rate-card", label: "Import rate card" },
+  { href: "/media/settings/import-media-plans", label: "Import media plans" },
+  { href: "/media/settings/import-kmz", label: "Import KMZ (locations)" },
+  { href: "/media/settings/ooh-enrichment", label: "Asset enrichment review" },
+  { href: "/media/settings/rate-versions", label: "Rate versions" },
+  { href: "/media/settings/suppliers", label: "Suppliers" },
+  { href: "/media/settings/asset-categories", label: "Asset categories" },
+  { href: "/media/settings/pricing-rules", label: "Pricing rules" },
+  { href: "/media/settings/fees", label: "Fees" },
+  { href: "/media/settings/revenue-targets", label: "Revenue targets", permission: "dashboard.revenue.view" },
+  { href: "/media/settings/retainer-fees", label: "Retainer fees", permission: "dashboard.revenue.view" },
+  { href: "/media/settings/avr-schemes", label: "Supplier AVR schemes", permission: "dashboard.avr.view" },
+  { href: "/media/settings/import-history", label: "Import history" },
+  { href: "/media/settings/audit-log", label: "Audit log" },
 ];
 const workspace = [
   { href: "/#/library", label: "Library", icon: Library },
@@ -57,7 +76,9 @@ function Section({ title }: { title: string }) {
 export function MediaShell({ user, permissions, modules, children }: { user: U; permissions: string[]; modules: string[]; children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
   const [open, setOpen] = useState(false);
-  void permissions; // reserved for permission-gated planner items as more media tools land
+  const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/media/settings"));
+  const permissionSet = new Set(permissions);
+  const visibleSettings = settingsNav.filter((i) => !i.permission || permissionSet.has(i.permission));
   const isAdmin = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
   const myPillars = pillars.filter((p) => modules.includes(p.id));
 
@@ -74,6 +95,16 @@ export function MediaShell({ user, permissions, modules, children }: { user: U; 
         <div key={p.id}>
           <Item href={p.href} label={p.label} icon={p.icon} color={p.color} active={p.id === "media" && pathname.startsWith("/media")} />
           {p.id === "media" && mediaTools.map((t) => <Item key={t.href} {...t} sub active={pathname === t.href || pathname.startsWith(t.href + "/")} />)}
+          {p.id === "media" && (
+            <>
+              <button onClick={() => setSettingsOpen((v) => !v)} className="flex w-full items-center gap-2.5 rounded-xl py-2 pl-9 pr-3 text-sm text-[#3c3c43] hover:bg-black/5">
+                <Settings size={14} strokeWidth={1.75} />Settings{settingsOpen ? <ChevronDown size={14} className="ml-auto" /> : <ChevronRight size={14} className="ml-auto" />}
+              </button>
+              {settingsOpen && visibleSettings.map((t) => (
+                <Link key={t.href} href={t.href} className={`block rounded-lg py-1.5 pl-14 pr-3 text-[13px] ${pathname.startsWith(t.href) ? "bg-white font-medium text-foreground shadow-sm ring-1 ring-black/5" : "text-[#3c3c43] hover:bg-black/5"}`}>{t.label}</Link>
+              ))}
+            </>
+          )}
         </div>
       ))}
       <Section title="Workspace" />

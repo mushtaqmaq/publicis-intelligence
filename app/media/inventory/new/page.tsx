@@ -1,3 +1,4 @@
+import { requireMediaUser } from "@/lib/auth/modules";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { createAssetAction } from "./actions";
@@ -17,6 +18,7 @@ const CALC_METHODS = [
 ];
 
 export default async function NewAssetPage({ searchParams }: { searchParams: Promise<{ error?: string; supplierId?: string }> }) {
+  await requireMediaUser();
   const { error, supplierId } = await searchParams;
   const [suppliers, categories] = await Promise.all([
     prisma.supplier.findMany({ where: { isActive: true }, orderBy: [{ mediaChannel: "asc" }, { name: "asc" }] }),

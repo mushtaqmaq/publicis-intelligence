@@ -1,3 +1,4 @@
+import { requireMediaUser } from "@/lib/auth/modules";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -24,6 +25,7 @@ export default async function EditAssetPage({
   params: Promise<{ assetId: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
+  await requireMediaUser();
   const { assetId } = await params;
   const { error } = await searchParams;
 
