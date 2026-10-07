@@ -37,6 +37,11 @@ jobs:
       - name: Type-check and build (Next.js)
         run: npx next build
 
+      - name: Apply database migrations
+        env:
+          DATABASE_URL: postgres://postgres:ci@localhost:5432/postgres
+        run: npx prisma migrate deploy
+
       - name: Boot against Postgres and sign in
         env:
           DATABASE_URL: postgres://postgres:ci@localhost:5432/postgres
