@@ -46,7 +46,7 @@ PI.PILLARS = [
       task: 'Write the video script as a table (timecode, visual, VO English, VO Arabic, super, sound). Then storyboard frame descriptions, a shot list, and one AI video prompt per shot covering subject, action, camera move, lens, lighting and style. Keep VO word counts realistic for the duration.' }
   ] },
   { id: 'media', name: 'Media', icon: 'megaphone', color: '#0EA5A0', desc: 'Online, OOH and hybrid media plans, campaign builds, mix modelling, reporting and analysis.', agents: [
-    { id: 'plan', name: 'Media planner', icon: 'calendar-clock', tool: 'mediaplan', blurb: 'Online, OOH or hybrid plans in the agency format, with live totals and Excel or PDF export.' },
+    { id: 'plan', name: 'Media planner', icon: 'calendar-clock', tool: 'mediaplan', blurb: 'Online, OOH or hybrid plans with real inventory and rates, versions and approvals, and agency-format Excel or PDF export.' },
     { id: 'setup', name: 'Campaign setup', icon: 'settings-2', tool: 'setup', blurb: 'Full platform builds with copy, targeting and tracking, exported as bulk-upload files.' },
     { id: 'optimize', name: 'Optimization', icon: 'sliders-horizontal', tool: 'optimize', blurb: 'Marketing mix modelling with saturation curves and a budget optimiser, plus live campaign diagnosis.' },
     { id: 'report', name: 'Reporting', icon: 'chart-column', tool: 'report', blurb: 'Drop platform exports and get a dashboard and a client-ready report.' },

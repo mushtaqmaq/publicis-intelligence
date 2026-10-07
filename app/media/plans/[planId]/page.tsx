@@ -334,7 +334,7 @@ export default async function MediaPlanPage({
 
       <div className="flex-1 overflow-auto px-8 py-5">
         {onlineData && (
-          <OnlineBlockEditor planId={planId} versionId={version.id} locked={version.isLocked} initial={onlineData} start={fmtDate(plan.campaignStart)} end={fmtDate(plan.campaignEnd)} />
+          <OnlineBlockEditor planId={planId} versionId={version.id} locked={version.isLocked} initial={onlineData} start={fmtDate(plan.campaignStart)} end={fmtDate(plan.campaignEnd)} ctx={{ client: plan.client.name, brand: plan.brand, objective: plan.objective, audience: plan.targetAudience, locations: plan.targetLocations, budget: plan.budget ? Number(plan.budget) : null }} />
         )}
         {!version.isLocked && !isOnlineOnly && (
           <section className="bg-surface border border-border rounded-lg p-5">
