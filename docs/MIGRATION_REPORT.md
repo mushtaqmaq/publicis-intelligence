@@ -1,7 +1,7 @@
 # Migration Report
 
 Original framework: Plain Node.js http server + vanilla JS SPA, SQLite, Docker (Hugging Face Space)
-Target framework: Unchanged Node server on Fly.io + static frontend on Vercel (Option 2)
+Target framework: Vercel-native: static frontend + one serverless function, Neon Postgres (Option 3)
 GitHub repository: https://github.com/mushtaqmaq/publicis-intelligence (private)
 Current branch: `main` (all PRs #1-#4 merged; `develop` is behind `main` by merge commits and should be synced)
 Vercel compatibility: READY for the split architecture (static only; `framework: null`, `.vercelignore` uploads only `public/` + `vercel.json`)

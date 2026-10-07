@@ -36,19 +36,20 @@ Docker: `docker build -t pi . && docker run -p 7860:7860 --env-file .env -v pi-d
 
 ## Development (GitHub workflow)
 
-Prerequisites: Node 22.13 or newer. There are no npm dependencies to install.
+Prerequisites: Node 22 and a Postgres database (a free Neon branch works; or `docker run -p 5432:5432 -e POSTGRES_PASSWORD=pw postgres:16-alpine`).
 
 ```bash
 git clone <repository>
 cd publicis-intelligence
-cp .env.example .env   # fill in only what you need; .env is git-ignored
+npm install
+cp .env.example .env   # set DATABASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD; .env is git-ignored
 node --env-file=.env server.js
 ```
 
-Open http://localhost:7860 (or your `PORT`). Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env` to create the first admin. Variables are documented in `docs/ENVIRONMENT_VARIABLES.md`.
+Open http://localhost:7860 (or your `PORT`). Variables are documented in `docs/ENVIRONMENT_VARIABLES.md`. Use a separate Neon branch for local work, never the production database.
 
-Testing: there is no automated test suite yet. CI runs a syntax check, a boot and `/api/health` check, and a Docker build on every Pull Request.
+Testing: there is no automated test suite yet. CI syntax-checks the code, boots the server against a Postgres service, signs in, and builds the Docker image on every Pull Request.
 
-Branches and Pull Requests: see `CONTRIBUTING.md`. Branch from `develop`, open a PR, and wait for review. `main` is protected.
+Branches and Pull Requests: see `CONTRIBUTING.md`. Branch from `develop`, open a PR, and wait for review. Never push to `main`.
 
-Deployment: production is owner-controlled. See `docs/VERCEL_ARCHITECTURE.md` and `docs/DEPLOYMENT_GUIDE.md`.
+Deployment: production runs entirely on Vercel (static frontend + one serverless function) with Neon Postgres. It is owner-controlled; see `docs/DEPLOYMENT_GUIDE.md`.

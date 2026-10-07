@@ -51,9 +51,10 @@ External Node backend (the existing server.js, Docker, persistent volume)
 
 No Vercel project, backend host or production deployment will be created until these are answered.
 
-## Decision record
-- **Chosen:** Option 2, Vercel frontend + the unchanged Node server on Fly.io (one machine, one `pi_data` volume mounted at `/data`).
-- **Files:** `fly.toml`, `Dockerfile.fly` + `fly-entrypoint.sh` (refuses to start without the volume, so data can never silently land in `/tmp`), `vercel.json`.
-- **Routing:** Vercel serves `public/` and rewrites `/api/*` and `/files/*` to the Fly app. `/login` maps to `login.html`. Because the browser only talks to the Vercel domain, the session cookie is first-party and **`lib/auth.js` is unchanged**.
-- **Placeholder:** `vercel.json` points at `https://REPLACE-ME.invalid`. The owner must replace it with the real Fly URL; the production workflow refuses to deploy while the placeholder is present.
-- **Known risks to test in parity:** (1) Vercel external rewrites have their own timeout; long `/api/ai` and audio calls stream a keepalive every 12 s, but this must be proven with a long agent run. If it fails, serve the API from a custom domain on Fly instead (and revisit cookie settings). (2) `public/` static files (including agent prompts in `js/agents.js`) are served without login, as before for `.js`/`.css`; `index.html` is now also public. (3) Single machine means brief downtime on deploy.
+## Decision record (current)
+- **Chosen (2026-10-07, owner):** Option 3, Vercel-native with Neon Postgres. This replaces the earlier Option 2 (Fly.io backend), which was dropped because Fly's free trial stops machines after 5 minutes without a card.
+- **Shape:** `public/` is served statically. `api/[...path].js` mounts the original router from `server.js` as one Vercel Function (`maxDuration` 300 s); `/files/*` is rewritten to it. The router logic is unchanged apart from the data layer.
+- **Database:** SQLite replaced by Neon Postgres via `DATABASE_URL` (`lib/db.js`, driver `pg`). Same schema; timestamps are BIGINT ms; ledger writes are one atomic statement; the login throttle moved into a `login_fails` table because instances do not share memory.
+- **Media:** generated and uploaded images/audio are stored in Postgres (`files.data` BYTEA), served by `/files/<id>`. Neon's free plan has a small storage quota; move to Vercel Blob if media grows.
+- **Sessions/cookies:** unchanged, first-party on the Vercel domain.
+- **Known limits to verify:** (1) Vercel caps request bodies at about 4.5 MB, so large image/audio uploads and big MMM data sets that previously worked (up to 30 MB) will now fail with 413. (2) Long streamed AI runs must finish inside `maxDuration`. (3) Cold starts add a schema check and a DB connection. (4) Neon free compute auto-suspends, so the first request after idle is slower.
