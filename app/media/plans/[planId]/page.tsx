@@ -179,6 +179,11 @@ export default async function MediaPlanPage({
           <div className="flex flex-col items-end gap-2">
             <div className="flex flex-col items-end gap-0.5 text-xs">
               <div className="flex items-center gap-1.5">
+                <span className="text-muted">Agency format:</span>
+                <a href={`/media/plans/${planId}/agency?v=${version.id}`} className="text-accent underline">EXCEL</a>
+                <a href={`/media/plans/${planId}/agency?v=${version.id}&format=pdf`} className="text-accent underline">PDF</a>
+              </div>
+              <div className="flex items-center gap-1.5">
                 <span className="text-muted">Client:</span>
                 {(["xlsx", "csv", "pdf"] as const).map((fmt) => (
                   <a
