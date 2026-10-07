@@ -1,3 +1,4 @@
+import { requireMediaUser } from "@/lib/auth/modules";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -21,6 +22,7 @@ export default async function AssetDetailPage({
 }: {
   params: Promise<{ assetId: string }>;
 }) {
+  await requireMediaUser();
   const { assetId } = await params;
 
   const asset = await prisma.asset.findUnique({

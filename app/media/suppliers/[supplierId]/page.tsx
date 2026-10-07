@@ -1,3 +1,4 @@
+import { requireMediaUser } from "@/lib/auth/modules";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -53,6 +54,7 @@ export default async function SupplierDetailPage({
   params: Promise<{ supplierId: string }>;
   searchParams: Promise<SupplierPageParams>;
 }) {
+  await requireMediaUser();
   const { supplierId } = await params;
   const filters = await searchParams;
 

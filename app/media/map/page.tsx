@@ -1,3 +1,4 @@
+import { requireMediaUser } from "@/lib/auth/modules";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
@@ -20,6 +21,7 @@ export default async function MapPage({
 }: {
   searchParams: Promise<{ channel?: string; supplier?: string }>;
 }) {
+  await requireMediaUser();
   const params = await searchParams;
 
   const supplierWhere: Prisma.SupplierWhereInput = {};

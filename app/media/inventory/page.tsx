@@ -1,3 +1,4 @@
+import { requireMediaUser } from "@/lib/auth/modules";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
@@ -75,6 +76,7 @@ export default async function InventoryPage({
 }: {
   searchParams: Promise<InventorySearchParams>;
 }) {
+  await requireMediaUser();
   const params = await searchParams;
   const [{ suppliers }, { total, assets, page, pageCount }] = await Promise.all([
     getFilterOptions(),

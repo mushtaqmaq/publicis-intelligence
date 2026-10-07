@@ -1,3 +1,4 @@
+import { requireMediaUser } from "@/lib/auth/modules";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -17,6 +18,7 @@ export default async function ProofOfPostingPage({
   params: Promise<{ planId: string }>;
   searchParams: Promise<{ error?: string; v?: string }>;
 }) {
+  await requireMediaUser();
   const { planId } = await params;
   const { error, v } = await searchParams;
 

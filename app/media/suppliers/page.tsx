@@ -1,3 +1,4 @@
+import { requireMediaUser } from "@/lib/auth/modules";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -5,6 +6,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 export const dynamic = "force-dynamic";
 
 export default async function SuppliersPage() {
+  await requireMediaUser();
   const suppliers = await prisma.supplier.findMany({
     where: { isActive: true },
     orderBy: { name: "asc" },
