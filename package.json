@@ -11,7 +11,10 @@
     "serve:legacy": "node server.js",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "postinstall": "prisma generate"
   },
   "engines": {
     "node": "22.x"
@@ -19,18 +22,28 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
+    "@vercel/blob": "^2.8.1",
+    "date-fns": "^4.4.0",
     "dotenv": "^18.0.6",
+    "jszip": "^3.10.2",
     "next": "^16.4.0",
+    "pdf-parse": "^2.4.5",
+    "pdfkit": "^0.20.2",
     "pg": "^8.13.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "xlsx": "^0.18.5",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/pdfkit": "^0.17.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "prisma": "^7.10.0",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^3.2.7"
   }
 }

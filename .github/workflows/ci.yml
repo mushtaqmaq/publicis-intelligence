@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Unit tests (rate engine, planning, ingestion)
+        run: npm test
+
       - name: Syntax check (server and client JS)
         run: |
           find server.js lib pages public -name '*.js' -not -path 'public/vendor/*' -print0 | xargs -0 -n1 node --check
