@@ -1,0 +1,25 @@
+.env
+.env.*
+!.env.example
+
+node_modules/
+.next/
+dist/
+build/
+
+.vercel/
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+.DS_Store
+
+*.log
+
+# Local runtime data (SQLite DB, generated media)
+data/
+*.db
+*.db-wal
+*.db-shm
