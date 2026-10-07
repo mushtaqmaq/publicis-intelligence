@@ -241,7 +241,7 @@ async function docs(req, res, user, parts) {
 
 /* ---------- Router ---------- */
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
-function file(res, f, extra) { res.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', 'referrer-policy': 'same-origin', ...(extra || {}) }); fs.createReadStream(f).pipe(res); }
+function file(res, f, extra) { res.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', 'referrer-policy': 'same-origin', ...(extra || {}) }); fs.createReadStream(/*turbopackIgnore: true*/ f).pipe(res); }
 
 async function route(req, res) {
   await ready();
@@ -262,7 +262,7 @@ async function route(req, res) {
   const user = await me(req);
   if (!user) {
     if (p.startsWith('/api/') || p.startsWith('/files/')) return fail(res, 401, 'Sign in required');
-    if (/\.(js|css|svg|ico|png|woff2)$/.test(p)) { const f = path.normalize(path.join(PUB, p)); if (f.startsWith(PUB) && fs.existsSync(f)) return file(res, f); }
+    if (/\.(js|css|svg|ico|png|woff2)$/.test(p)) { const f = path.normalize(path.join(PUB, p)); if (f.startsWith(PUB) && fs.existsSync(/*turbopackIgnore: true*/ f)) return file(res, f); }
     res.writeHead(302, { location: '/login' }); return res.end();
   }
   if (p.startsWith('/api/') && req.method !== 'GET' && req.headers['x-pi'] !== '1') return fail(res, 403, 'Missing app header');
@@ -373,7 +373,7 @@ async function route(req, res) {
   if (p.startsWith('/api/')) return fail(res, 404, 'Not found');
   let f = path.normalize(path.join(PUB, p === '/' ? 'index.html' : p));
   if (!f.startsWith(PUB)) return fail(res, 403, 'no');
-  if (!fs.existsSync(f) || fs.statSync(f).isDirectory() || f.endsWith('login.html')) f = path.join(PUB, 'index.html');
+  if (!fs.existsSync(/*turbopackIgnore: true*/ f) || fs.statSync(/*turbopackIgnore: true*/ f).isDirectory() || f.endsWith('login.html')) f = path.join(PUB, 'index.html');
   file(res, f);
 }
 

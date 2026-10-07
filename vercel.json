@@ -3,27 +3,8 @@
   "git": {
     "deploymentEnabled": false
   },
-  "framework": null,
-  "buildCommand": null,
-  "outputDirectory": "public",
-  "cleanUrls": false,
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 300
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/api/index?__p=:path*"
-    },
-    {
-      "source": "/files/:path*",
-      "destination": "/api/index?__p=files/:path*"
-    },
-    {
-      "source": "/login",
-      "destination": "/login.html"
-    }
-  ]
+  "framework": "nextjs",
+  "buildCommand": "next build",
+  "outputDirectory": ".next",
+  "installCommand": "npm ci"
 }

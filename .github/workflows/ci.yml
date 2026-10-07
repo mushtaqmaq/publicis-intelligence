@@ -30,22 +30,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Syntax check (server, API entry and client JS)
+      - name: Syntax check (server and client JS)
         run: |
-          find server.js api lib public -name '*.js' -not -path 'public/vendor/*' -print0 | xargs -0 -n1 node --check
+          find server.js lib pages public -name '*.js' -not -path 'public/vendor/*' -print0 | xargs -0 -n1 node --check
+
+      - name: Type-check and build (Next.js)
+        run: npx next build
 
       - name: Boot against Postgres and sign in
         env:
-          PORT: 7861
           DATABASE_URL: postgres://postgres:ci@localhost:5432/postgres
           ADMIN_EMAIL: ci@example.com
           ADMIN_PASSWORD: ci-only-password-1
         run: |
-          node server.js &
+          npx next start -p 7861 &
           for i in $(seq 1 20); do curl -fs localhost:7861/api/health && break; sleep 1; done
           curl -fs localhost:7861/api/health
           curl -fs -c jar -H 'x-pi: 1' -H 'content-type: application/json' -d '{"email":"ci@example.com","password":"ci-only-password-1"}' localhost:7861/api/login
           curl -fs -b jar localhost:7861/api/me
+          curl -fs -b jar -o /dev/null localhost:7861/planning
+          curl -fs -o /dev/null localhost:7861/
 
       - name: Validate vercel.json
         run: node -e "JSON.parse(require('fs').readFileSync('vercel.json','utf8'))"
