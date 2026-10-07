@@ -27,7 +27,7 @@ export default async function NewAssetPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="p-8 max-w-2xl">
-      <Link href="/planning/inventory" className="text-sm text-accent underline">
+      <Link href="/media/inventory" className="text-sm text-accent underline">
         ← Back to Inventory
       </Link>
       <div className="mt-3">
@@ -37,7 +37,7 @@ export default async function NewAssetPage({ searchParams }: { searchParams: Pro
             <>
               Add a single asset by hand — for a new digital placement (e.g. a DV360 or InMobi line item), a
               one-off site, or anything else that doesn&apos;t come from a rate-card upload. Need a brand new
-              supplier first? <Link href="/planning/settings/suppliers" className="text-accent underline">Create it here</Link>.
+              supplier first? <Link href="/media/settings/suppliers" className="text-accent underline">Create it here</Link>.
             </>
           }
         />

@@ -13,6 +13,9 @@ Schema is owned by **Prisma** (`prisma/schema.prisma`, `prisma/migrations`). The
 | Passwords | two scrypt formats | planner format `salt:key`. Old platform-format hashes still verify. |
 | First admin | env `ADMIN_EMAIL`/`ADMIN_PASSWORD` | Creates a `SUPER_ADMIN` if the email is new. If the email already exists (e.g. the planner owner) it is **not** modified except for one-time opening credits. |
 
+## Module access (from `module_permissions`)
+Each pillar is a module (strategy, creative, media, finance, production, search), stored as a permission `module.<id>` in the planner's `permissions` table and granted per user through `user_permission_overrides` (role defaults in `role_permissions` also work). `SUPER_ADMIN` and `ADMIN` hold every module implicitly. The migration grants `module.media` to every existing non-admin user so nobody loses access. Enforcement is server-side: agent routes named `<module>/<agent>`, image and audio generation (Creative), MMM (Media), and every planner page and API under `/media`. The shared routes (assistant, command) are open to all signed-in users. Note: the AI endpoint takes its route label from the client, so module checks govern which tools, paid services and planner data a person can reach; they are not a content filter on free-form prompts.
+
 ## Platform tables (new, from `platform_merge`)
 `ledger` (credit history), `docs` (library, clients, projects JSON), `conversations` (assistant chats, FK users), `settings` (admin settings JSON), `files` (generated media, BYTEA), `login_fails` (login throttle). Timestamps here are epoch milliseconds.
 

@@ -49,7 +49,7 @@ export default async function EditAssetPage({
 
   return (
     <div className="p-8 max-w-3xl">
-      <Link href={`/planning/inventory/${asset.id}`} className="text-sm text-accent underline">
+      <Link href={`/media/inventory/${asset.id}`} className="text-sm text-accent underline">
         ← Back to {asset.assetName}
       </Link>
       <div className="mt-3">

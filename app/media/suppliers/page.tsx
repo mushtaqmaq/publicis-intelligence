@@ -28,7 +28,7 @@ export default async function SuppliersPage() {
           {suppliers.map((s) => (
             <tr key={s.id} className="border-b border-border hover:bg-surface">
               <td className="py-2 pr-4 font-medium text-foreground">
-                <Link href={`/planning/suppliers/${s.id}`} className="hover:underline">
+                <Link href={`/media/suppliers/${s.id}`} className="hover:underline">
                   {s.name}
                 </Link>
               </td>

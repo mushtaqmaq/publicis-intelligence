@@ -141,7 +141,7 @@ export async function AccountManagerDashboard({ user }: { user: SessionUser }) {
             {allPlans.map((p) => (
               <tr key={p.id} className="border-b border-border">
                 <td className="py-2 pr-4">
-                  <Link href={`/planning/media-plans/${p.id}`} className="font-medium text-foreground hover:underline">
+                  <Link href={`/media/media-plans/${p.id}`} className="font-medium text-foreground hover:underline">
                     {p.campaignName}
                   </Link>
                 </td>

@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
+import { hasModule } from "@/lib/auth/modules";
 
 export type SearchResult = { type: string; id: string; label: string; sublabel?: string; href: string };
 
 export async function GET(req: NextRequest) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  if (!(await hasModule(user, "media"))) return NextResponse.json({ error: "You do not have access to the Media module." }, { status: 403 });
 
   const q = req.nextUrl.searchParams.get("q")?.trim();
   if (!q || q.length < 2) return NextResponse.json({ results: [] });

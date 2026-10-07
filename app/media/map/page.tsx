@@ -140,7 +140,7 @@ export default async function MapPage({
             Filter
           </button>
           {(params.channel || params.supplier) && (
-            <Link href="/planning/map" className="text-sm text-muted underline">
+            <Link href="/media/map" className="text-sm text-muted underline">
               Clear
             </Link>
           )}

@@ -100,7 +100,7 @@ export default async function InventoryPage({
           title="Inventory"
           subtitle={`${total.toLocaleString()} assets`}
           actions={
-            <Link href="/planning/inventory/new" className="rounded-md bg-accent text-accent-foreground px-3 py-1.5 text-sm font-medium">
+            <Link href="/media/inventory/new" className="rounded-md bg-accent text-accent-foreground px-3 py-1.5 text-sm font-medium">
               + New Asset
             </Link>
           }
@@ -138,7 +138,7 @@ export default async function InventoryPage({
             Filter
           </button>
           {(params.q || params.supplier || params.format || params.channel) && (
-            <Link href="/planning/inventory" className="text-sm text-muted underline">
+            <Link href="/media/inventory" className="text-sm text-muted underline">
               Clear
             </Link>
           )}
@@ -169,7 +169,7 @@ export default async function InventoryPage({
               return (
                 <tr key={asset.id} className="border-b border-border hover:bg-background">
                   <td className="py-2 pr-4">
-                    <Link href={`/planning/inventory/${asset.id}`}>
+                    <Link href={`/media/inventory/${asset.id}`}>
                       <div className="w-10 h-10 rounded-md border border-border bg-background overflow-hidden flex items-center justify-center">
                         {primaryImage ? (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -185,7 +185,7 @@ export default async function InventoryPage({
                     </Link>
                   </td>
                   <td className="py-2 pr-4">
-                    <Link href={`/planning/inventory/${asset.id}`} className="font-medium text-foreground hover:underline">
+                    <Link href={`/media/inventory/${asset.id}`} className="font-medium text-foreground hover:underline">
                       {asset.assetName}
                     </Link>
                     {isPackage && (
@@ -234,7 +234,7 @@ export default async function InventoryPage({
                     )}
                   </td>
                   <td className="py-2 pr-4">
-                    <Link href={`/planning/inventory/${asset.id}/edit`} className="text-xs text-accent underline">
+                    <Link href={`/media/inventory/${asset.id}/edit`} className="text-xs text-accent underline">
                       Edit
                     </Link>
                   </td>

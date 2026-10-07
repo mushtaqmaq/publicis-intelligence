@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { get } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
+import { hasModule } from "@/lib/auth/modules";
 
 /**
  * Streams an asset photo from the (private) Blob store.
@@ -16,6 +17,7 @@ import { getSessionUser } from "@/lib/auth/session";
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ imageId: string }> }) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  if (!(await hasModule(user, "media"))) return NextResponse.json({ error: "You do not have access to the Media module." }, { status: 403 });
 
   const { imageId } = await params;
 

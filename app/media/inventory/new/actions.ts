@@ -24,7 +24,7 @@ export async function createAssetAction(formData: FormData) {
   const notes = (formData.get("notes") as string)?.trim() || null;
 
   if (!supplierId || !assetName || !locationName) {
-    redirect(`/planning/inventory/new?error=${encodeURIComponent("Supplier, asset name, and location are required.")}`);
+    redirect(`/media/inventory/new?error=${encodeURIComponent("Supplier, asset name, and location are required.")}`);
   }
 
   const supplier = await prisma.supplier.findUniqueOrThrow({ where: { id: supplierId } });
@@ -95,5 +95,5 @@ export async function createAssetAction(formData: FormData) {
     },
   });
 
-  redirect(`/planning/inventory/${asset.id}`);
+  redirect(`/media/inventory/${asset.id}`);
 }

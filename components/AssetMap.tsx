@@ -62,7 +62,7 @@ export function AssetMap({ assets, center }: { assets: MapAsset[]; center: [numb
                 </div>
               )}
               <div className="text-xs font-medium mt-1">{a.latestRate ?? "No rate on file"}</div>
-              <Link href={`/planning/inventory/${a.assetId}`} className="text-xs text-blue-600 underline mt-1 inline-block">
+              <Link href={`/media/inventory/${a.assetId}`} className="text-xs text-blue-600 underline mt-1 inline-block">
                 View details →
               </Link>
             </div>
