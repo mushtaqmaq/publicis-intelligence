@@ -1,0 +1,12 @@
+# Fly.io image. Same app as ./Dockerfile, but starts as root so the mounted
+# volume at /data can be made writable, then drops to the unprivileged user.
+FROM node:22-alpine
+RUN apk add --no-cache su-exec
+WORKDIR /app
+COPY --chown=node:node . .
+COPY fly-entrypoint.sh /usr/local/bin/fly-entrypoint.sh
+RUN chmod +x /usr/local/bin/fly-entrypoint.sh
+ENV PORT=7860 NODE_ENV=production NODE_NO_WARNINGS=1 DATA_DIR=/data
+EXPOSE 7860
+ENTRYPOINT ["fly-entrypoint.sh"]
+CMD ["node", "server.js"]
