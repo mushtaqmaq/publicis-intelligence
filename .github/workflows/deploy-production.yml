@@ -3,60 +3,31 @@ name: Deploy Production
 # Manual only. Never triggered by pushes. Run from the Actions tab on `main`.
 on:
   workflow_dispatch:
-    inputs:
-      target:
-        description: "What to deploy"
-        type: choice
-        options: [backend-and-frontend, backend-only, frontend-only]
-        default: backend-and-frontend
 
 permissions:
   contents: read
 
 jobs:
-  guard:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Only from main
-        run: |
-          if [ "${{ github.ref }}" != "refs/heads/main" ]; then echo "Run this workflow on main only"; exit 1; fi
-
-  backend:
-    needs: guard
-    if: inputs.target != 'frontend-only'
+  deploy:
     runs-on: ubuntu-latest
     environment: production
-    concurrency: production-backend
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-      - name: Deploy to Fly.io
-        run: flyctl deploy --remote-only --config fly.toml
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-
-  frontend:
-    needs: [guard, backend]
-    if: ${{ !cancelled() && needs.guard.result == 'success' && (needs.backend.result == 'success' || needs.backend.result == 'skipped') && inputs.target != 'backend-only' }}
-    runs-on: ubuntu-latest
-    environment: production
-    concurrency: production-frontend
+    concurrency: production
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
     steps:
+      - name: Only from main
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then echo "Run this workflow on main only"; exit 1; fi
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Refuse placeholder backend URL
-        run: |
-          if grep -q "REPLACE-ME" vercel.json; then echo "vercel.json still points at the placeholder backend"; exit 1; fi
+      - name: Install dependencies
+        run: npm ci
       - name: Install Vercel CLI
         run: npm install -g vercel
       - name: Pull Vercel configuration

@@ -153,9 +153,9 @@ Production values are owner-managed; contributors use their own local `.env` (gi
 - Required environments: local: optional unless the feature is used | preview: n/a | production: per feature
 - Secret: no
 
-## DATA_DIR
-- Used by: `server.js`
-- Purpose: Directory for SQLite DB and media; needs persistence in production
-- Required environments: local: optional unless the feature is used | preview: n/a | production: per feature
-- Secret: no
+## DATABASE_URL
+- Used by: `lib/db.js`
+- Purpose: Neon Postgres connection string (use the pooled one on Vercel)
+- Required environments: local: yes | preview: n/a | production: yes
+- Secret: yes
 

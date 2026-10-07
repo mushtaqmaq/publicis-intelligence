@@ -10,6 +10,14 @@ permissions:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -19,29 +27,31 @@ jobs:
         with:
           node-version: 22
 
-      - name: Syntax check (server and client JS)
-        run: |
-          find server.js lib public -name '*.js' -not -path 'public/vendor/*' -print0 | xargs -0 -n1 node --check
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Boot and health check
+      - name: Syntax check (server, API entry and client JS)
+        run: |
+          find server.js api lib public -name '*.js' -not -path 'public/vendor/*' -print0 | xargs -0 -n1 node --check
+
+      - name: Boot against Postgres and sign in
         env:
           PORT: 7861
-          DATA_DIR: ${{ runner.temp }}/pi-data
+          DATABASE_URL: postgres://postgres:ci@localhost:5432/postgres
+          ADMIN_EMAIL: ci@example.com
+          ADMIN_PASSWORD: ci-only-password-1
         run: |
           node server.js &
-          for i in $(seq 1 20); do curl -fs localhost:7861/api/health && exit 0; sleep 1; done
-          echo "server did not become healthy"; exit 1
+          for i in $(seq 1 20); do curl -fs localhost:7861/api/health && break; sleep 1; done
+          curl -fs localhost:7861/api/health
+          curl -fs -c jar -H 'x-pi: 1' -H 'content-type: application/json' -d '{"email":"ci@example.com","password":"ci-only-password-1"}' localhost:7861/api/login
+          curl -fs -b jar localhost:7861/api/me
 
-      - name: Docker build (Hugging Face image)
+      - name: Validate vercel.json
+        run: node -e "JSON.parse(require('fs').readFileSync('vercel.json','utf8'))"
+
+      - name: Docker build
         run: docker build -t publicis-intelligence:ci .
-
-      - name: Docker build (Fly image)
-        run: docker build -f Dockerfile.fly -t publicis-intelligence:ci-fly .
-
-      - name: Validate vercel.json and shell scripts
-        run: |
-          node -e "JSON.parse(require('fs').readFileSync('vercel.json','utf8'))"
-          sh -n fly-entrypoint.sh
 
       - name: Block committed env files
         run: |
