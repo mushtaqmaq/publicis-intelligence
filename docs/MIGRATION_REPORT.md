@@ -1,23 +1,25 @@
 # Migration Report
 
 Original framework: Plain Node.js http server + vanilla JS SPA, SQLite, Docker (Hugging Face Space)
-Target framework: Undecided (Path B; recommended Option 2, Vercel frontend + external Node backend)
+Target framework: Unchanged Node server on Fly.io + static frontend on Vercel (Option 2)
 GitHub repository: https://github.com/mushtaqmaq/publicis-intelligence (private)
-Current branch: `develop` (PR #1 into `main`); `main` holds the unmodified Space history
-Vercel compatibility: REQUIRES CHANGES (see VERCEL_ARCHITECTURE.md)
+Current branch: `main` (all PRs #1-#4 merged; `develop` is behind `main` by merge commits and should be synced)
+Vercel compatibility: READY for the split architecture (static only; `framework: null`, `.vercelignore` uploads only `public/` + `vercel.json`)
+Production deployed: YES (2026-10-07). Backend: https://publicis-intelligence-api.fly.dev (Fly, region fra, one machine, 3 GB volume `pi_data`). Frontend: https://publicis-intelligence.vercel.app (Vercel team `maq5`). Both deployed from `main` by the owner's CLI sessions, not by the GitHub workflow.
 Number of features identified: 21 platform features + 28 agents in 6 pillars
-Features migrated: all code preserved unchanged; none re-implemented. Parity testing not performed (no deployed target yet)
+Features migrated: all code preserved unchanged
+Verified live: `/`, `/login`, static assets, `/api/health` through the Vercel proxy, `/api/me` returns 401 when signed out
+NOT yet verified: owner sign-in through the proxy (cookie), every feature in FEATURE_PARITY_TEST.md, long (>2 min) streamed agent run through Vercel's rewrite, 30 MB upload paths
 Outstanding issues:
-- Architecture decision (Option 1/2/3) and backend host
-- `main` is not technically protected (needs GitHub Pro or a public repo)
-- Production deploy workflow not created (depends on the decision)
-- `docs/FEATURE_PARITY_TEST.md` not created (needs a deployed migrated build)
-- No automated tests exist; CI is syntax + boot + Docker build
-- Old `.env.example` in git history looks like placeholders only (pattern check, not confirmed by owner)
-- Cookie handling in `lib/auth.js` is Hugging Face-specific and needs review for a new domain
-- Live Space data (`/data`) not yet exported or backed up
-Environment variables required: see ENVIRONMENT_VARIABLES.md (26 names)
+- No AI provider keys set on Fly yet, so agents cannot generate until added
+- Space data (`/data`) not imported; live DB is empty except the admin account
+- `main` has no branch protection (needs GitHub Pro); `production` environment has no required reviewers
+- `VERCEL_TOKEN` GitHub secret not set; workflow cannot deploy the frontend yet
+- No automated tests; CI is syntax + boot + Docker builds
+- Old `.env.example` in git history looks like placeholders (pattern check only)
+- Single Fly machine: brief downtime on each backend deploy
+Environment variables required: see ENVIRONMENT_VARIABLES.md (26 names). Fly secrets currently set: ADMIN_EMAIL, ADMIN_NAME, ADMIN_PASSWORD
 Database changes: none
 Authentication changes: none
-Production readiness: NOT READY
-Recommended next action: choose the architecture and host; upgrade GitHub plan; back up the Space's `/data`
+Production readiness: PARTIAL (infrastructure live; functional parity unverified, no provider keys)
+Recommended next action: sign in, add provider keys, run the parity checklist, then decide on data import
