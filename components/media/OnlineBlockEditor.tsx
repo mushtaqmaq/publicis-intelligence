@@ -3,21 +3,29 @@
 import { useMemo, useState, useTransition } from "react";
 import { saveOnlineBlockAction } from "@/app/media/plans/[planId]/onlineActions";
 import {
-  UNITS, KPIS, SECTION_PRESETS, calcOnline, weeksOf, n, newOnlineRow,
+  UNITS, KPIS, SECTION_PRESETS, DEFAULT_FX, calcOnline, weeksOf, n, newOnlineRow,
   type OnlineData, type OnlineRow, type OnlineSection,
 } from "@/lib/planning/online";
+import { readAiStream, extractJson, onlineDraftFromAi, draftSystemPrompt } from "@/lib/planning/onlineDraft";
 
 const fmt = (v: number, d = 0) => v.toLocaleString("en-US", { maximumFractionDigits: d, minimumFractionDigits: d });
 const uid = () => Math.random().toString(36).slice(2, 10);
 const inp = "w-full rounded border border-border bg-surface px-2 py-1 text-sm disabled:bg-black/5 disabled:text-muted";
 
-export function OnlineBlockEditor({ planId, versionId, locked, initial, start, end }: {
-  planId: string; versionId: string; locked: boolean; initial: OnlineData; start: string; end: string;
+export type DraftContext = { client?: string; brand?: string | null; objective?: string | null; audience?: string | null; locations?: string | null; budget?: number | null };
+
+export function OnlineBlockEditor({ planId, versionId, locked, initial, start, end, ctx }: {
+  planId: string; versionId: string; locked: boolean; initial: OnlineData; start: string; end: string; ctx?: DraftContext;
 }) {
   const [data, setData] = useState<OnlineData>(initial);
   const [dirty, setDirty] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
+  const [draftOpen, setDraftOpen] = useState(false);
+  const [brief, setBrief] = useState("");
+  const [draftBudget, setDraftBudget] = useState(ctx?.budget ? String(ctx.budget) : "");
+  const [drafting, setDrafting] = useState(false);
+  const [draftErr, setDraftErr] = useState<string | null>(null);
   const calc = useMemo(() => calcOnline(data, start, end), [data, start, end]);
   const weeks = useMemo(() => weeksOf(start, end), [start, end]);
   const total = calc.reduce((a, s) => a + s.qar, 0);
@@ -25,6 +33,36 @@ export function OnlineBlockEditor({ planId, versionId, locked, initial, start, e
   const edit = (fn: (d: OnlineData) => void) => { setData((d) => { const c = structuredClone(d); fn(c); return c; }); setDirty(true); setMsg(null); };
   const setRow = (si: number, ri: number, patch: Partial<OnlineRow>) => edit((d) => { Object.assign(d.sections[si].rows[ri], patch); });
   const setSec = (si: number, patch: Partial<OnlineSection>) => edit((d) => { Object.assign(d.sections[si], patch); });
+
+  // Asks the AI for an online draft (module-checked route media/plan). The result replaces the block and stays
+  // fully editable; nothing is saved until you press Save.
+  async function draft() {
+    if (!brief.trim()) { setDraftErr("Describe the objective first."); return; }
+    const hasWork = data.sections.some((sec) => sec.rows.some((r) => r.platform || n(r.price) || n(r.alloc)));
+    if (hasWork && !window.confirm("This replaces the online plan you have so far (until you save). Continue?")) return;
+    setDrafting(true); setDraftErr(null);
+    try {
+      const budget = n(draftBudget);
+      const res = await fetch("/api/ai", {
+        method: "POST", headers: { "content-type": "application/json", "x-pi": "1" },
+        body: JSON.stringify({
+          route: "media/plan", tier: "complex", json: true,
+          system: draftSystemPrompt({ client: ctx?.client, brand: ctx?.brand, objective: ctx?.objective, audience: ctx?.audience, locations: ctx?.locations }),
+          messages: [{ role: "user", content: `Brief: ${brief.trim()}\nCampaign dates: ${start} to ${end}\nOnline budget QAR: ${budget || "decide sensibly"}` }],
+        }),
+      });
+      const raw = await res.text();
+      if (!res.ok) { let m = `Request failed (${res.status})`; try { m = JSON.parse(raw).error || m; } catch { /* keep default */ } throw new Error(m); }
+      const out = readAiStream(raw);
+      if (out.error) throw new Error(out.error);
+      const block = onlineDraftFromAi(extractJson(out.text), start, end, n(data.fx) || DEFAULT_FX);
+      if (!block) throw new Error("The AI did not return any platforms. Try again with more detail.");
+      setData({ ...block, terms: data.terms }); setDirty(true);
+      setMsg({ ok: true, text: "Draft ready. Prices are AI estimates: review and confirm every one against current rate cards, then Save." });
+      setDraftOpen(false);
+    } catch (e) { setDraftErr(e instanceof Error ? e.message : "The draft failed."); }
+    finally { setDrafting(false); }
+  }
 
   function save() {
     startTransition(async () => {
@@ -45,9 +83,26 @@ export function OnlineBlockEditor({ planId, versionId, locked, initial, start, e
             <input className={inp + " !w-20"} disabled={locked} value={String(data.fx)} inputMode="decimal" onChange={(e) => edit((d) => { d.fx = e.target.value; })} />
           </label>
           <div className="text-right"><div className="text-xs text-muted">Online spend</div><div className="font-semibold">QAR {fmt(total)}</div></div>
+          {!locked && <button onClick={() => { setDraftOpen((v) => !v); setDraftErr(null); }} className="rounded-lg border border-border px-3 py-1.5 text-sm text-accent">Draft with AI</button>}
           {!locked && <button onClick={save} disabled={pending || !dirty} className="rounded-lg bg-accent px-3 py-1.5 text-sm text-accent-foreground disabled:opacity-40">{pending ? "Saving…" : "Save"}</button>}
         </div>
       </div>
+      {draftOpen && !locked && (
+        <div className="mb-4 rounded-lg border border-border bg-background/60 p-3">
+          <label className="block text-xs font-medium text-muted">Objective and brief
+            <textarea className={inp + " mt-1 min-h-[80px]"} value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="e.g. Drive applications for the new travel card among affluent Qatari nationals and expats, 25 to 45." />
+          </label>
+          <div className="mt-2 flex flex-wrap items-end gap-3">
+            <label className="text-xs text-muted">Online budget (QAR)
+              <input className={inp + " mt-1 !w-36"} inputMode="decimal" value={draftBudget} onChange={(e) => setDraftBudget(e.target.value)} placeholder="e.g. 150000" />
+            </label>
+            <button onClick={draft} disabled={drafting} className="rounded-lg bg-accent px-3 py-1.5 text-sm text-accent-foreground disabled:opacity-50">{drafting ? "Planning… this can take a minute" : "Draft plan"}</button>
+            <button onClick={() => setDraftOpen(false)} className="text-xs text-muted">Cancel</button>
+          </div>
+          <p className="mt-2 text-xs text-muted">Proposes platforms, units, prices and budget shares for Qatar. Every number stays editable. Prices are estimates, not quoted rates. Uses credits.</p>
+          {draftErr && <p className="mt-2 text-xs text-[var(--danger)]">{draftErr}</p>}
+        </div>
+      )}
       {msg && <div className={`mb-3 rounded border px-3 py-2 text-xs ${msg.ok ? "border-green-200 bg-green-50 text-[var(--success)]" : "border-red-200 bg-red-50 text-[var(--danger)]"}`}>{msg.text}</div>}
       {locked && <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-[var(--warning)]">This version is locked. Create a new version to edit the online plan.</div>}
 
