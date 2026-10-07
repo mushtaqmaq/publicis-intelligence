@@ -1,0 +1,5 @@
+# Frontend-only deploy: the Node server runs on Fly.io, never as a Vercel function.
+*
+!public
+!public/**
+!vercel.json
