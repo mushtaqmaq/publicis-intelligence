@@ -26,5 +26,5 @@ export async function assignAccountManagerAction(formData: FormData) {
     },
   });
 
-  revalidatePath("/planning/clients");
+  revalidatePath("/media/clients");
 }

@@ -43,7 +43,7 @@ export async function MediaPlannerDashboard({ user }: { user: SessionUser }) {
           <ul className="space-y-1.5">
             {awaitingApproval.map((p) => (
               <li key={p.id} className="text-sm">
-                <Link href={`/planning/media-plans/${p.id}`} className="text-accent underline">
+                <Link href={`/media/media-plans/${p.id}`} className="text-accent underline">
                   {p.campaignName}
                 </Link>{" "}
                 <span className="text-muted">— {p.client.name}</span>
@@ -70,7 +70,7 @@ export async function MediaPlannerDashboard({ user }: { user: SessionUser }) {
             {plans.map((p) => (
               <tr key={p.id} className="border-b border-border">
                 <td className="py-2 pr-4">
-                  <Link href={`/planning/media-plans/${p.id}`} className="font-medium text-foreground hover:underline">
+                  <Link href={`/media/media-plans/${p.id}`} className="font-medium text-foreground hover:underline">
                     {p.campaignName}
                   </Link>
                 </td>
@@ -89,7 +89,7 @@ export async function MediaPlannerDashboard({ user }: { user: SessionUser }) {
         </table>
         {plans.length === 0 && (
           <div className="text-center text-muted text-sm py-12">
-            No media plans yet. <Link href="/planning/new-media-plan" className="text-accent underline">Create one →</Link>
+            No media plans yet. <Link href="/media/new-media-plan" className="text-accent underline">Create one →</Link>
           </div>
         )}
       </section>
@@ -97,7 +97,7 @@ export async function MediaPlannerDashboard({ user }: { user: SessionUser }) {
       <section className="mt-6 bg-surface border border-border rounded-lg p-5">
         <h2 className="text-sm font-medium text-foreground mb-2">Inventory Search</h2>
         <p className="text-sm text-muted mb-3">Search suppliers, media types, areas, and availability across every channel.</p>
-        <Link href="/planning/inventory" className="inline-block rounded-md bg-accent text-accent-foreground px-4 py-1.5 text-sm font-medium">
+        <Link href="/media/inventory" className="inline-block rounded-md bg-accent text-accent-foreground px-4 py-1.5 text-sm font-medium">
           Open Inventory →
         </Link>
       </section>

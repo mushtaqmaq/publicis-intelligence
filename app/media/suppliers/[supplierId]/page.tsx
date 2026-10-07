@@ -162,7 +162,7 @@ export default async function SupplierDetailPage({
   return (
     <div className="flex flex-col h-full overflow-auto">
       <div className="p-8 max-w-6xl w-full mx-auto">
-        <Link href="/planning/suppliers" className="text-sm text-accent underline">
+        <Link href="/media/suppliers" className="text-sm text-accent underline">
           ← Back to Suppliers
         </Link>
 
@@ -187,11 +187,11 @@ export default async function SupplierDetailPage({
             }
             actions={
               <>
-                <Link href={`/planning/map?supplier=${supplier.id}`} className="text-sm text-accent underline">
+                <Link href={`/media/map?supplier=${supplier.id}`} className="text-sm text-accent underline">
                   View on Map →
                 </Link>
                 <Link
-                  href={`/planning/settings/suppliers/${supplier.id}/edit`}
+                  href={`/media/settings/suppliers/${supplier.id}/edit`}
                   className="rounded-md border border-border px-3 py-1.5 text-sm font-medium"
                 >
                   Edit Supplier
@@ -320,7 +320,7 @@ export default async function SupplierDetailPage({
               Filter
             </button>
             {(filters.q || filters.category || filters.format || filters.rate) && (
-              <Link href={`/planning/suppliers/${supplierId}`} className="text-sm text-muted underline">
+              <Link href={`/media/suppliers/${supplierId}`} className="text-sm text-muted underline">
                 Clear
               </Link>
             )}
@@ -346,7 +346,7 @@ export default async function SupplierDetailPage({
                 return (
                   <tr key={asset.id} className="border-b border-border hover:bg-background">
                     <td className="py-2 pr-4">
-                      <Link href={`/planning/inventory/${asset.id}`}>
+                      <Link href={`/media/inventory/${asset.id}`}>
                         <div className="w-10 h-10 rounded-md border border-border bg-background overflow-hidden flex items-center justify-center">
                           {primaryImage ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -358,7 +358,7 @@ export default async function SupplierDetailPage({
                       </Link>
                     </td>
                     <td className="py-2 pr-4">
-                      <Link href={`/planning/inventory/${asset.id}`} className="font-medium text-foreground hover:underline">
+                      <Link href={`/media/inventory/${asset.id}`} className="font-medium text-foreground hover:underline">
                         {asset.assetName}
                       </Link>
                       <div className="text-xs text-muted">{asset.assetCode}</div>
@@ -402,7 +402,7 @@ export default async function SupplierDetailPage({
                       )}
                     </td>
                     <td className="py-2 pr-4">
-                      <Link href={`/planning/inventory/${asset.id}/edit`} className="text-xs text-accent underline">
+                      <Link href={`/media/inventory/${asset.id}/edit`} className="text-xs text-accent underline">
                         Edit
                       </Link>
                     </td>

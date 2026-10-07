@@ -2,6 +2,7 @@
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
 const { db, init: initDb } = require('./lib/db');
 const A = require('./lib/auth');
+const MOD = require('./lib/modules');
 const P = require('./lib/providers');
 const SEO = require('./lib/dataforseo');
 const PAGE = require('./lib/webpage');
@@ -68,6 +69,28 @@ const round = (x, d = 2) => Math.round((+x || 0) * 10 ** d) / 10 ** d;
 function body(req, limit) { if (req.body !== undefined && req.body !== null) { const b = req.body; return Promise.resolve(Buffer.isBuffer(b) ? b.toString('utf8') : typeof b === 'string' ? b : JSON.stringify(b)); } return new Promise((ok, no) => { let n = 0; const c = []; req.on('data', d => { n += d.length; if (n > limit) { no(Object.assign(new Error('The upload is too large.'), { status: 413 })); req.destroy(); } else c.push(d); }); req.on('end', () => ok(Buffer.concat(c).toString('utf8'))); req.on('error', no); }); }
 async function json(req, limit = 4e6) { const t = await body(req, limit); try { return t ? JSON.parse(t) : {}; } catch (_) { throw Object.assign(new Error('Bad JSON'), { status: 400 }); } }
 async function me(req) { const tok = A.parseCookies(req).pi_session; if (!tok) return null; return (await db.prepare(`SELECT ${uCols('u')} FROM sessions s JOIN users u ON u.id=s."userId" WHERE s.id=? AND s."expiresAt" > ${UTC_NOW} AND u."isActive"`).get(tok)) || null; }
+// Module access (see lib/modules.js). Role defaults plus per-user overrides, cached on the user for the request.
+async function modulesOf(user) {
+  if (user._mods) return user._mods;
+  if (MOD.isAdminRole(user.planner_role)) return (user._mods = MOD.IDS.slice());
+  const [grants, overrides] = await Promise.all([
+    db.prepare(`SELECT p.key FROM role_permissions rp JOIN permissions p ON p.id=rp."permissionId" WHERE rp.role=?::"UserRole" AND p.key LIKE 'module.%'`).all(user.planner_role),
+    db.prepare(`SELECT p.key, o.granted FROM user_permission_overrides o JOIN permissions p ON p.id=o."permissionId" WHERE o."userId"=? AND p.key LIKE 'module.%'`).all(user.id)
+  ]);
+  return (user._mods = MOD.resolveModules(user.planner_role, grants.map(g => g.key), overrides));
+}
+// Replaces a user's granted modules. Admins hold every module implicitly; this stores the explicit grants.
+async function setModules(userId, ids) {
+  const want = [...new Set((Array.isArray(ids) ? ids : []).filter(x => MOD.IDS.includes(x)))];
+  await db.prepare(`DELETE FROM user_permission_overrides WHERE "userId"=? AND "permissionId" IN (SELECT id FROM permissions WHERE key LIKE 'module.%')`).run(userId);
+  for (const id of want) await db.prepare(`INSERT INTO user_permission_overrides(id,"userId","permissionId",granted) SELECT gen_random_uuid()::text, ?, p.id, true FROM permissions p WHERE p.key=? ON CONFLICT ("userId","permissionId") DO UPDATE SET granted=true`).run(userId, MOD.permKey(id));
+}
+// Sends a 403 and returns false when the user may not use the module.
+async function allow(res, user, mod) {
+  if (!mod || MOD.canUse(await modulesOf(user), mod)) return true;
+  const label = (MOD.MODULES.find(m => m.id === mod) || {}).label || mod;
+  fail(res, 403, `You do not have access to the ${label} module. Ask an admin to add it to your account.`); return false;
+}
 const pub = u => ({ id: u.id, email: u.email, name: u.name, role: u.role, credits: round(u.credits), active: !!u.active, createdAt: u.created_at });
 const balance = async id => (await db.prepare('SELECT credits FROM users WHERE id=?').get(id)).credits;
 
@@ -107,6 +130,7 @@ async function answer(req, res, user) {
   const p = await json(req, 30e6), s = (await settings());
   if (user.credits <= 0) return fail(res, 402, 'You have no credits left. Ask an admin to top up your account.');
   const route = String(p.route || 'assistant').slice(0, 60);
+  if (!(await allow(res, user, MOD.moduleOfRoute(route)))) return;
   let role = p.role === 'web' ? 'web' : (ROLE_OF_TIER[p.tier] || 'default');
   const messages = (Array.isArray(p.messages) ? p.messages : []).filter(m => m && m.content).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content) }));
   if (!messages.length || messages[messages.length - 1].role !== 'user') return fail(res, 400, 'The request must end with a user message.');
@@ -193,6 +217,7 @@ async function answer(req, res, user) {
 /* ---------- Images and audio ---------- */
 const SIZES = { square: '1024x1024', landscape: '1536x1024', portrait: '1024x1536', auto: 'auto' };
 async function makeImage(req, res, user) {
+  if (!(await allow(res, user, 'creative'))) return;
   const p = await json(req, 40e6), s = (await settings());
   const engine = p.engine === 'banana' ? 'banana' : 'openai', quality = ['low', 'medium', 'high'].includes(p.quality) ? p.quality : 'high';
   const cost = engine === 'banana' ? s.imageCredits.banana : s.imageCredits[quality];
@@ -207,6 +232,7 @@ async function makeImage(req, res, user) {
   } catch (e) { fail(res, e.status && e.status < 600 && e.status !== 401 ? e.status : 502, e.message || 'Image generation failed.'); }
 }
 async function makeAudio(req, res, user) {
+  if (!(await allow(res, user, 'creative'))) return;
   const p = await json(req, 30e6), s = (await settings());
   const mode = ['voice', 'clone', 'music'].includes(p.mode) ? p.mode : 'voice';
   const cost = s.audioCredits[mode]; if (user.credits < cost) return fail(res, 402, 'Not enough credits for audio. Ask an admin to top up your account.');
@@ -286,7 +312,7 @@ async function route(req, res) {
   if (fd && req.method === 'DELETE') { const r = (await db.prepare('SELECT * FROM files WHERE id=?').get(fd[1])); if (r && (r.owner === user.id || user.role === 'admin')) { (await db.prepare('DELETE FROM files WHERE id=?').run(r.id)); } res.writeHead(204); return res.end(); }
 
   if (p === '/api/logout' && req.method === 'POST') { (await db.prepare('DELETE FROM sessions WHERE id=?').run(A.parseCookies(req).pi_session || '')); res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': A.sessionCookie(req, '', 0) }); return res.end('{"ok":true}'); }
-  if (p === '/api/me') { const s = (await settings()), i = P.info(); return send(res, 200, { ...pub(user), creditsPerUSD: s.creditsPerUSD, imageCredits: s.imageCredits, audioCredits: s.audioCredits, caps: { research: i.openrouter.configured, images: i.openai.configured, banana: i.openrouter.configured, audio: i.replicate.configured, seo: SEO.configured(), ai: i.openrouter.configured || i.hf.configured } }); }
+  if (p === '/api/me') { const s = (await settings()), i = P.info(); return send(res, 200, { ...pub(user), modules: await modulesOf(user), creditsPerUSD: s.creditsPerUSD, imageCredits: s.imageCredits, audioCredits: s.audioCredits, caps: { research: i.openrouter.configured, images: i.openai.configured, banana: i.openrouter.configured, audio: i.replicate.configured, seo: SEO.configured(), ai: i.openrouter.configured || i.hf.configured } }); }
   if (p === '/api/me/password' && req.method === 'POST') {
     const b = await json(req);
     if (!A.verify(b.current || '', user.pass)) return fail(res, 400, 'Current password is incorrect.');
@@ -306,7 +332,7 @@ async function route(req, res) {
   if (p === '/api/ai' && req.method === 'POST') return answer(req, res, user);
   if (p === '/api/image' && req.method === 'POST') return makeImage(req, res, user);
   if (p === '/api/audio' && req.method === 'POST') return makeAudio(req, res, user);
-  if (p === '/api/mmm' && req.method === 'POST') { const b = await json(req, 20e6); try { return send(res, 200, MMM.run(b)); } catch (e) { return fail(res, 400, e.message); } }
+  if (p === '/api/mmm' && req.method === 'POST') { if (!(await allow(res, user, 'media'))) return; const b = await json(req, 20e6); try { return send(res, 200, MMM.run(b)); } catch (e) { return fail(res, 400, e.message); } }
   if (p.startsWith('/api/db/')) return docs(req, res, user, p.slice(8).split('/').filter(Boolean));
 
   if (p === '/api/conversations') return send(res, 200, (await db.prepare('SELECT id, title, updated_at FROM conversations WHERE user_id=? ORDER BY updated_at DESC LIMIT 200').all(user.id)));
@@ -324,7 +350,8 @@ async function route(req, res) {
     if (user.role !== 'admin') return fail(res, 403, 'Admins only');
     if (p === '/api/admin/users' && req.method === 'GET') {
       const spent = Object.fromEntries((await db.prepare("SELECT user_id, -SUM(credits) AS c FROM ledger WHERE kind='usage' AND ts>=? GROUP BY user_id").all(Date.now() - 30 * 864e5)).map(r => [r.user_id, r.c]));
-      return send(res, 200, (await db.prepare(`SELECT ${uCols()} FROM users ORDER BY "createdAt"`).all()).map(u => ({ ...pub(u), spent30: round(spent[u.id] || 0) })));
+      const rows = await db.prepare(`SELECT ${uCols()} FROM users ORDER BY "createdAt"`).all();
+      return send(res, 200, await Promise.all(rows.map(async u => ({ ...pub(u), modules: await modulesOf(u), spent30: round(spent[u.id] || 0) }))));
     }
     if (p === '/api/admin/users' && req.method === 'POST') {
       const b = await json(req), email = String(b.email || '').trim().toLowerCase();
@@ -333,6 +360,7 @@ async function route(req, res) {
       if ((await db.prepare('SELECT 1 FROM users WHERE email=?').get(email))) return fail(res, 400, 'That login already exists.');
       const id = A.newId(), credits = b.credits !== '' && b.credits != null ? Math.max(0, +b.credits || 0) : (await settings()).newUserCredits;
       (await db.prepare(`INSERT INTO users(id,email,name,"passwordHash",role,credits,"isActive","createdAt","updatedAt") VALUES(?,?,?,?,?::"UserRole",0,true,${UTC_NOW},${UTC_NOW})`).run(id, email, String(b.name || '').slice(0, 80), A.hash(b.password), b.role === 'admin' ? 'ADMIN' : 'PLANNER'));
+      if (Array.isArray(b.modules)) await setModules(id, b.modules);
       if (credits) await ledger(id, { kind: 'topup', credits, note: 'Opening balance', by: user.id });
       return send(res, 200, { id });
     }
@@ -343,6 +371,7 @@ async function route(req, res) {
       if (um[2] && req.method === 'POST') { const amt = +b.amount; if (!isFinite(amt) || !amt) return fail(res, 400, 'Enter an amount.'); return send(res, 200, { balance: round(await ledger(t.id, { kind: amt > 0 ? 'topup' : 'adjust', credits: amt, note: String(b.note || '').slice(0, 200), by: user.id })) }); }
       if (!um[2] && req.method === 'PATCH') {
         if (t.id === user.id && (b.active === false || b.role === 'member')) return fail(res, 400, 'You cannot demote or disable your own account.');
+        if (Array.isArray(b.modules)) await setModules(t.id, b.modules);
         if (b.name != null) (await db.prepare(`UPDATE users SET name=?, "updatedAt"=${UTC_NOW} WHERE id=?`).run(String(b.name).slice(0, 80), t.id));
         if (b.role) { const keep = t.planner_role === 'SUPER_ADMIN' && b.role === 'admin'; if (!keep) (await db.prepare(`UPDATE users SET role=?::"UserRole", "updatedAt"=${UTC_NOW} WHERE id=?`).run(b.role === 'admin' ? 'ADMIN' : 'PLANNER', t.id)); }
         if (b.active != null) { (await db.prepare(`UPDATE users SET "isActive"=?::boolean, "updatedAt"=${UTC_NOW} WHERE id=?`).run(!!b.active, t.id)); if (!b.active) (await db.prepare('DELETE FROM sessions WHERE "userId"=?').run(t.id)); }

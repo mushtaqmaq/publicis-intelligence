@@ -9,51 +9,56 @@ import {
 } from "lucide-react";
 
 type U = { name: string | null; email: string; role: string };
+type Ico = React.ComponentType<{ size?: number; strokeWidth?: number }>;
 
-// Links back into the existing single-page app (hash routes), so planning feels like one product.
+// Links back into the single-page app (hash routes), so everything feels like one product.
 const platformNav = [
   { href: "/#/home", label: "Home", icon: Home },
   { href: "/#/command", label: "Command", icon: Zap },
   { href: "/#/assistant", label: "Assistant", icon: MessageCircle },
 ];
-const pillars = [
-  { href: "/#/p/strategy", label: "Strategy", icon: Compass, color: "#2F6BFF" },
-  { href: "/#/p/creative", label: "Creative", icon: Sparkles, color: "#E5487A" },
-  { href: "/#/p/media", label: "Media", icon: Megaphone, color: "#0EA5A0" },
-  { href: "/#/p/finance", label: "Finance", icon: Wallet, color: "#C9971A" },
-  { href: "/#/p/production", label: "Production", icon: Clapperboard, color: "#7C5CFF" },
-  { href: "/#/p/search", label: "Search", icon: Search, color: "#16A36A" },
+// Each pillar is a module. Only the modules a person has are shown (admins have all).
+const pillars: { id: string; href: string; label: string; icon: Ico; color: string }[] = [
+  { id: "strategy", href: "/#/p/strategy", label: "Strategy", icon: Compass, color: "#2F6BFF" },
+  { id: "creative", href: "/#/p/creative", label: "Creative", icon: Sparkles, color: "#E5487A" },
+  { id: "media", href: "/#/p/media", label: "Media", icon: Megaphone, color: "#0EA5A0" },
+  { id: "finance", href: "/#/p/finance", label: "Finance", icon: Wallet, color: "#C9971A" },
+  { id: "production", href: "/#/p/production", label: "Production", icon: Clapperboard, color: "#7C5CFF" },
+  { id: "search", href: "/#/p/search", label: "Search", icon: Search, color: "#16A36A" },
+];
+// The OOH planner lives inside the Media module.
+const mediaTools = [
+  { href: "/media/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/media/inventory", label: "Inventory", icon: Boxes },
+  { href: "/media/map", label: "Map", icon: MapIcon },
+  { href: "/media/suppliers", label: "Suppliers", icon: Building2 },
+  { href: "/media/clients", label: "Client accounts", icon: Users },
 ];
 const workspace = [
   { href: "/#/library", label: "Library", icon: Library },
   { href: "/#/clients", label: "Clients", icon: Building2 },
   { href: "/#/usage", label: "Usage", icon: Gauge },
 ];
-const planningNav = [
-  { href: "/planning/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/planning/inventory", label: "Inventory", icon: Boxes },
-  { href: "/planning/map", label: "Map", icon: MapIcon },
-  { href: "/planning/suppliers", label: "Suppliers", icon: Building2 },
-  { href: "/planning/clients", label: "Clients", icon: Users },
-];
 
-function Item({ href, label, icon: Icon, active, color }: { href: string; label: string; icon: React.ComponentType<{ size?: number; strokeWidth?: number }>; active?: boolean; color?: string }) {
-  const cls = `flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors ${active ? "bg-white text-foreground shadow-sm ring-1 ring-black/5 font-medium" : "text-[#3c3c43] hover:bg-black/5"}`;
+function Item({ href, label, icon: Icon, active, color, sub }: { href: string; label: string; icon: Ico; active?: boolean; color?: string; sub?: boolean }) {
+  const cls = `flex items-center gap-2.5 rounded-xl py-2 text-sm transition-colors ${sub ? "pl-9 pr-3" : "px-3"} ${active ? "bg-white text-foreground shadow-sm ring-1 ring-black/5 font-medium" : "text-[#3c3c43] hover:bg-black/5"}`;
   const icon = color ? (
     <span className="grid h-6 w-6 place-items-center rounded-lg" style={{ background: `${color}14`, color }}><Icon size={14} strokeWidth={1.75} /></span>
-  ) : <Icon size={16} strokeWidth={1.75} />;
-  // Planning routes use client-side links; platform links are plain anchors into the static SPA.
-  return href.startsWith("/planning") ? <Link href={href} className={cls}>{icon}{label}</Link> : <a href={href} className={cls}>{icon}{label}</a>;
+  ) : <Icon size={sub ? 14 : 16} strokeWidth={1.75} />;
+  // Media tools use client-side links; platform links are plain anchors into the static app.
+  return href.startsWith("/media") ? <Link href={href} className={cls}>{icon}{label}</Link> : <a href={href} className={cls}>{icon}{label}</a>;
 }
 
 function Section({ title }: { title: string }) {
   return <div className="px-3 pt-4 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted">{title}</div>;
 }
 
-export function PlanningShell({ user, permissions, children }: { user: U; permissions: string[]; children: React.ReactNode }) {
-  const pathname = usePathname();
+export function MediaShell({ user, permissions, modules, children }: { user: U; permissions: string[]; modules: string[]; children: React.ReactNode }) {
+  const pathname = usePathname() ?? "";
   const [open, setOpen] = useState(false);
-  void permissions; // reserved for permission-gated items as more planning sections land
+  void permissions; // reserved for permission-gated planner items as more media tools land
+  const isAdmin = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
+  const myPillars = pillars.filter((p) => modules.includes(p.id));
 
   async function signOut() {
     try { await fetch("/api/logout", { method: "POST", headers: { "x-pi": "1" } }); } catch { /* ignore */ }
@@ -63,13 +68,16 @@ export function PlanningShell({ user, permissions, children }: { user: U; permis
   const nav = (
     <nav className="flex-1 overflow-y-auto px-3 pb-4">
       {platformNav.map((i) => <Item key={i.href} {...i} />)}
-      <Section title="Pillars" />
-      {pillars.map((i) => <Item key={i.href} {...i} />)}
-      <Section title="OOH Planning" />
-      {planningNav.map((i) => <Item key={i.href} {...i} active={pathname === i.href || (pathname ?? "").startsWith(i.href + "/")} />)}
+      {myPillars.length > 0 && <Section title="Modules" />}
+      {myPillars.map((p) => (
+        <div key={p.id}>
+          <Item href={p.href} label={p.label} icon={p.icon} color={p.color} active={p.id === "media" && pathname.startsWith("/media")} />
+          {p.id === "media" && mediaTools.map((t) => <Item key={t.href} {...t} sub active={pathname === t.href || pathname.startsWith(t.href + "/")} />)}
+        </div>
+      ))}
       <Section title="Workspace" />
       {workspace.map((i) => <Item key={i.href} {...i} />)}
-      {user.role === "SUPER_ADMIN" || user.role === "ADMIN" ? <Item href="/#/admin" label="Admin" icon={ShieldCheck} /> : null}
+      {isAdmin ? <Item href="/#/admin" label="Admin" icon={ShieldCheck} /> : null}
     </nav>
   );
 
@@ -85,7 +93,7 @@ export function PlanningShell({ user, permissions, children }: { user: U; permis
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4 md:px-6">
           <button className="md:hidden" aria-label="Menu" onClick={() => setOpen((v) => !v)}><Menu size={20} /></button>
-          <div className="text-sm text-muted hidden md:block">OOH Planning</div>
+          <div className="text-sm text-muted hidden md:block">Media</div>
           <div className="flex items-center gap-3 text-sm">
             <div className="text-right leading-tight">
               <div className="font-medium">{user.name || user.email}</div>

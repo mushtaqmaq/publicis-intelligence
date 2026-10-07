@@ -99,6 +99,7 @@ PI.PILLARS = [
       task: 'Write the full article: meta title, meta description, H1, a direct answer paragraph at the top, structured body with H2 and H3, an FAQ section, and a suggested schema type.' }
   ] }
 ];
+PI.MODULES = [{ id: 'strategy', label: 'Strategy' }, { id: 'creative', label: 'Creative' }, { id: 'media', label: 'Media' }, { id: 'finance', label: 'Finance' }, { id: 'production', label: 'Production' }, { id: 'search', label: 'Search' }];
 PI.pillar = id => PI.PILLARS.find(p => p.id === id);
 PI.agentOf = (p, a) => (PI.pillar(p) || { agents: [] }).agents.find(x => x.id === a);
 PI.routeName = r => { if (!r) return 'Other'; if (r.startsWith('assistant')) return 'Assistant'; if (r.startsWith('command')) return 'Command'; if (r === 'creative/image') return 'Image studio'; if (r === 'creative/audio') return 'Audio studio'; const [p, a] = r.split('/'); const ag = PI.agentOf(p, a); return ag ? ag.name : r; };

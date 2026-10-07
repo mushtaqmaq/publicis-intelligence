@@ -158,7 +158,7 @@ export async function AdminDashboard({ user }: { user: SessionUser }) {
       <section className="bg-surface border border-border rounded-lg p-5 mt-6">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-foreground">Revenue Target Tracker — {currentYear}</h2>
-          <Link href="/planning/settings/revenue-targets" className="text-xs text-accent underline">
+          <Link href="/media/settings/revenue-targets" className="text-xs text-accent underline">
             {target === null ? "+ Set Target" : "Edit Target"}
           </Link>
         </div>
@@ -189,7 +189,7 @@ export async function AdminDashboard({ user }: { user: SessionUser }) {
         {closestOpportunities.length === 0 ? (
           <p className="text-sm text-muted">
             No AVR schemes entered yet, so no rebate-proximity opportunities to show.{" "}
-            <Link href="/planning/settings/avr-schemes" className="text-accent underline">
+            <Link href="/media/settings/avr-schemes" className="text-accent underline">
               Add a supplier&apos;s real AVR slabs
             </Link>{" "}
             to see these.
@@ -216,7 +216,7 @@ export async function AdminDashboard({ user }: { user: SessionUser }) {
         <section className="bg-surface border border-border rounded-lg p-5 mt-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-medium text-foreground">Supplier AVR Tracker — {currentYear}</h2>
-            <Link href="/planning/settings/avr-schemes" className="text-xs text-accent underline">
+            <Link href="/media/settings/avr-schemes" className="text-xs text-accent underline">
               Manage schemes
             </Link>
           </div>
@@ -266,7 +266,7 @@ export async function AdminDashboard({ user }: { user: SessionUser }) {
 
       <p className="text-xs text-muted mt-6">
         Deeper discount/negotiation history and the campaign calendar are planned for a later pass — see{" "}
-        <Link href="/planning/reports" className="text-accent underline">
+        <Link href="/media/reports" className="text-accent underline">
           Reports
         </Link>{" "}
         for full spend breakdowns today.

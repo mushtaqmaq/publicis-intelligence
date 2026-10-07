@@ -2,6 +2,9 @@
 export default {
   turbopack: { root: import.meta.dirname },
   serverExternalPackages: ['pg'],
+  async redirects() {
+    return [{ source: '/planning/:path*', destination: '/media/:path*', permanent: false }, { source: '/planning', destination: '/media', permanent: false }];
+  },
   async rewrites() {
     return {
       // The existing single-page app and its login screen are static files in /public.

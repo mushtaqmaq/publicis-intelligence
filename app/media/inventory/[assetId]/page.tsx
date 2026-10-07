@@ -54,7 +54,7 @@ export default async function AssetDetailPage({
 
   return (
     <div className="p-8 max-w-5xl">
-      <Link href="/planning/inventory" className="text-sm text-accent underline">
+      <Link href="/media/inventory" className="text-sm text-accent underline">
         ← Back to Inventory
       </Link>
 
@@ -103,7 +103,7 @@ export default async function AssetDetailPage({
                 {asset.componentOfPackages.map((c, i) => (
                   <span key={c.id}>
                     {i > 0 && ", "}
-                    <Link href={`/planning/inventory/${c.packageAsset.id}`} className="text-accent underline">
+                    <Link href={`/media/inventory/${c.packageAsset.id}`} className="text-accent underline">
                       {c.packageAsset.assetName}
                     </Link>
                   </span>
@@ -113,7 +113,7 @@ export default async function AssetDetailPage({
           </div>
         </div>
         <Link
-          href={`/planning/inventory/${asset.id}/edit`}
+          href={`/media/inventory/${asset.id}/edit`}
           className="rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium shrink-0"
         >
           Edit
@@ -204,7 +204,7 @@ export default async function AssetDetailPage({
                     <td className="py-2 pr-4">{c.sizeRaw ?? "—"}</td>
                     <td className="py-2 pr-4">
                       {c.linkedAsset ? (
-                        <Link href={`/planning/inventory/${c.linkedAsset.id}`} className="text-accent underline">
+                        <Link href={`/media/inventory/${c.linkedAsset.id}`} className="text-accent underline">
                           {c.linkedAsset.assetName}
                         </Link>
                       ) : (
@@ -311,7 +311,7 @@ export default async function AssetDetailPage({
               {bookings.map((b, i) => (
                 <tr key={i} className="border-b border-border">
                   <td className="py-2 pr-4">
-                    <Link href={`/planning/media-plans/${b.planId}`} className="text-accent underline">
+                    <Link href={`/media/media-plans/${b.planId}`} className="text-accent underline">
                       {b.campaignName}
                     </Link>
                   </td>

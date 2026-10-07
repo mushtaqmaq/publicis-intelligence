@@ -102,8 +102,8 @@ export async function updateAssetAction(formData: FormData) {
     }
   }
 
-  revalidatePath(`/planning/inventory/${assetId}`);
-  redirect(`/planning/inventory/${assetId}`);
+  revalidatePath(`/media/inventory/${assetId}`);
+  redirect(`/media/inventory/${assetId}`);
 }
 
 function toIntOrNull(v: FormDataEntryValue | null): number | null {
@@ -117,7 +117,7 @@ export async function uploadAssetImageAction(formData: FormData) {
   const assetId = formData.get("assetId") as string;
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) {
-    redirect(`/planning/inventory/${assetId}/edit?error=${encodeURIComponent("No file selected.")}`);
+    redirect(`/media/inventory/${assetId}/edit?error=${encodeURIComponent("No file selected.")}`);
   }
 
   const buffer = Buffer.from(await file!.arrayBuffer());
@@ -137,9 +137,9 @@ export async function uploadAssetImageAction(formData: FormData) {
     },
   });
 
-  revalidatePath(`/planning/inventory/${assetId}/edit`);
-  revalidatePath(`/planning/inventory/${assetId}`);
-  redirect(`/planning/inventory/${assetId}/edit`);
+  revalidatePath(`/media/inventory/${assetId}/edit`);
+  revalidatePath(`/media/inventory/${assetId}`);
+  redirect(`/media/inventory/${assetId}/edit`);
 }
 
 export async function setPrimaryImageAction(formData: FormData) {
@@ -152,9 +152,9 @@ export async function setPrimaryImageAction(formData: FormData) {
     prisma.assetImage.update({ where: { id: imageId }, data: { kind: "primary" } }),
   ]);
 
-  revalidatePath(`/planning/inventory/${assetId}/edit`);
-  revalidatePath(`/planning/inventory/${assetId}`);
-  redirect(`/planning/inventory/${assetId}/edit`);
+  revalidatePath(`/media/inventory/${assetId}/edit`);
+  revalidatePath(`/media/inventory/${assetId}`);
+  redirect(`/media/inventory/${assetId}/edit`);
 }
 
 export async function deleteAssetImageAction(formData: FormData) {
@@ -162,9 +162,9 @@ export async function deleteAssetImageAction(formData: FormData) {
   const assetId = formData.get("assetId") as string;
   const imageId = formData.get("imageId") as string;
   await prisma.assetImage.delete({ where: { id: imageId } });
-  revalidatePath(`/planning/inventory/${assetId}/edit`);
-  revalidatePath(`/planning/inventory/${assetId}`);
-  redirect(`/planning/inventory/${assetId}/edit`);
+  revalidatePath(`/media/inventory/${assetId}/edit`);
+  revalidatePath(`/media/inventory/${assetId}`);
+  redirect(`/media/inventory/${assetId}/edit`);
 }
 
 export async function addAssetRateAction(formData: FormData) {
@@ -225,9 +225,9 @@ export async function addAssetRateAction(formData: FormData) {
     },
   });
 
-  revalidatePath(`/planning/inventory/${assetId}/edit`);
-  revalidatePath(`/planning/inventory/${assetId}`);
-  redirect(`/planning/inventory/${assetId}/edit`);
+  revalidatePath(`/media/inventory/${assetId}/edit`);
+  revalidatePath(`/media/inventory/${assetId}`);
+  redirect(`/media/inventory/${assetId}/edit`);
 }
 
 export async function updateAssetRateAction(formData: FormData) {
@@ -259,9 +259,9 @@ export async function updateAssetRateAction(formData: FormData) {
     },
   });
 
-  revalidatePath(`/planning/inventory/${assetId}/edit`);
-  revalidatePath(`/planning/inventory/${assetId}`);
-  redirect(`/planning/inventory/${assetId}/edit`);
+  revalidatePath(`/media/inventory/${assetId}/edit`);
+  revalidatePath(`/media/inventory/${assetId}`);
+  redirect(`/media/inventory/${assetId}/edit`);
 }
 
 export async function deleteAssetRateAction(formData: FormData) {
@@ -276,7 +276,7 @@ export async function deleteAssetRateAction(formData: FormData) {
     data: { userId: user.id, action: "ASSET_RATE_DELETED", entityType: "AssetRate", entityId: rateId },
   });
 
-  revalidatePath(`/planning/inventory/${assetId}/edit`);
-  revalidatePath(`/planning/inventory/${assetId}`);
-  redirect(`/planning/inventory/${assetId}/edit`);
+  revalidatePath(`/media/inventory/${assetId}/edit`);
+  revalidatePath(`/media/inventory/${assetId}`);
+  redirect(`/media/inventory/${assetId}/edit`);
 }
