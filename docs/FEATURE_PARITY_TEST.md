@@ -1,6 +1,6 @@
 # Feature Parity Test
 
-Run after the Fly + Vercel stack is up (staging data only), comparing against the Hugging Face Space. Fill in yes/no and notes. **Not yet run: nothing is deployed.**
+Run against the live Vercel + Neon deployment (use test data), comparing against the Hugging Face Space. Fill in yes/no and notes. **Not yet run: nothing is deployed.**
 
 | Feature | Original works | Migrated works | Visual parity | Data parity | Notes |
 |---|---|---|---|---|---|
@@ -31,8 +31,8 @@ Run after the Fly + Vercel stack is up (staging data only), comparing against th
 | Search agents (5) | | | | | |
 
 ## Migration-specific checks
-- [ ] A long (>2 min) agent run streams to completion through Vercel's rewrite
-- [ ] `/files/<id>` media loads and persists after a Fly machine restart
-- [ ] Data survives `fly machine restart` and a redeploy
-- [ ] Cookie is set on the Vercel domain and survives reload
-- [ ] 30 MB upload paths (`/api/files`, `/api/ai` with images, `/api/mmm`): compare behavior with the original through the Vercel proxy (limits may differ)
+- [ ] A long (>2 min) agent run streams to completion inside the 300 s function limit
+- [ ] `/files/<id>` media loads and persists across cold starts
+- [ ] Data survives a redeploy
+- [ ] Session cookie is set and survives reload
+- [ ] 30 MB upload paths (`/api/files`, `/api/ai` with images, `/api/mmm`): expect 413 above ~4.5 MB on Vercel (old limit was 30 MB); note which features are affected
