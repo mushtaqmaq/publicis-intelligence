@@ -49,7 +49,7 @@ npm run dev
 
 Open http://localhost:7860 (or your `PORT`). Variables are documented in `docs/ENVIRONMENT_VARIABLES.md`. Use a separate Neon branch for local work, never the production database.
 
-Testing: there is no automated test suite yet. CI syntax-checks the code, boots the server against a Postgres service, signs in, and builds the Docker image on every Pull Request.
+Testing: `npm test` runs the rate-engine, planning and ingestion unit tests (48 so far). CI also syntax-checks the code, boots the server against a Postgres service, signs in, and builds the Docker image on every Pull Request.
 
 Branches and Pull Requests: see `CONTRIBUTING.md`. Branch from `develop`, open a PR, and wait for review. Never push to `main`.
 
