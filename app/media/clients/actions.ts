@@ -1,12 +1,14 @@
 "use server";
 
+import { requireMediaUser } from "@/lib/auth/modules";
+
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireSessionUser } from "@/lib/auth/session";
+
 import { requirePermission } from "@/lib/auth/permissions";
 
 export async function assignAccountManagerAction(formData: FormData) {
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
   await requirePermission(user, "clients.manage_all");
 
   const clientId = formData.get("clientId") as string;

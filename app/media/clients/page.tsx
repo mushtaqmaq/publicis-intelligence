@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireSessionUser } from "@/lib/auth/session";
+import { requireMediaUser } from "@/lib/auth/modules";
 import { hasPermission } from "@/lib/auth/permissions";
 import { assignAccountManagerAction } from "./actions";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 export const dynamic = "force-dynamic";
 
 export default async function ClientsPage() {
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
   const canManageAll = await hasPermission(user, "clients.manage_all");
 
   // An Account Manager without clients.manage_all only ever sees their own

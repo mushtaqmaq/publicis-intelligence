@@ -1,3 +1,4 @@
+import { hasModule } from "@/lib/auth/modules";
 import { NextRequest, NextResponse } from "next/server";
 import { gatherPhotosheetData, buildPhotosheetBuffer } from "@/lib/planning/photosheet";
 import { getSessionUser } from "@/lib/auth/session";
@@ -5,6 +6,7 @@ import { getSessionUser } from "@/lib/auth/session";
 export async function GET(req: NextRequest, { params }: { params: Promise<{ planId: string }> }) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  if (!(await hasModule(user, "media"))) return new Response("You do not have access to the Media module.", { status: 403 });
 
   const { planId } = await params;
   const versionIdParam = req.nextUrl.searchParams.get("v");

@@ -1,12 +1,14 @@
 "use server";
 
+import { requireMediaUser } from "@/lib/auth/modules";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import type { AssetFormat } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
-import { requireSessionUser } from "@/lib/auth/session";
+
 import { createManualRateCardVersion } from "@/lib/ingestion/manualRateCard";
 
 interface AuditableChange {
@@ -30,7 +32,7 @@ async function logAssetEdit(assetId: string, changes: AuditableChange[], userId:
 }
 
 export async function updateAssetAction(formData: FormData) {
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
   const assetId = formData.get("assetId") as string;
   const current = await prisma.asset.findUniqueOrThrow({ where: { id: assetId } });
 
@@ -113,7 +115,7 @@ function toIntOrNull(v: FormDataEntryValue | null): number | null {
 }
 
 export async function uploadAssetImageAction(formData: FormData) {
-  await requireSessionUser();
+  await requireMediaUser();
   const assetId = formData.get("assetId") as string;
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) {
@@ -143,7 +145,7 @@ export async function uploadAssetImageAction(formData: FormData) {
 }
 
 export async function setPrimaryImageAction(formData: FormData) {
-  await requireSessionUser();
+  await requireMediaUser();
   const assetId = formData.get("assetId") as string;
   const imageId = formData.get("imageId") as string;
 
@@ -158,7 +160,7 @@ export async function setPrimaryImageAction(formData: FormData) {
 }
 
 export async function deleteAssetImageAction(formData: FormData) {
-  await requireSessionUser();
+  await requireMediaUser();
   const assetId = formData.get("assetId") as string;
   const imageId = formData.get("imageId") as string;
   await prisma.assetImage.delete({ where: { id: imageId } });
@@ -168,7 +170,7 @@ export async function deleteAssetImageAction(formData: FormData) {
 }
 
 export async function addAssetRateAction(formData: FormData) {
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
   const assetId = formData.get("assetId") as string;
   const asset = await prisma.asset.findUniqueOrThrow({ where: { id: assetId }, include: { supplier: true } });
 
@@ -231,7 +233,7 @@ export async function addAssetRateAction(formData: FormData) {
 }
 
 export async function updateAssetRateAction(formData: FormData) {
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
   const assetId = formData.get("assetId") as string;
   const rateId = formData.get("rateId") as string;
   const grossRateStatus = formData.get("grossRateStatus") as string;
@@ -265,7 +267,7 @@ export async function updateAssetRateAction(formData: FormData) {
 }
 
 export async function deleteAssetRateAction(formData: FormData) {
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
   const assetId = formData.get("assetId") as string;
   const rateId = formData.get("rateId") as string;
 

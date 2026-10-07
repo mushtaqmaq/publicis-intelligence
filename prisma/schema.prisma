@@ -742,6 +742,8 @@ model MediaPlan {
   targetAudience  String?
   targetLocations String?
   notes           String?
+  // OFFLINE (inventory lines only), ONLINE (digital block only) or HYBRID (both).
+  planType        String          @default("OFFLINE")
   status          MediaPlanStatus @default(DRAFT)
   // Real workflow tracking, added alongside status — all optional because a
   // campaign genuinely has "not tracked yet" as its starting state, never a
@@ -766,6 +768,8 @@ model MediaPlanVersion {
   versionNumber Int
   label         String // "V1", "V2", "V3 Approved"
   isLocked      Boolean   @default(false) // true once Approved/Booked — immutable
+  // Online/digital block (sections, platforms, allocation, targeting) as JSON; versioned and locked with the version.
+  onlineData    Json?
   createdById   String?
   createdBy     User?     @relation(fields: [createdById], references: [id])
   createdAt     DateTime  @default(now())

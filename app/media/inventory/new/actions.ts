@@ -1,8 +1,10 @@
 "use server";
 
+import { requireMediaUser } from "@/lib/auth/modules";
+
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireSessionUser } from "@/lib/auth/session";
+
 import { createManualRateCardVersion } from "@/lib/ingestion/manualRateCard";
 import type { AssetFormat } from "@/generated/prisma/enums";
 
@@ -13,7 +15,7 @@ function toIntOrNull(v: FormDataEntryValue | null): number | null {
 }
 
 export async function createAssetAction(formData: FormData) {
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
 
   const supplierId = formData.get("supplierId") as string;
   const assetName = (formData.get("assetName") as string)?.trim();

@@ -1,12 +1,14 @@
 "use server";
 
+import { requireMediaUser } from "@/lib/auth/modules";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import type { PricingCalculationMethod } from "@/generated/prisma/enums";
 import { buildAndCalculateLineItem } from "@/lib/planning/buildLineItem";
-import { requireSessionUser } from "@/lib/auth/session";
+
 import { requirePermission } from "@/lib/auth/permissions";
 
 // Deleting a media plan is irreversible (cascades through every version,
@@ -15,7 +17,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 // restricted to the owner/SUPER_ADMIN account only, not delegable via the
 // regular permission system the way campaigns.manage_status etc. are.
 export async function deleteMediaPlanAction(formData: FormData) {
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
   if (user.role !== "SUPER_ADMIN") {
     throw new Error("Only the owner (Super Admin) can delete a media plan.");
   }
@@ -55,7 +57,7 @@ async function assertVersionEditable(versionId: string) {
 }
 
 export async function addAssetToPlanAction(formData: FormData) {
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
   const planId = formData.get("planId") as string;
   const versionId = formData.get("versionId") as string;
   const assetId = formData.get("assetId") as string;
@@ -176,7 +178,7 @@ export async function addAssetToPlanAction(formData: FormData) {
 }
 
 export async function removeItemAction(formData: FormData) {
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
   const planId = formData.get("planId") as string;
   const itemId = formData.get("itemId") as string;
 
@@ -207,7 +209,7 @@ export async function removeItemAction(formData: FormData) {
 const LOCKING_STATUSES = new Set(["APPROVED", "BOOKED", "COMPLETED", "SCHEDULED", "LIVE"]);
 
 export async function updateStatusAction(formData: FormData) {
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
   const planId = formData.get("planId") as string;
   const versionId = formData.get("versionId") as string;
   const newStatus = formData.get("status") as string;
@@ -239,7 +241,7 @@ export async function updateStatusAction(formData: FormData) {
 // from the plan's overall status, so an Account Manager can record "artwork
 // submitted" without touching the plan's approval/booking state.
 export async function updateWorkflowStatusAction(formData: FormData) {
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
   await requirePermission(user, "campaigns.manage_status");
 
   const planId = formData.get("planId") as string;
@@ -276,7 +278,7 @@ export async function updateWorkflowStatusAction(formData: FormData) {
 }
 
 export async function createNewVersionAction(formData: FormData) {
-  const user = await requireSessionUser();
+  const user = await requireMediaUser();
   const planId = formData.get("planId") as string;
 
   const latest = await prisma.mediaPlanVersion.findFirst({
@@ -293,6 +295,7 @@ export async function createNewVersionAction(formData: FormData) {
       versionNumber: nextNumber,
       label: `V${nextNumber}`,
       createdById: user.id,
+      ...(latest.onlineData !== null ? { onlineData: latest.onlineData as unknown as Prisma.InputJsonValue } : {}),
       items: {
         create: latest.items.map((item) => ({
           assetId: item.assetId,
