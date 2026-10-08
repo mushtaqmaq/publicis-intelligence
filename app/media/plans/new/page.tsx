@@ -10,7 +10,7 @@ export default async function NewMediaPlanPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("plans");
   const { error } = await searchParams;
   const clients = await prisma.client.findMany({ orderBy: { name: "asc" }, select: { name: true } });
 

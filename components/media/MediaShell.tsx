@@ -28,13 +28,13 @@ const pillars: { id: string; href: string; label: string; icon: Ico; color: stri
 ];
 // The OOH planner lives inside the Media module.
 const mediaTools = [
-  { href: "/media/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/media/plans", label: "Media plans", icon: FileStack },
-  { href: "/media/inventory", label: "Inventory", icon: Boxes },
-  { href: "/media/map", label: "Map", icon: MapIcon },
-  { href: "/media/suppliers", label: "Suppliers", icon: Building2 },
-  { href: "/media/reports", label: "Reports", icon: BarChart3 },
-  { href: "/media/clients", label: "Client accounts", icon: Users },
+  { section: "dashboard", href: "/media/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { section: "plans", href: "/media/plans", label: "Media plans", icon: FileStack },
+  { section: "inventory", href: "/media/inventory", label: "Inventory", icon: Boxes },
+  { section: "map", href: "/media/map", label: "Map", icon: MapIcon },
+  { section: "suppliers", href: "/media/suppliers", label: "Suppliers", icon: Building2 },
+  { section: "reports", href: "/media/reports", label: "Reports", icon: BarChart3 },
+  { section: "clients", href: "/media/clients", label: "Client accounts", icon: Users },
 ];
 // Media settings (rate cards, imports, fees, locations ...). Items with a permission are hidden unless granted.
 const settingsNav: { href: string; label: string; permission?: string }[] = [
@@ -73,7 +73,7 @@ function Section({ title }: { title: string }) {
   return <div className="px-3 pt-4 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted">{title}</div>;
 }
 
-export function MediaShell({ user, permissions, modules, children }: { user: U; permissions: string[]; modules: string[]; children: React.ReactNode }) {
+export function MediaShell({ user, permissions, modules, sections, children }: { user: U; permissions: string[]; modules: string[]; sections: string[]; children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
   const [open, setOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/media/settings"));
@@ -94,8 +94,8 @@ export function MediaShell({ user, permissions, modules, children }: { user: U; 
       {myPillars.map((p) => (
         <div key={p.id}>
           <Item href={p.href} label={p.label} icon={p.icon} color={p.color} active={p.id === "media" && pathname.startsWith("/media")} />
-          {p.id === "media" && mediaTools.map((t) => <Item key={t.href} {...t} sub active={pathname === t.href || pathname.startsWith(t.href + "/")} />)}
-          {p.id === "media" && (
+          {p.id === "media" && mediaTools.filter((t) => sections.includes(t.section)).map(({ section: _s, ...t }) => <Item key={t.href} {...t} sub active={pathname === t.href || pathname.startsWith(t.href + "/")} />)}
+          {p.id === "media" && sections.includes("settings") && (
             <>
               <button onClick={() => setSettingsOpen((v) => !v)} className="flex w-full items-center gap-2.5 rounded-xl py-2 pl-9 pr-3 text-sm text-[#3c3c43] hover:bg-black/5">
                 <Settings size={14} strokeWidth={1.75} />Settings{settingsOpen ? <ChevronDown size={14} className="ml-auto" /> : <ChevronRight size={14} className="ml-auto" />}

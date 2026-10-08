@@ -126,7 +126,7 @@ async function applyAudience(assetId: string, row: OohEnrichmentRow, sourceLabel
 }
 
 export async function assignToExistingAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") throw new Error("Only Admins can resolve enrichment rows.");
 
   const batchId = formData.get("batchId") as string;
@@ -158,7 +158,7 @@ export async function assignToExistingAction(formData: FormData) {
 }
 
 export async function createNewAssetAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") throw new Error("Only Admins can resolve enrichment rows.");
 
   const batchId = formData.get("batchId") as string;
@@ -271,7 +271,7 @@ export async function createNewAssetAction(formData: FormData) {
 }
 
 export async function dismissRowAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") throw new Error("Only Admins can resolve enrichment rows.");
 
   const batchId = formData.get("batchId") as string;

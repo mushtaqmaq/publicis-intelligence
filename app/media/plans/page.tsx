@@ -33,7 +33,7 @@ export default async function MediaPlansPage({
 }: {
   searchParams: Promise<{ status?: string; year?: string }>;
 }) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("plans");
   const canDelete = user.role === "SUPER_ADMIN";
 
   const { status: statusParam, year: yearParam } = await searchParams;

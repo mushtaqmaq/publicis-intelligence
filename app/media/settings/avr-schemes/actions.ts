@@ -27,7 +27,7 @@ function readSlabs(formData: FormData) {
 }
 
 export async function createAvrSchemeAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   await requirePermission(user, "dashboard.avr.view");
 
   const supplierId = formData.get("supplierId") as string;
@@ -74,7 +74,7 @@ export async function createAvrSchemeAction(formData: FormData) {
 // the wrong supplier) be corrected in place instead of only being
 // deletable — including reassigning it to a different supplier.
 export async function updateAvrSchemeAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   await requirePermission(user, "dashboard.avr.view");
 
   const id = formData.get("id") as string;
@@ -128,7 +128,7 @@ export async function updateAvrSchemeAction(formData: FormData) {
 }
 
 export async function deleteAvrSchemeAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   await requirePermission(user, "dashboard.avr.view");
 
   const id = formData.get("id") as string;
@@ -159,7 +159,7 @@ export async function deleteAvrSchemeAction(formData: FormData) {
 // use Edit on the resulting scheme card to reassign it — nothing here is
 // destructive of other suppliers' data.
 export async function importAvrExcelAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   await requirePermission(user, "dashboard.avr.view");
 
   const supplierId = formData.get("supplierId") as string;

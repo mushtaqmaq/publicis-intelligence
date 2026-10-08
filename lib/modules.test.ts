@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { resolveModules, moduleOfRoute, canUse, IDS } from "./modules";
+import fs from "node:fs";
+import path from "node:path";
+import { resolveModules, resolveSections, sectionIds, SECTIONS, moduleOfRoute, canUse, IDS } from "./modules";
 
 describe("moduleOfRoute", () => {
   it("maps agent routes to their module", () => {
@@ -50,5 +52,37 @@ describe("multimedia module", () => {
   it("is granted through module.multimedia", () => {
     expect(resolveModules("PLANNER", [], [{ key: "module.multimedia", granted: true }])).toEqual(["multimedia"]);
     expect(resolveModules("PLANNER", [], [{ key: "module.production", granted: true }])).toEqual([]);
+  });
+});
+
+describe("media sections", () => {
+  const all: string[] = sectionIds("media");
+  it("gives admins every section", () => {
+    expect(resolveSections("ADMIN", [], "media", [])).toEqual(all);
+    expect(resolveSections("SUPER_ADMIN", [], "media", [{ key: "media.plans", granted: false }])).toEqual(all);
+  });
+  it("gives everyone with the module every section until one is switched off", () => {
+    expect(resolveSections("PLANNER", ["media"], "media", [])).toEqual(all);
+    expect(resolveSections("PLANNER", ["media"], "media", [{ key: "media.suppliers", granted: false }, { key: "media.settings", granted: false }]))
+      .toEqual(all.filter((x) => x !== "suppliers" && x !== "settings"));
+  });
+  it("gives nothing without the module, and ignores grants that do not remove anything", () => {
+    expect(resolveSections("PLANNER", ["strategy"], "media", [])).toEqual([]);
+    expect(resolveSections("PLANNER", ["media"], "media", [{ key: "media.plans", granted: true }])).toEqual(all);
+  });
+  it("lets a person be left with exactly the sections an admin ticked", () => {
+    const keep = ["plans", "inventory"];
+    const off = all.filter((x) => !keep.includes(x)).map((x) => ({ key: `media.${x}`, granted: false }));
+    expect(resolveSections("PLANNER", ["media"], "media", off)).toEqual(keep);
+  });
+  it("matches the section list the admin screen shows", () => {
+    const src = fs.readFileSync(path.resolve(__dirname, "../public/js/agents.js"), "utf8");
+    const m = /PI\.SECTIONS = (\{.*\});/.exec(src);
+    expect(m).not.toBeNull();
+    expect(eval("(" + m![1] + ")")).toEqual(SECTIONS);
+  });
+  it("has a seeded permission row for every section", () => {
+    const sql = fs.readFileSync(path.resolve(__dirname, "../prisma/migrations/20261008130000_media_section_permissions/migration.sql"), "utf8");
+    for (const id of all) expect(sql).toContain(`'media.${id}'`);
   });
 });

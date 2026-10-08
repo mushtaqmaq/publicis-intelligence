@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 // restricted widget with its contents hidden; it simply gets a different
 // component tree.
 export default async function DashboardPage() {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("dashboard");
 
   switch (user.role) {
     case "SUPER_ADMIN":

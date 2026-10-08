@@ -7,7 +7,7 @@ import { requireMediaUser } from "@/lib/auth/modules";
 import type { MediaChannel } from "@/generated/prisma/enums";
 
 async function requireAdmin() {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
     throw new Error("Only Admins can manage suppliers.");
   }

@@ -54,7 +54,7 @@ export default async function SupplierDetailPage({
   params: Promise<{ supplierId: string }>;
   searchParams: Promise<SupplierPageParams>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("suppliers");
   const { supplierId } = await params;
   const filters = await searchParams;
 

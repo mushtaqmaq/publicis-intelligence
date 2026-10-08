@@ -7,7 +7,7 @@ import { parseMediaPlanFilesAction, commitMediaPlanImportAction } from "./action
 export const dynamic = "force-dynamic";
 
 export default async function ImportMediaPlansPage() {
-  await requireMediaUser();
+  await requireMediaUser("settings");
   const [clients, suppliers, existingPlanCodes] = await Promise.all([
     prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.supplier.findMany({ where: { isActive: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),

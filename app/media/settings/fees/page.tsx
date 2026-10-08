@@ -26,7 +26,7 @@ export default async function FeesPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("settings");
   const params = await searchParams;
   const page = Math.max(1, Number(params.page ?? "1") || 1);
 

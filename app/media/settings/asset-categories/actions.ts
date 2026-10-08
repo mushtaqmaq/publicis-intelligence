@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireMediaUser } from "@/lib/auth/modules";
 
 async function requireAdmin() {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
     throw new Error("Only Admins can manage asset categories.");
   }
@@ -14,7 +14,7 @@ async function requireAdmin() {
 }
 
 export async function updateAssetCategoryAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
     throw new Error("Only Admins can recategorize assets.");
   }

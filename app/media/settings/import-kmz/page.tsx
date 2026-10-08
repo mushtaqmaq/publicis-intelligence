@@ -23,7 +23,7 @@ export default async function ImportKmzPage({
 }: {
   searchParams: Promise<{ error?: string; result?: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("settings");
   const { error, result } = await searchParams;
   const suppliers = await prisma.supplier.findMany({ where: { isActive: true }, orderBy: { name: "asc" } });
 

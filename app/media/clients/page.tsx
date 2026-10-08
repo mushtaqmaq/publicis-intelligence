@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 export const dynamic = "force-dynamic";
 
 export default async function ClientsPage() {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("clients");
   const canManageAll = await hasPermission(user, "clients.manage_all");
 
   // An Account Manager without clients.manage_all only ever sees their own

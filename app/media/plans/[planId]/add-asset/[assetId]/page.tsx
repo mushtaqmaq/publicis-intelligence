@@ -25,7 +25,7 @@ export default async function AddAssetToPlanPage({
   params: Promise<{ planId: string; assetId: string }>;
   searchParams: Promise<{ error?: string; v?: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("plans");
   const { planId, assetId } = await params;
   const { error, v } = await searchParams;
 

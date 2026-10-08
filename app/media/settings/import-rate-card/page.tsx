@@ -12,7 +12,7 @@ export default async function ImportRateCardPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("settings");
   const [{ error }, suppliers, recentVersions] = await Promise.all([
     searchParams,
     getSuppliersForUpload(),

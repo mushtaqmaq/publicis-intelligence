@@ -18,7 +18,7 @@ function generatePlanCode(campaignName: string, start: Date): string {
 }
 
 export async function createMediaPlanAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("plans");
   const clientName = (formData.get("clientName") as string)?.trim();
   const campaignName = (formData.get("campaignName") as string)?.trim();
   const campaignStartRaw = formData.get("campaignStart") as string;

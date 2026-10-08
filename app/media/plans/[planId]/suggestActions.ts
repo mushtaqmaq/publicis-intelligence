@@ -24,7 +24,7 @@ async function editableVersion(planId: string, versionId: string): Promise<{ ok:
 
 /** Step 1: the real inventory catalogue (priced for one unit over the campaign) the AI may choose from. */
 export async function getSuggestionCatalogueAction(planId: string, versionId: string, filters: SuggestFilters): Promise<{ ok: true; candidates: Candidate[]; considered: number; noRate: number; start: string; end: string; budget: number | null; client: string } | Err> {
-  await requireMediaUser();
+  await requireMediaUser("plans");
   const ctx = await editableVersion(planId, versionId);
   if (!ctx.ok) return ctx;
   const c = await buildCandidates(planId, { channel: filters.channel || undefined, supplierId: filters.supplierId || undefined, q: filters.q || undefined });
@@ -36,7 +36,7 @@ export type PricedRow = { assetId: string; assetName: string; supplier: string; 
 
 /** Step 2: validate the AI's picks against the REAL catalogue and price every one with the planner engine. */
 export async function priceSuggestionAction(planId: string, versionId: string, picks: Pick[]): Promise<{ ok: true; rows: PricedRow[]; dropped: { assetId: string; reason: string }[]; total: number; anyPending: boolean } | Err> {
-  await requireMediaUser();
+  await requireMediaUser("plans");
   const ctx = await editableVersion(planId, versionId);
   if (!ctx.ok) return ctx;
   const ids = [...new Set(picks.map((p) => String(p.assetId)))].slice(0, 80);
@@ -55,7 +55,7 @@ export async function priceSuggestionAction(planId: string, versionId: string, p
 
 /** Step 3: add the lines the planner ticked. Prices are recomputed here; nothing from the browser is trusted. */
 export async function addSuggestionsAction(planId: string, versionId: string, lines: { assetId: string; qty: number }[]): Promise<{ ok: true; added: number } | Err> {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("plans");
   const ctx = await editableVersion(planId, versionId);
   if (!ctx.ok) return ctx;
   const ids = [...new Set(lines.map((l) => String(l.assetId)))].slice(0, 80);

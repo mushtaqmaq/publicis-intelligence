@@ -18,7 +18,7 @@ export default async function ProofOfPostingPage({
   params: Promise<{ planId: string }>;
   searchParams: Promise<{ error?: string; v?: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("plans");
   const { planId } = await params;
   const { error, v } = await searchParams;
 

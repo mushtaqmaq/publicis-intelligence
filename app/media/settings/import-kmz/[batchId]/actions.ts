@@ -45,7 +45,7 @@ function getPending(batchPending: Prisma.JsonValue, resolved: string[]): Pending
 }
 
 export async function assignPlacemarkAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") throw new Error("Only Admins can resolve KMZ placemarks.");
 
   const batchId = formData.get("batchId") as string;
@@ -76,7 +76,7 @@ export async function assignPlacemarkAction(formData: FormData) {
 }
 
 export async function dismissPlacemarkAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") throw new Error("Only Admins can resolve KMZ placemarks.");
 
   const batchId = formData.get("batchId") as string;
@@ -87,7 +87,7 @@ export async function dismissPlacemarkAction(formData: FormData) {
 }
 
 export async function bulkAssignGroupAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") throw new Error("Only Admins can resolve KMZ placemarks.");
 
   const batchId = formData.get("batchId") as string;
@@ -146,7 +146,7 @@ export async function bulkAssignGroupAction(formData: FormData) {
 }
 
 export async function bulkDismissGroupAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") throw new Error("Only Admins can resolve KMZ placemarks.");
 
   const batchId = formData.get("batchId") as string;

@@ -24,7 +24,7 @@ const CHANNEL_LABEL: Record<MediaChannel, string> = {
 };
 
 export async function parseMediaPlanFilesAction(formData: FormData): Promise<ParsedMediaPlan[]> {
-  await requireMediaUser();
+  await requireMediaUser("settings");
 
   const files = formData.getAll("files") as File[];
   const results: ParsedMediaPlan[] = [];
@@ -178,7 +178,7 @@ async function getOrCreatePlatformAsset(channel: MediaChannel, platformName: str
 }
 
 export async function commitMediaPlanImportAction(rows: MediaPlanImportRow[]): Promise<CommitResult> {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
 
   const skipped: Array<{ sourceFile: string; reason: string }> = [];
   let created = 0;

@@ -6,7 +6,7 @@ import { requireMediaUser } from "@/lib/auth/modules";
 import { requirePermission } from "@/lib/auth/permissions";
 
 export async function upsertRevenueTargetAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   await requirePermission(user, "dashboard.revenue.view");
 
   const year = Number(formData.get("year"));
@@ -40,7 +40,7 @@ export async function upsertRevenueTargetAction(formData: FormData) {
 }
 
 export async function deleteRevenueTargetAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   await requirePermission(user, "dashboard.revenue.view");
 
   const id = formData.get("id") as string;

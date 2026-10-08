@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 export const dynamic = "force-dynamic";
 
 export default async function OohEnrichmentBatchesPage() {
-  await requireMediaUser();
+  await requireMediaUser("settings");
   const batches = await prisma.oohEnrichmentBatch.findMany({ orderBy: { createdAt: "desc" } });
 
   return (

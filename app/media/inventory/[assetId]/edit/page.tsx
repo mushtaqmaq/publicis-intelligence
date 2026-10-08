@@ -25,7 +25,7 @@ export default async function EditAssetPage({
   params: Promise<{ assetId: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("inventory");
   const { assetId } = await params;
   const { error } = await searchParams;
 

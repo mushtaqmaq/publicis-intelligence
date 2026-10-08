@@ -22,7 +22,7 @@ export default async function AssetDetailPage({
 }: {
   params: Promise<{ assetId: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("inventory");
   const { assetId } = await params;
 
   const asset = await prisma.asset.findUnique({

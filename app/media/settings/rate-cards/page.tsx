@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 export const dynamic = "force-dynamic";
 
 export default async function RateCardsPage() {
-  await requireMediaUser();
+  await requireMediaUser("settings");
   const versions = await prisma.rateCardVersion.findMany({
     select: {
       id: true,

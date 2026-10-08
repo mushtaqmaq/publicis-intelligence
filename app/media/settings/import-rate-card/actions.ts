@@ -22,7 +22,7 @@ function detectFileType(filename: string): "PDF" | "XLSX" | "XLS" | "CSV" | null
 }
 
 export async function uploadRateCardAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   const file = formData.get("file") as File | null;
   const supplierId = formData.get("supplierId") as string;
   const rateYearRaw = formData.get("rateYear") as string;

@@ -12,7 +12,7 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 export default async function ImportHistoryPage() {
-  await requireMediaUser();
+  await requireMediaUser("settings");
   const jobs = await prisma.importJob.findMany({
     orderBy: { createdAt: "desc" },
     include: {

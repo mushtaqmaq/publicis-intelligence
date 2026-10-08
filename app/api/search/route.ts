@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
-import { hasModule } from "@/lib/auth/modules";
+import { hasModule, getUserSections } from "@/lib/auth/modules";
 
 export type SearchResult = { type: string; id: string; label: string; sublabel?: string; href: string };
 
@@ -13,15 +13,17 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim();
   if (!q || q.length < 2) return NextResponse.json({ results: [] });
 
+  // Only search the areas this person may open.
+  const mine = new Set(await getUserSections(user, "media"));
   const [plans, clients, suppliers, assets] = await Promise.all([
-    prisma.mediaPlan.findMany({
+    !mine.has("plans") ? Promise.resolve([]) : prisma.mediaPlan.findMany({
       where: { OR: [{ campaignName: { contains: q, mode: "insensitive" } }, { planCode: { contains: q, mode: "insensitive" } }] },
       select: { id: true, campaignName: true, planCode: true },
       take: 5,
     }),
-    prisma.client.findMany({ where: { name: { contains: q, mode: "insensitive" } }, select: { id: true, name: true }, take: 5 }),
-    prisma.supplier.findMany({ where: { name: { contains: q, mode: "insensitive" } }, select: { id: true, name: true }, take: 5 }),
-    prisma.asset.findMany({
+    !mine.has("clients") ? Promise.resolve([]) : prisma.client.findMany({ where: { name: { contains: q, mode: "insensitive" } }, select: { id: true, name: true }, take: 5 }),
+    !mine.has("suppliers") ? Promise.resolve([]) : prisma.supplier.findMany({ where: { name: { contains: q, mode: "insensitive" } }, select: { id: true, name: true }, take: 5 }),
+    !mine.has("inventory") ? Promise.resolve([]) : prisma.asset.findMany({
       where: { OR: [{ assetName: { contains: q, mode: "insensitive" } }, { locationName: { contains: q, mode: "insensitive" } }] },
       select: { id: true, assetName: true, locationName: true },
       take: 5,

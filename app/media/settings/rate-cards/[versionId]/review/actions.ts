@@ -20,7 +20,7 @@ interface EditableNewValue {
 }
 
 export async function editCandidateAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   const rateChangeId = formData.get("rateChangeId") as string;
   const versionId = formData.get("versionId") as string;
 
@@ -78,7 +78,7 @@ export async function editCandidateAction(formData: FormData) {
 }
 
 export async function publishOneAction(rateChangeId: string, versionId: string) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   try {
     await publishRateChange(rateChangeId, { userId: user.id });
   } catch (err) {
@@ -91,13 +91,13 @@ export async function publishOneAction(rateChangeId: string, versionId: string) 
 }
 
 export async function publishAsNewAssetAction(rateChangeId: string, versionId: string) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   await publishRateChange(rateChangeId, { forceNewAsset: true, userId: user.id });
   revalidatePath(`/media/settings/rate-cards/${versionId}/review`);
 }
 
 export async function mergeIntoAssetAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   const rateChangeId = formData.get("rateChangeId") as string;
   const versionId = formData.get("versionId") as string;
   const mergeIntoAssetId = formData.get("mergeIntoAssetId") as string;
@@ -124,13 +124,13 @@ export async function mergeIntoAssetAction(formData: FormData) {
 }
 
 export async function rejectOneAction(rateChangeId: string, versionId: string) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   await rejectRateChange(rateChangeId, user.id);
   revalidatePath(`/media/settings/rate-cards/${versionId}/review`);
 }
 
 export async function publishAllAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   const versionId = formData.get("versionId") as string;
   const result = await publishAllEligible(versionId, user.id);
   if (result.skipped.length > 0) {
@@ -147,7 +147,7 @@ export async function publishAllAction(formData: FormData) {
 }
 
 export async function resolveReconciliationAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   const reconciliationId = formData.get("reconciliationId") as string;
   const versionId = formData.get("versionId") as string;
   const recommendedAction = formData.get("recommendedAction") as ReconciliationAction;

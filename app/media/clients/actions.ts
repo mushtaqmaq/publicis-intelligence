@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/auth/permissions";
 
 export async function assignAccountManagerAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("clients");
   await requirePermission(user, "clients.manage_all");
 
   const clientId = formData.get("clientId") as string;

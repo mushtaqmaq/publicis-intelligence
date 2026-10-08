@@ -8,7 +8,7 @@ import { sanitizeOnlineData } from "@/lib/planning/online";
 
 // Saves the online/digital block of a plan version. Locked versions are never edited.
 export async function saveOnlineBlockAction(planId: string, versionId: string, data: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("plans");
   const version = await prisma.mediaPlanVersion.findUnique({
     where: { id: versionId },
     select: { isLocked: true, mediaPlanId: true, mediaPlan: { select: { planType: true } } },

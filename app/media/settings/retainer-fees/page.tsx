@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 const MONTH_LABEL = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export default async function RetainerFeesPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (!(await hasPermission(user, "dashboard.revenue.view"))) notFound();
   const { error } = await searchParams;
 

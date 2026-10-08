@@ -15,7 +15,7 @@ function toIntOrNull(v: FormDataEntryValue | null): number | null {
 }
 
 export async function createAssetAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("inventory");
 
   const supplierId = formData.get("supplierId") as string;
   const assetName = (formData.get("assetName") as string)?.trim();
