@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   LayoutDashboard, FileStack, Boxes, Map as MapIcon, Building2, Users, Home, Zap, MessageCircle, Compass, Sparkles,
-  Megaphone, Wallet, Clapperboard, Search, Library, Gauge, ShieldCheck, LogOut, Menu, BarChart3, Settings, ChevronDown, ChevronRight, Flag, CheckSquare,
+  Megaphone, Wallet, Clapperboard, Search, Library, Gauge, ShieldCheck, LogOut, Menu, BarChart3, Settings, ChevronDown, ChevronRight, Flag, CheckSquare, CalendarDays,
 } from "lucide-react";
 
 type U = { name: string | null; email: string; role: string };
@@ -28,6 +28,12 @@ const pillars: { id: string; href: string; label: string; icon: Ico; color: stri
 ];
 // Creative requests live inside the Creative module.
 const creativeTools = [{ href: "/creative", label: "Requests", icon: Sparkles }];
+const multimediaTools = [
+  { href: "/multimedia", label: "Jobs", icon: Clapperboard },
+  { href: "/multimedia/schedule", label: "Schedule", icon: CalendarDays },
+  { href: "/multimedia/resources", label: "Resources", icon: Boxes },
+  { href: "/multimedia/reports", label: "Reports", icon: BarChart3 },
+];
 // The OOH planner lives inside the Media module.
 const mediaTools = [
   { section: "dashboard", href: "/media/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -70,7 +76,7 @@ function Item({ href, label, icon: Icon, active, color, sub }: { href: string; l
     <span className="grid h-6 w-6 place-items-center rounded-lg" style={{ background: `${color}14`, color }}><Icon size={14} strokeWidth={1.75} /></span>
   ) : <Icon size={sub ? 14 : 16} strokeWidth={1.75} />;
   // Media tools use client-side links; platform links are plain anchors into the static app.
-  return href.startsWith("/media") || href.startsWith("/creative") || href.startsWith("/campaigns") || href.startsWith("/approvals") ? <Link href={href} className={cls}>{icon}{label}</Link> : <a href={href} className={cls}>{icon}{label}</a>;
+  return href.startsWith("/media") || href.startsWith("/creative") || href.startsWith("/multimedia") || href.startsWith("/campaigns") || href.startsWith("/approvals") ? <Link href={href} className={cls}>{icon}{label}</Link> : <a href={href} className={cls}>{icon}{label}</a>;
 }
 
 function Section({ title }: { title: string }) {
@@ -98,6 +104,7 @@ export function MediaShell({ user, permissions, modules, sections, children }: {
       {myPillars.map((p) => (
         <div key={p.id}>
           <Item href={p.href} label={p.label} icon={p.icon} color={p.color} active={p.id === "media" && pathname.startsWith("/media")} />
+          {p.id === "multimedia" && multimediaTools.map((t) => <Item key={t.href} {...t} sub active={t.href === "/multimedia" ? pathname === "/multimedia" || /^\/multimedia\/(new|c)/.test(pathname) : pathname.startsWith(t.href)} />)}
           {p.id === "creative" && creativeTools.map((t) => <Item key={t.href} {...t} sub active={pathname.startsWith(t.href)} />)}
           {p.id === "media" && mediaTools.filter((t) => sections.includes(t.section)).map(({ section: _s, ...t }) => <Item key={t.href} {...t} sub active={pathname === t.href || pathname.startsWith(t.href + "/")} />)}
           {p.id === "media" && sections.includes("settings") && (
@@ -130,7 +137,7 @@ export function MediaShell({ user, permissions, modules, sections, children }: {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4 md:px-6">
           <button className="md:hidden" aria-label="Menu" onClick={() => setOpen((v) => !v)}><Menu size={20} /></button>
-          <div className="text-sm text-muted hidden md:block">{pathname.startsWith("/creative") ? "Creative" : pathname.startsWith("/campaigns") ? "Campaigns" : pathname.startsWith("/approvals") ? "Approvals" : "Media"}</div>
+          <div className="text-sm text-muted hidden md:block">{pathname.startsWith("/multimedia") ? "Multimedia" : pathname.startsWith("/creative") ? "Creative" : pathname.startsWith("/campaigns") ? "Campaigns" : pathname.startsWith("/approvals") ? "Approvals" : "Media"}</div>
           <div className="flex items-center gap-3 text-sm">
             <div className="text-right leading-tight">
               <div className="font-medium">{user.name || user.email}</div>

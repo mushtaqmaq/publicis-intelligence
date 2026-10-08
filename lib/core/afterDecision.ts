@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { audit } from "./service";
 import { onVersionReviewed } from "@/lib/creative/service";
+import { onMultimediaReviewed } from "@/lib/multimedia/service";
 
 // What happens to a document when its approval closes. One place, so every module reacts the same way.
 export async function afterDecision(requestId: string, actorId: string) {
@@ -13,4 +14,5 @@ export async function afterDecision(requestId: string, actorId: string) {
     await audit(actorId, "CAMPAIGN_ACTIVATED", "Campaign", r.documentId, { via: "approval" });
   }
   if (r.documentType === "CREATIVE_VERSION") await onVersionReviewed(r.documentId, result, actorId, feedback);
+  if (r.documentType === "MULTIMEDIA_VERSION") await onMultimediaReviewed(r.documentId, result, actorId, feedback);
 }

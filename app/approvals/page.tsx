@@ -15,7 +15,9 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   ]);
   const versionIds = [...waiting, ...mine].filter((r) => r.documentType === "CREATIVE_VERSION").map((r) => r.documentId);
   const versions = await prisma.creativeVersion.findMany({ where: { id: { in: versionIds } }, select: { id: true, requestId: true, url: true } });
-  const link = (t: string, id: string) => (t === "CAMPAIGN" ? `/campaigns/${id}` : t === "CREATIVE_VERSION" ? (versions.find((v) => v.id === id) ? `/creative/${versions.find((v) => v.id === id)!.requestId}` : null) : null);
+  const mmIds = [...waiting, ...mine].filter((r) => r.documentType === "MULTIMEDIA_VERSION").map((r) => r.documentId);
+  const mmVersions = await prisma.multimediaVersion.findMany({ where: { id: { in: mmIds } }, select: { id: true, jobId: true } });
+  const link = (t: string, id: string) => t === "MULTIMEDIA_VERSION" ? (mmVersions.find((v) => v.id === id) ? `/multimedia/${mmVersions.find((v) => v.id === id)!.jobId}` : null) : (t === "CAMPAIGN" ? `/campaigns/${id}` : t === "CREATIVE_VERSION" ? (versions.find((v) => v.id === id) ? `/creative/${versions.find((v) => v.id === id)!.requestId}` : null) : null);
   return (
     <div className="p-8 max-w-4xl">
       <PageHeader title="Approvals" subtitle="Requests waiting for you, and the ones you asked for." actions={isAdmin ? <a href="/approvals/settings" className="text-sm text-accent underline">Set approvers</a> : undefined} />
