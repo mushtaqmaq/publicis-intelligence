@@ -31,4 +31,4 @@ Plan create/lock/new version/compare; add inventory line at real rate (gross 1,2
 - [ ] A long (>2 min) agent run completes inside the 300 s function limit (owner to run a Deep research request)
 - [ ] A real PDF rate-card upload works on Vercel
 - [ ] Draft with AI and Suggest from inventory produce sensible output with the real key
-- [ ] Space accounts and data imported and spot-checked
+- [x] Space accounts and data import: cancelled by the owner (no production data)

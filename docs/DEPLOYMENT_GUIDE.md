@@ -39,7 +39,9 @@ Take a dump before migrations or imports (use the same major version as the serv
 docker run --rm -e U="$DATABASE_URL_UNPOOLED" postgres:18-alpine sh -c 'pg_dump "$U" --no-owner --no-acl -Fc' > backup.dump
 ```
 
-## Importing data from the Hugging Face Space
+## Importing data from the Hugging Face Space (cancelled)
+The owner cancelled this on 2026-10-08: there is no production data to migrate. The tool is kept for reference only.
+
 Tool: `scripts/import-space.mjs`. It reads the Space's SQLite file and `files/` folder and writes into the unified database. It is a dry run unless `--apply` is given, runs in one transaction, is safe to repeat, and never changes an existing user, setting or document. It creates the Space's users (their old passwords keep working), gives non-admins the modules you choose (default all six), and imports their credit history, saved documents, conversations and files.
 
 1. Export the Space's `/data` folder (the SQLite file `publicis-intelligence.db` and the `files/` folder).

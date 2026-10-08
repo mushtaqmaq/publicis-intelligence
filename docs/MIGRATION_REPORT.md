@@ -10,7 +10,7 @@ Vercel compatibility: READY, deployed (team `maq5`, project `publicis-intelligen
 Production deployed: YES. Fly.io was tried first and removed (free trial stops machines without a card).
 
 ## What the platform is now
-- One product, one database, one login. The OOH Media Planner (inventory, rates, plans, imports) was rebuilt inside this repo as part of the **Media** module; the old standalone planner is still live against the same database and should be retired once everyone has moved.
+- One product, one database, one login. The OOH Media Planner (inventory, rates, plans, imports) was rebuilt inside this repo as part of the **Media** module; the old standalone planner app was paused on 2026-10-08 (owner decision; reversible).
 - Each pillar is a module (Strategy, Creative, Media, Finance, Production, Search). Admins hold all; everyone else only the modules granted to them. Enforced on every page, server action, route handler and AI/tool route; a test fails CI if a `/media` page, action or route lacks the guard.
 - Media planner: online, offline/OOH and hybrid plans in one plan model with versions and locking; online block with AI draft; inventory suggestions (AI picks from real inventory at real rates, every pick re-priced by the engine); agency-format Excel and PDF; settings (rate cards, imports, KMZ, fees, AVR, revenue targets, audit log).
 
@@ -30,8 +30,8 @@ Features migrated: all preserved; the Media planner tool was replaced by the uni
 - Visual and workflow parity of every feature against the original Space (FEATURE_PARITY_TEST.md).
 
 ## Outstanding items
-- Import the Space's accounts and data: tool is ready (`scripts/import-space.mjs`, dry run by default); needs the Space's `/data` export. See DEPLOYMENT_GUIDE.md.
-- Retire the standalone planner (deliberately not done: it is still live against the same database; switch it off only once everyone has moved). The empty `neon-coral-pillar` database was deleted on 2026-10-08.
+- Space data import: CANCELLED by the owner on 2026-10-08 (there is no production data; existing records are test data). `scripts/import-space.mjs` stays in the repo, unused.
+- Standalone planner: paused on 2026-10-08 at the owner's request (reversible, see INTEGRATION_PLAN.md decision 7). The empty `neon-coral-pillar` database was deleted on 2026-10-08.
 - Vercel request bodies are limited to about 4.5 MB (the original allowed 30 MB): large uploads fail with 413.
 - Generated media is stored in Postgres; move to Vercel Blob if Neon's storage quota becomes a constraint.
 - Inventory cleanup: 10 rows named `TECHNICAL DETAILS**` (ELAN DECAUX, a rate-card parsing artifact, unused in any plan) plus about 113 rows to review (no published rate, duplicates, size-like names). `scripts/audit-inventory.mjs` reports them read-only and can write a reversible retire script for the clear junk; nothing has been changed in production.
@@ -42,4 +42,4 @@ Environment variables required: see ENVIRONMENT_VARIABLES.md
 Database changes: one Neon database shared with the planner; 22 Prisma migrations (see DATABASE_AUDIT.md)
 Authentication changes: planner `users`/`sessions` tables are now the single identity store; roles map SUPER_ADMIN/ADMIN to admin, others to member
 Production readiness: LIVE; functional parity checks and the items above remain
-Recommended next action: run the live checks listed under "Not verified", then the Space import, then retire the standalone planner
+Recommended next action: confirm the decisions in INTEGRATION_PLAN.md section 9, then build Creative, Multimedia (renamed from Production) and Finance as one connected system
