@@ -12,7 +12,7 @@ const fmt = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "—");
 export default async function CampaignPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; ok?: string }> }) {
   await requirePlatformUser();
   const [{ id }, { error, ok }] = await Promise.all([params, searchParams]);
-  const c = await prisma.campaign.findUnique({ where: { id }, include: { client: true, owner: { select: { name: true, email: true } }, deliverables: { orderBy: { createdAt: "asc" } }, mediaPlans: { select: { id: true, planCode: true, campaignName: true, status: true } }, creativeRequests: { select: { id: true, code: true, title: true, status: true }, orderBy: { createdAt: "asc" } }, multimediaJobs: { select: { id: true, code: true, title: true, status: true }, orderBy: { createdAt: "asc" } } } });
+  const c = await prisma.campaign.findUnique({ where: { id }, include: { client: true, owner: { select: { name: true, email: true } }, deliverables: { orderBy: { createdAt: "asc" } }, mediaPlans: { select: { id: true, planCode: true, campaignName: true, status: true } }, creativeRequests: { select: { id: true, code: true, title: true, status: true }, orderBy: { createdAt: "asc" } }, multimediaJobs: { select: { id: true, code: true, title: true, status: true }, orderBy: { createdAt: "asc" } }, financeDocuments: { where: { status: { notIn: ["CANCELLED", "VOID", "REJECTED"] } }, select: { id: true, code: true, type: true, status: true, total: true }, orderBy: { createdAt: "asc" } } } });
   if (!c) notFound();
   const [links, comments, approvals] = await Promise.all([
     prisma.link.findMany({ where: { OR: [{ entityType: "Campaign", entityId: id }, { entityType: "Deliverable", entityId: { in: c.deliverables.map((d) => d.id) } }] }, orderBy: { createdAt: "asc" } }),
@@ -102,6 +102,11 @@ export default async function CampaignPage({ params, searchParams }: { params: P
       <section className={card}>
         <div className="flex items-center"><h2 className="font-medium">Multimedia jobs</h2><Link href={`/multimedia/new?campaign=${c.id}`} className="ml-auto text-sm text-accent">New job</Link></div>
         <ul className="mt-2 text-sm">{c.multimediaJobs.map((q) => <li key={q.id}><Link href={`/multimedia/${q.id}`} className="text-accent">{q.code} {q.title}</Link> <span className="text-muted">{q.status.replace(/_/g, " ").toLowerCase()}</span></li>)}{c.multimediaJobs.length === 0 && <li className="text-muted">None yet.</li>}</ul>
+      </section>
+
+      <section className={card}>
+        <h2 className="font-medium">Finance documents</h2>
+        <ul className="mt-2 text-sm">{c.financeDocuments.map((q) => <li key={q.id}><Link href={`/finance/documents/${q.id}`} className="text-accent">{q.code ?? "Draft"}</Link> <span className="text-muted">{q.type.replace(/_/g, " ").toLowerCase()} · {q.status.replace(/_/g, " ").toLowerCase()} · QAR {Number(q.total).toLocaleString()}</span></li>)}{c.financeDocuments.length === 0 && <li className="text-muted">None yet.</li>}</ul>
       </section>
 
       <section className={card}>

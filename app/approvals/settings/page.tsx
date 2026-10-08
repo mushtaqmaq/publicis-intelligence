@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Banner, field, labelCls } from "@/components/platform/Banner";
 import { saveTemplateAction } from "../actions";
 
-const DOC_TYPES = [["CAMPAIGN", "Campaign"], ["CREATIVE_VERSION", "Creative artwork review"], ["MULTIMEDIA_VERSION", "Multimedia cut review"]] as const; // finance document types are added as those modules arrive
+const DOC_TYPES = [["CAMPAIGN", "Campaign"], ["CREATIVE_VERSION", "Creative artwork review"], ["MULTIMEDIA_VERSION", "Multimedia cut review"], ["QUOTATION", "Finance: quotation"], ["PURCHASE_ORDER", "Finance: purchase order"], ["BILL", "Finance: supplier bill"]] as const; // finance document types are added as those modules arrive
 const ROLES = ["ACCOUNT_MANAGER", "PLANNER", "ADMIN", "SUPER_ADMIN", "VIEWER"];
 
 export default async function ApprovalSettings({ searchParams }: { searchParams: Promise<{ error?: string; ok?: string }> }) {

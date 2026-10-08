@@ -90,3 +90,20 @@ describe("Multimedia module guard coverage", () => {
     expect(bad).toEqual([]);
   });
 });
+
+describe("Finance module guard coverage", () => {
+  const ff = walk(path.resolve(__dirname, "../app/finance")).filter((f) => /\.(ts|tsx)$/.test(f));
+  const need = ff.filter((f) => path.basename(f) === "page.tsx" || path.basename(f) === "route.ts" || /^\s*["']use server["']/m.test(fs.readFileSync(f, "utf8")));
+  it("every page, action file and route requires the Finance module", () => {
+    expect(need.length).toBeGreaterThan(9);
+    expect(need.filter((f) => !/requireFinanceUser\(/.test(fs.readFileSync(f, "utf8"))).map(rel)).toEqual([]);
+  });
+  it("every exported action calls the guard itself", () => {
+    const bad: string[] = [];
+    for (const f of need.filter((x) => path.basename(x) === "actions.ts")) {
+      const text = fs.readFileSync(f, "utf8");
+      for (const m of text.matchAll(/export async function (\w+)\([^)]*\)\s*\{([\s\S]*?)\n\}/g)) if (!/requireFinanceUser\(/.test(m[2])) bad.push(`${rel(f)}:${m[1]}`);
+    }
+    expect(bad).toEqual([]);
+  });
+});

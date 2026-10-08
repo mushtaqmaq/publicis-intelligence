@@ -335,7 +335,8 @@ model Supplier {
   rateCards        RateCard[]
   kmzImportBatches KmzImportBatch[]
   avrSchemes       AvrScheme[]
-  buyingEntityFor  MediaPlanItem[]  @relation("MediaPlanItemBuyingEntity")
+  buyingEntityFor  MediaPlanItem[]   @relation("MediaPlanItemBuyingEntity")
+  financeDocuments FinanceDocument[]
 
   @@map("suppliers")
 }
@@ -736,6 +737,7 @@ model Client {
   campaigns        Campaign[]
   creativeRequests CreativeRequest[]
   multimediaJobs   MultimediaJob[]
+  financeDocuments FinanceDocument[]
 
   @@map("clients")
 }
@@ -773,7 +775,8 @@ model MediaPlan {
   createdAt                  DateTime                    @default(now())
   updatedAt                  DateTime                    @updatedAt
 
-  versions MediaPlanVersion[]
+  versions         MediaPlanVersion[]
+  financeDocuments FinanceDocument[]
 
   @@map("media_plans")
 }
@@ -1166,6 +1169,7 @@ model Campaign {
   mediaPlans       MediaPlan[]
   creativeRequests CreativeRequest[]
   multimediaJobs   MultimediaJob[]
+  financeDocuments FinanceDocument[]
 
   @@index([clientId])
   @@map("campaigns")
@@ -1495,4 +1499,110 @@ model MultimediaVersion {
 
   @@unique([jobId, versionNo])
   @@map("multimedia_versions")
+}
+
+// ---------------------------------------------------------------------------
+// Finance module (QAR only; tax is a rate per document, default 0). Quotation -> Booking order -> Invoice on
+// the client side; Purchase order -> Bill on the supplier side. Payments are allocated to invoices (money in)
+// or bills (money out). No general ledger yet. Everything is traceable to a campaign.
+// ---------------------------------------------------------------------------
+
+enum FinanceDocType {
+  QUOTATION
+  BOOKING_ORDER
+  PURCHASE_ORDER
+  INVOICE
+  BILL
+}
+
+model FinanceDocument {
+  id                 String            @id @default(cuid())
+  type               FinanceDocType
+  code               String?           @unique // QUO-/BO-/PO- at creation; INV-/BILL- when issued/received (gapless)
+  status             String            @default("DRAFT")
+  clientId           String?
+  client             Client?           @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  supplierId         String?
+  supplier           Supplier?         @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  campaignId         String?
+  campaign           Campaign?         @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  mediaPlanId        String?
+  mediaPlan          MediaPlan?        @relation(fields: [mediaPlanId], references: [id], onDelete: SetNull)
+  mediaPlanVersionId String?
+  parentId           String? // the document this one was made from (quotation -> booking order -> invoice)
+  parent             FinanceDocument?  @relation("DocParent", fields: [parentId], references: [id], onDelete: SetNull)
+  children           FinanceDocument[] @relation("DocParent")
+  reference          String? // client LPO number, supplier invoice number, etc.
+  issueDate          DateTime?
+  dueDate            DateTime?
+  validUntil         DateTime?
+  taxRatePct         Decimal           @default(0) @db.Decimal(6, 3)
+  subtotal           Decimal           @default(0) @db.Decimal(14, 2)
+  taxAmount          Decimal           @default(0) @db.Decimal(14, 2)
+  total              Decimal           @default(0) @db.Decimal(14, 2)
+  paidAmount         Decimal           @default(0) @db.Decimal(14, 2)
+  notes              String?
+  createdById        String?
+  voidedAt           DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  lines       FinanceLine[]
+  allocations FinanceAllocation[]
+
+  @@index([type, status])
+  @@index([clientId])
+  @@index([supplierId])
+  @@index([campaignId])
+  @@index([parentId])
+  @@map("finance_documents")
+}
+
+model FinanceLine {
+  id           String          @id @default(cuid())
+  documentId   String
+  document     FinanceDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  position     Int
+  description  String
+  quantity     Decimal         @default(1) @db.Decimal(12, 3)
+  unitPrice    Decimal         @db.Decimal(14, 2)
+  amount       Decimal         @db.Decimal(14, 2) // quantity x unitPrice, rounded to 2 places
+  sourceItemId String? // media plan item / online section this line came from
+
+  @@unique([documentId, position])
+  @@map("finance_lines")
+}
+
+model FinancePayment {
+  id          String    @id @default(cuid())
+  code        String    @unique // RCT-0001 (money in) / PAY-0001 (money out)
+  direction   String // IN | OUT
+  clientId    String?
+  supplierId  String?
+  amount      Decimal   @db.Decimal(14, 2)
+  paidOn      DateTime
+  method      String    @default("BANK_TRANSFER") // BANK_TRANSFER | CHEQUE | CASH | CARD | OTHER
+  reference   String?
+  notes       String?
+  createdById String?
+  voidedAt    DateTime?
+  createdAt   DateTime  @default(now())
+
+  allocations FinanceAllocation[]
+
+  @@index([direction, paidOn])
+  @@map("finance_payments")
+}
+
+model FinanceAllocation {
+  id         String          @id @default(cuid())
+  paymentId  String
+  payment    FinancePayment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  documentId String
+  document   FinanceDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  amount     Decimal         @db.Decimal(14, 2)
+
+  @@index([documentId])
+  @@index([paymentId])
+  @@map("finance_allocations")
 }
