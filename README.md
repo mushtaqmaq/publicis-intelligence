@@ -10,7 +10,7 @@ pinned: false
 
 # Publicis Intelligence
 
-The agentic platform for Publicis Media Qatar: Strategy, Creative, Media, Finance, Production, Search, Library and Clients, with a Command centre, an Assistant, team accounts, credits and an admin console.
+The agentic platform for Publicis Media Qatar: Strategy, Creative, Media, Finance, Multimedia, Search, Library and Clients, with a Command centre, an Assistant, team accounts, credits and an admin console.
 
 ## Settings (Hugging Face: Settings > Variables and secrets)
 

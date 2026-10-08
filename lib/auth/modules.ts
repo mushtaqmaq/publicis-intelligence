@@ -6,7 +6,7 @@ import type { SessionUser } from "./session";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import { IDS, permKey, resolveModules } from "@/lib/modules";
 
-export type ModuleId = "strategy" | "creative" | "media" | "finance" | "production" | "search";
+export type ModuleId = "strategy" | "creative" | "media" | "finance" | "multimedia" | "search";
 
 // The modules this user may open: admins get all, everyone else only what was granted to them.
 export async function getUserModules(user: SessionUser): Promise<string[]> {

@@ -35,7 +35,7 @@ Each agent: prompt and fields in agents.js; backend is `/api/ai` (plus tools). M
 - **Creative**: Image studio, Adaptation, Audio studio, Copywriter, Art director, Video scripts
 - **Media**: Media planner, Campaign setup, Optimization, Reporting, Data analyst
 - **Finance**: Fee estimator, Budget reconciliation, Invoice drafter, Profitability
-- **Production**: Job planner, Spec sheet, Vendor brief
+- **Multimedia** (renamed from Production on 2026-10-08): Job planner, Spec sheet, Vendor brief
 - **Search**: SEO audit, Keyword strategy, AI answer visibility (AEO), Local SEO, SEO writer
 
 Note: counts come from the `id`/`name` entries in `agents.js` and will be verified in Phase 20. Both `public/agents.js` and `public/js/agents.js` exist; their relationship is still to be confirmed (possibly legacy).
