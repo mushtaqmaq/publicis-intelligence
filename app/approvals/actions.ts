@@ -2,7 +2,8 @@
 
 import { requirePlatformUser } from "@/lib/auth/platform";
 import { prisma } from "@/lib/prisma";
-import { actOnApproval, audit, cancelApproval, CoreError, saveApprovalTemplate } from "@/lib/core/service";
+import { actOnApproval, cancelApproval, CoreError, saveApprovalTemplate } from "@/lib/core/service";
+import { afterDecision } from "@/lib/core/afterDecision";
 import { withMessage } from "@/lib/core/formErrors";
 import type { Role, StepDef } from "@/lib/core/approvals";
 
@@ -14,15 +15,8 @@ export async function decideAction(formData: FormData) {
   await withMessage("/approvals", async () => {
     const requestId = str(formData, "requestId");
     const action = str(formData, "action") === "REJECT" ? "REJECT" : "APPROVE";
-    const status = await actOnApproval({ id: user.id, role: user.role }, requestId, action, str(formData, "comment"));
-    // A fully approved campaign goes live.
-    if (status === "APPROVED") {
-      const r = await prisma.approvalRequest.findUnique({ where: { id: requestId } });
-      if (r?.documentType === "CAMPAIGN") {
-        await prisma.campaign.updateMany({ where: { id: r.documentId, status: "DRAFT" }, data: { status: "ACTIVE" } });
-        await audit(user.id, "CAMPAIGN_ACTIVATED", "Campaign", r.documentId, { via: "approval" });
-      }
-    }
+    await actOnApproval({ id: user.id, role: user.role }, requestId, action, str(formData, "comment"));
+    await afterDecision(requestId, user.id);
   }, "Decision recorded");
 }
 

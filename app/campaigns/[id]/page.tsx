@@ -12,7 +12,7 @@ const fmt = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "—");
 export default async function CampaignPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; ok?: string }> }) {
   await requirePlatformUser();
   const [{ id }, { error, ok }] = await Promise.all([params, searchParams]);
-  const c = await prisma.campaign.findUnique({ where: { id }, include: { client: true, owner: { select: { name: true, email: true } }, deliverables: { orderBy: { createdAt: "asc" } }, mediaPlans: { select: { id: true, planCode: true, campaignName: true, status: true } } } });
+  const c = await prisma.campaign.findUnique({ where: { id }, include: { client: true, owner: { select: { name: true, email: true } }, deliverables: { orderBy: { createdAt: "asc" } }, mediaPlans: { select: { id: true, planCode: true, campaignName: true, status: true } }, creativeRequests: { select: { id: true, code: true, title: true, status: true }, orderBy: { createdAt: "asc" } } } });
   if (!c) notFound();
   const [links, comments, approvals] = await Promise.all([
     prisma.link.findMany({ where: { OR: [{ entityType: "Campaign", entityId: id }, { entityType: "Deliverable", entityId: { in: c.deliverables.map((d) => d.id) } }] }, orderBy: { createdAt: "asc" } }),
@@ -92,6 +92,11 @@ export default async function CampaignPage({ params, searchParams }: { params: P
       <section className={card}>
         <h2 className="font-medium">Media plans</h2>
         <ul className="mt-2 text-sm">{c.mediaPlans.map((p) => <li key={p.id}><Link href={`/media/plans/${p.id}`} className="text-accent">{p.planCode} {p.campaignName}</Link> <span className="text-muted">{p.status.toLowerCase()}</span></li>)}{c.mediaPlans.length === 0 && <li className="text-muted">None linked yet.</li>}</ul>
+      </section>
+
+      <section className={card}>
+        <div className="flex items-center"><h2 className="font-medium">Creative requests</h2><Link href={`/creative/new?campaign=${c.id}`} className="ml-auto text-sm text-accent">New request</Link></div>
+        <ul className="mt-2 text-sm">{c.creativeRequests.map((q) => <li key={q.id}><Link href={`/creative/${q.id}`} className="text-accent">{q.code} {q.title}</Link> <span className="text-muted">{q.status.replace(/_/g, " ").toLowerCase()}</span></li>)}{c.creativeRequests.length === 0 && <li className="text-muted">None yet.</li>}</ul>
       </section>
 
       <section className={card}>

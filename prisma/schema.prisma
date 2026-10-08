@@ -731,9 +731,10 @@ model Client {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  mediaPlans   MediaPlan[]
-  retainerFees RetainerFee[]
-  campaigns    Campaign[]
+  mediaPlans       MediaPlan[]
+  retainerFees     RetainerFee[]
+  campaigns        Campaign[]
+  creativeRequests CreativeRequest[]
 
   @@map("clients")
 }
@@ -1160,8 +1161,9 @@ model Campaign {
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
-  deliverables Deliverable[]
-  mediaPlans   MediaPlan[]
+  deliverables     Deliverable[]
+  mediaPlans       MediaPlan[]
+  creativeRequests CreativeRequest[]
 
   @@index([clientId])
   @@map("campaigns")
@@ -1184,6 +1186,8 @@ model Deliverable {
   status      DeliverableStatus @default(PENDING)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
+
+  creativeRequests CreativeRequest[]
 
   @@index([campaignId])
   @@map("deliverables")
@@ -1303,4 +1307,70 @@ model ApprovalStep {
   @@unique([requestId, stepOrder])
   @@index([approverUserId, status])
   @@map("approval_steps")
+}
+
+// ---------------------------------------------------------------------------
+// Creative module: design requests from brief to final artwork. Briefs, references and artwork are LINKS
+// (see Link); versions keep the revision history; review runs through the shared approval engine.
+// ---------------------------------------------------------------------------
+
+enum CreativeStatus {
+  NEW
+  ASSIGNED
+  IN_PROGRESS
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  DELIVERED
+  CANCELLED
+}
+
+model CreativeRequest {
+  id            String         @id @default(cuid())
+  code          String         @unique // CRQ-0001
+  title         String
+  kind          String         @default("DESIGN") // DESIGN | SOCIAL | PRINT | OOH | VIDEO_STORYBOARD | OTHER
+  brief         String
+  priority      String         @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
+  status        CreativeStatus @default(NEW)
+  clientId      String
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  campaignId    String?
+  campaign      Campaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  deliverableId String?
+  deliverable   Deliverable?   @relation(fields: [deliverableId], references: [id], onDelete: SetNull)
+  requestedById String
+  assigneeId    String? // the designer
+  reviewerId    String? // internal reviewer (used when no approval steps are configured)
+  dueDate       DateTime?
+  assignedAt    DateTime?
+  deliveredAt   DateTime?
+  deliveryNote  String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  versions CreativeVersion[]
+
+  @@index([status])
+  @@index([assigneeId])
+  @@index([clientId])
+  @@index([campaignId])
+  @@map("creative_requests")
+}
+
+model CreativeVersion {
+  id            String          @id @default(cuid())
+  requestId     String
+  request       CreativeRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  versionNo     Int
+  url           String // link to the artwork in the company's own storage
+  notes         String?
+  status        String          @default("SUBMITTED") // SUBMITTED | APPROVED | CHANGES_REQUESTED
+  submittedById String
+  feedback      String? // reviewer's comment when changes are requested
+  createdAt     DateTime        @default(now())
+  decidedAt     DateTime?
+
+  @@unique([requestId, versionNo])
+  @@map("creative_versions")
 }

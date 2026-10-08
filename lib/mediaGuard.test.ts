@@ -56,3 +56,20 @@ describe("Platform pages (campaigns, approvals) guard coverage", () => {
     expect(a).toMatch(/saveTemplateAction[\s\S]*requirePlatformUser\(\{ admin: true \}\)/);
   });
 });
+
+describe("Creative module guard coverage", () => {
+  const cf = walk(path.resolve(__dirname, "../app/creative")).filter((f) => /\.(ts|tsx)$/.test(f));
+  const need = cf.filter((f) => path.basename(f) === "page.tsx" || path.basename(f) === "route.ts" || /^\s*["']use server["']/m.test(fs.readFileSync(f, "utf8")));
+  it("every page, action file and route requires the Creative module", () => {
+    expect(need.length).toBeGreaterThan(4);
+    expect(need.filter((f) => !/requireCreativeUser\(/.test(fs.readFileSync(f, "utf8"))).map(rel)).toEqual([]);
+  });
+  it("every exported action calls the guard itself", () => {
+    const bad: string[] = [];
+    for (const f of need.filter((x) => path.basename(x) === "actions.ts")) {
+      const text = fs.readFileSync(f, "utf8");
+      for (const m of text.matchAll(/export async function (\w+)\([^)]*\)\s*\{([\s\S]*?)\n\}/g)) if (!/requireCreativeUser\(/.test(m[2])) bad.push(`${rel(f)}:${m[1]}`);
+    }
+    expect(bad).toEqual([]);
+  });
+});

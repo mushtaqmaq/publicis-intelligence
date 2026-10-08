@@ -33,7 +33,9 @@ export async function createCampaign(userId: string, input: CampaignInput) {
 
 async function assertEntity(entityType: string, entityId: string) {
   if (!isLinkable(entityType)) throw new CoreError("Links cannot be added to that kind of record.");
-  const found = entityType === "Campaign" ? await prisma.campaign.findUnique({ where: { id: entityId }, select: { id: true } }) : await prisma.deliverable.findUnique({ where: { id: entityId }, select: { id: true } });
+  const found = entityType === "Campaign" ? await prisma.campaign.findUnique({ where: { id: entityId }, select: { id: true } })
+    : entityType === "CreativeRequest" ? await prisma.creativeRequest.findUnique({ where: { id: entityId }, select: { id: true } })
+    : await prisma.deliverable.findUnique({ where: { id: entityId }, select: { id: true } });
   if (!found) throw new CoreError("That record no longer exists.");
 }
 
