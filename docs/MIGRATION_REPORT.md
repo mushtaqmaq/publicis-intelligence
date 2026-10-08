@@ -31,10 +31,10 @@ Features migrated: all preserved; the Media planner tool was replaced by the uni
 
 ## Outstanding items
 - Import the Space's accounts and data: tool is ready (`scripts/import-space.mjs`, dry run by default); needs the Space's `/data` export. See DEPLOYMENT_GUIDE.md.
-- Retire the standalone planner and delete the empty `neon-coral-pillar` database after the owner confirms.
+- Retire the standalone planner (deliberately not done: it is still live against the same database; switch it off only once everyone has moved). The empty `neon-coral-pillar` database was deleted on 2026-10-08.
 - Vercel request bodies are limited to about 4.5 MB (the original allowed 30 MB): large uploads fail with 413.
 - Generated media is stored in Postgres; move to Vercel Blob if Neon's storage quota becomes a constraint.
-- Some imported inventory rows have junk names (e.g. `TECHNICAL DETAILS**`, a rate-card parsing artifact); clean in Inventory.
+- Inventory cleanup: 10 rows named `TECHNICAL DETAILS**` (ELAN DECAUX, a rate-card parsing artifact, unused in any plan) plus about 113 rows to review (no published rate, duplicates, size-like names). `scripts/audit-inventory.mjs` reports them read-only and can write a reversible retire script for the clear junk; nothing has been changed in production.
 - `main` has no branch protection and the `production` GitHub environment has no required reviewers (needs GitHub Pro). Production deploys are run by the owner (`vercel deploy --prod --scope maq5`) or the manual workflow, which also needs the `VERCEL_TOKEN` secret.
 - Remaining `npm audit` findings: the Prisma CLI's dependency chain (the suggested fix is a downgrade, and the flaws are in MySQL features that are not used) and `exceljs`/`uuid` (suggested fix is a downgrade; the vulnerable path is not used). `xlsx` is the patched SheetJS 0.20.3 from the vendor's CDN (pinned by integrity hash).
 

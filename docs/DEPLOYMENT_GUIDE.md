@@ -22,6 +22,8 @@ Local setup: see README.md. Local development must use a local Postgres or a Neo
 
 If a deploy fails with "Not authorized", retry once; it has been transient.
 
+Automated version of step 4 (signed-out checks, 23 routes): `npm run smoke` (or `sh scripts/smoke-prod.sh <base-url>`). It exits non-zero if any route returns the wrong status. Signed-in behaviour still has to be checked by hand.
+
 ## Environment variables (Vercel, Production)
 `DATABASE_URL` (pooled Neon URL), `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PASSWORD`, `OPENROUTER_API_KEY`, and any other provider keys from ENVIRONMENT_VARIABLES.md. Set secrets with the dashboard or `vercel env add ... --sensitive`; never commit them or paste them in chat. `ADMIN_PASSWORD` only matters when the admin account is first created. `RESET_ADMIN_PASSWORD=1` forces a reset on the next cold start; remove it straight after.
 
@@ -46,3 +48,6 @@ Tool: `scripts/import-space.mjs`. It reads the Space's SQLite file and `files/` 
 4. If the summary looks right, add `--apply`, and check the result (users, credits, a document, a file).
 5. Only then repeat steps 3 and 4 against production, after a backup.
 Add `--modules media,strategy` to limit which modules imported members receive.
+
+## Inventory audit (read-only)
+`DATABASE_URL=<postgres> node scripts/audit-inventory.mjs --csv audit.csv --sql retire.sql` lists inventory rows that look like rate-card parsing artifacts. It only runs SELECT queries (the session is set read-only). "Junk" is deliberately narrow: footnote asterisks and exact section-heading names. Duplicates, rows with no published rate, and short or size-like names (real assets are often named by their size, e.g. `13M`) are only listed for review. `--sql` writes a reversible script (status RETIRED, back to ACTIVE to undo) for the clear junk that no plan uses; review it and run it yourself against a Neon branch first. Run it on a copy first: an earlier version of the rules wrongly flagged real newspaper placements such as "Page 2 & 3 - Full Page", which is why the rules are exact and tested.
