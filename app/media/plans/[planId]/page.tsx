@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma/client";
 import { removeItemAction, updateStatusAction, updateWorkflowStatusAction, createNewVersionAction, deleteMediaPlanAction } from "./actions";
 import { OnlineBlockEditor } from "@/components/media/OnlineBlockEditor";
+import { InventorySuggest } from "@/components/media/InventorySuggest";
 import { sanitizeOnlineData, onlineTotalQar } from "@/lib/planning/online";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MediumSupplierSelect } from "@/components/MediumSupplierSelect";
@@ -336,6 +337,7 @@ export default async function MediaPlanPage({
         {onlineData && (
           <OnlineBlockEditor planId={planId} versionId={version.id} locked={version.isLocked} initial={onlineData} start={fmtDate(plan.campaignStart)} end={fmtDate(plan.campaignEnd)} ctx={{ client: plan.client.name, brand: plan.brand, objective: plan.objective, audience: plan.targetAudience, locations: plan.targetLocations, budget: plan.budget ? Number(plan.budget) : null }} />
         )}
+        {!version.isLocked && !isOnlineOnly && <InventorySuggest planId={planId} versionId={version.id} suppliers={suppliers} channels={MEDIA_CHANNELS} defaultBudget={budget} />}
         {!version.isLocked && !isOnlineOnly && (
           <section className="bg-surface border border-border rounded-lg p-5">
             <div className="flex items-center justify-between mb-3">
