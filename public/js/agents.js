@@ -100,6 +100,8 @@ PI.PILLARS = [
   ] }
 ];
 PI.MODULES = [{ id: 'strategy', label: 'Strategy' }, { id: 'creative', label: 'Creative' }, { id: 'media', label: 'Media' }, { id: 'finance', label: 'Finance' }, { id: 'multimedia', label: 'Multimedia' }, { id: 'search', label: 'Search' }];
+// Sections inside a module that an admin can switch off per person (kept in step with lib/modules.js; a test checks it).
+PI.SECTIONS = { media: [{ id: 'dashboard', label: 'Dashboard' }, { id: 'plans', label: 'Media plans' }, { id: 'inventory', label: 'Inventory' }, { id: 'map', label: 'Map' }, { id: 'suppliers', label: 'Suppliers' }, { id: 'reports', label: 'Reports' }, { id: 'clients', label: 'Client accounts' }, { id: 'settings', label: 'Settings & imports' }] };
 PI.pillar = id => PI.PILLARS.find(p => p.id === id);
 PI.agentOf = (p, a) => (PI.pillar(p) || { agents: [] }).agents.find(x => x.id === a);
 PI.routeName = r => { if (!r) return 'Other'; if (r.startsWith('assistant')) return 'Assistant'; if (r.startsWith('command')) return 'Command'; if (r === 'creative/image') return 'Image studio'; if (r === 'creative/audio') return 'Audio studio'; const [p, a] = r.split('/'); const ag = PI.agentOf(p, a); return ag ? ag.name : r; };

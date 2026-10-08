@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { get } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
-import { hasModule } from "@/lib/auth/modules";
+import { hasSection } from "@/lib/auth/modules";
 
 const CONTENT_TYPES: Record<string, string> = {
   PDF: "application/pdf",
@@ -21,7 +21,7 @@ const CONTENT_TYPES: Record<string, string> = {
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ versionId: string }> }) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  if (!(await hasModule(user, "media"))) return NextResponse.json({ error: "You do not have access to the Media module." }, { status: 403 });
+  if (!(await hasSection(user, "media", "settings"))) return NextResponse.json({ error: "You do not have access to the Media module." }, { status: 403 });
 
   const { versionId } = await params;
 

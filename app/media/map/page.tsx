@@ -21,7 +21,7 @@ export default async function MapPage({
 }: {
   searchParams: Promise<{ channel?: string; supplier?: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("map");
   const params = await searchParams;
 
   const supplierWhere: Prisma.SupplierWhereInput = {};

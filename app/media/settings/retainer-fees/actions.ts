@@ -7,7 +7,7 @@ import { requireMediaUser } from "@/lib/auth/modules";
 import { requirePermission } from "@/lib/auth/permissions";
 
 export async function upsertRetainerFeeAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   await requirePermission(user, "dashboard.revenue.view");
 
   const clientId = formData.get("clientId") as string;
@@ -44,7 +44,7 @@ export async function upsertRetainerFeeAction(formData: FormData) {
 }
 
 export async function deleteRetainerFeeAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   await requirePermission(user, "dashboard.revenue.view");
 
   const id = formData.get("id") as string;

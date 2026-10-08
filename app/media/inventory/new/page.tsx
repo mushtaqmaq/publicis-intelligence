@@ -18,7 +18,7 @@ const CALC_METHODS = [
 ];
 
 export default async function NewAssetPage({ searchParams }: { searchParams: Promise<{ error?: string; supplierId?: string }> }) {
-  await requireMediaUser();
+  await requireMediaUser("inventory");
   const { error, supplierId } = await searchParams;
   const [suppliers, categories] = await Promise.all([
     prisma.supplier.findMany({ where: { isActive: true }, orderBy: [{ mediaChannel: "asc" }, { name: "asc" }] }),

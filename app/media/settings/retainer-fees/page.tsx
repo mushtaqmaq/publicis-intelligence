@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 const MONTH_LABEL = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export default async function RetainerFeesPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (!(await hasPermission(user, "dashboard.revenue.view"))) notFound();
   const { error } = await searchParams;
 
@@ -19,7 +19,7 @@ export default async function RetainerFeesPage({ searchParams }: { searchParams:
       include: { client: { select: { name: true } } },
       orderBy: [{ year: "desc" }, { month: "desc" }],
     }),
-    prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.client.findMany({ where: { departments: { has: "media" } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   const currentYear = new Date().getFullYear();

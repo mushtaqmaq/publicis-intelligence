@@ -26,7 +26,7 @@ export default async function EditCandidatePage({
   params: Promise<{ versionId: string; rateChangeId: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("settings");
   const { versionId, rateChangeId } = await params;
   const { error } = await searchParams;
 

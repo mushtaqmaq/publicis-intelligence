@@ -239,18 +239,19 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  conversations Conversation[]
-  auditLogs         AuditLog[]
-  importJobs        ImportJob[]
-  mediaPlansCreated MediaPlan[]        @relation("PlanCreatedBy")
-  rateOverrides     RateOverride[]
-  reconciliations   Reconciliation[]   @relation("ReconciliationResolvedBy")
-  planVersions      MediaPlanVersion[]
-  sessions          Session[]
-  proofOfPostings   ProofOfPosting[]
-  kmzImportBatches  KmzImportBatch[]
+  conversations       Conversation[]
+  auditLogs           AuditLog[]
+  importJobs          ImportJob[]
+  mediaPlansCreated   MediaPlan[]              @relation("PlanCreatedBy")
+  rateOverrides       RateOverride[]
+  reconciliations     Reconciliation[]         @relation("ReconciliationResolvedBy")
+  planVersions        MediaPlanVersion[]
+  sessions            Session[]
+  proofOfPostings     ProofOfPosting[]
+  kmzImportBatches    KmzImportBatch[]
   permissionOverrides UserPermissionOverride[]
   clientsManaged      Client[]                 @relation("ClientAccountManager")
+  campaignsOwned      Campaign[]               @relation("CampaignOwner")
 
   @@map("users")
 }
@@ -324,15 +325,17 @@ model Supplier {
   website            String?
   notes              String?
   defaultDiscountPct Decimal?     @db.Decimal(6, 4)
+  paymentTermsDays   Int?
+  taxId              String?
   isActive           Boolean      @default(true)
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
-  assets          Asset[]
-  rateCards       RateCard[]
+  assets           Asset[]
+  rateCards        RateCard[]
   kmzImportBatches KmzImportBatch[]
-  avrSchemes      AvrScheme[]
-  buyingEntityFor MediaPlanItem[] @relation("MediaPlanItemBuyingEntity")
+  avrSchemes       AvrScheme[]
+  buyingEntityFor  MediaPlanItem[]  @relation("MediaPlanItemBuyingEntity")
 
   @@map("suppliers")
 }
@@ -523,7 +526,7 @@ model KmzImportBatch {
   uploadedById String?
   uploadedBy   User?     @relation(fields: [uploadedById], references: [id])
   pending      Json // Array<{ name: string; lat: number; lon: number; reason: string }>
-  resolved     String[] @default([]) // placemark names already assigned or dismissed
+  resolved     String[]  @default([]) // placemark names already assigned or dismissed
   createdAt    DateTime  @default(now())
 
   @@map("kmz_import_batches")
@@ -715,6 +718,14 @@ model Client {
   defaultAgencyFeePct Decimal? @db.Decimal(6, 4)
   currency            String   @default("QAR")
   notes               String?
+  // Billing details used by Finance (all optional: "not recorded" is a real state, never guessed).
+  paymentTermsDays    Int?
+  taxId               String?
+  billingAddress      String?
+  creditLimit         Decimal? @db.Decimal(14, 2)
+  // Which departments handle this client (see lib/core/clients.ts). One client record for the whole platform;
+  // a department only offers the clients it handles. Finance sees every client.
+  departments         String[] @default([])
   accountManagerId    String? // null = unassigned; never guessed
   accountManager      User?    @relation("ClientAccountManager", fields: [accountManagerId], references: [id], onDelete: SetNull)
   createdAt           DateTime @default(now())
@@ -722,39 +733,43 @@ model Client {
 
   mediaPlans   MediaPlan[]
   retainerFees RetainerFee[]
+  campaigns    Campaign[]
 
   @@map("clients")
 }
 
 model MediaPlan {
-  id              String          @id @default(cuid())
-  planCode        String          @unique
-  clientId        String
-  client          Client          @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  campaignName    String
-  campaignId      String?
-  brand           String?
-  campaignStart   DateTime
-  campaignEnd     DateTime
-  budget          Decimal?        @db.Decimal(14, 2)
-  currency        String          @default("QAR")
-  objective       String?
-  targetAudience  String?
-  targetLocations String?
-  notes           String?
+  id                         String                      @id @default(cuid())
+  planCode                   String                      @unique
+  clientId                   String
+  client                     Client                      @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  campaignName               String
+  campaignId                 String? // the planner's own free-text campaign reference (kept as is)
+  // The shared Campaign this plan belongs to (Creative, Multimedia and Finance link to the same record).
+  campaignRefId              String?
+  campaignRef                Campaign?                   @relation(fields: [campaignRefId], references: [id], onDelete: SetNull)
+  brand                      String?
+  campaignStart              DateTime
+  campaignEnd                DateTime
+  budget                     Decimal?                    @db.Decimal(14, 2)
+  currency                   String                      @default("QAR")
+  objective                  String?
+  targetAudience             String?
+  targetLocations            String?
+  notes                      String?
   // OFFLINE (inventory lines only), ONLINE (digital block only) or HYBRID (both).
-  planType        String          @default("OFFLINE")
-  status          MediaPlanStatus @default(DRAFT)
+  planType                   String                      @default("OFFLINE")
+  status                     MediaPlanStatus             @default(DRAFT)
   // Real workflow tracking, added alongside status — all optional because a
   // campaign genuinely has "not tracked yet" as its starting state, never a
   // guessed default.
-  artworkStatus               ArtworkStatus?
-  boPoStatus                  BoPoStatus?
-  supplierConfirmationStatus  SupplierConfirmationStatus?
-  createdById     String?
-  createdBy       User?           @relation("PlanCreatedBy", fields: [createdById], references: [id])
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  artworkStatus              ArtworkStatus?
+  boPoStatus                 BoPoStatus?
+  supplierConfirmationStatus SupplierConfirmationStatus?
+  createdById                String?
+  createdBy                  User?                       @relation("PlanCreatedBy", fields: [createdById], references: [id])
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
 
   versions MediaPlanVersion[]
 
@@ -1023,13 +1038,13 @@ model AvrScheme {
 }
 
 model AvrSlab {
-  id           String    @id @default(cuid())
-  avrSchemeId  String
-  avrScheme    AvrScheme @relation(fields: [avrSchemeId], references: [id], onDelete: Cascade)
-  thresholdFrom Decimal  @db.Decimal(14, 2) // spend required to reach this slab
-  thresholdTo  Decimal?  @db.Decimal(14, 2) // optional upper bound; null = open-ended (this slab applies at thresholdFrom and above, until a higher slab is reached)
-  rebatePct    Decimal   @db.Decimal(6, 4)
-  sortOrder    Int       @default(0)
+  id            String    @id @default(cuid())
+  avrSchemeId   String
+  avrScheme     AvrScheme @relation(fields: [avrSchemeId], references: [id], onDelete: Cascade)
+  thresholdFrom Decimal   @db.Decimal(14, 2) // spend required to reach this slab
+  thresholdTo   Decimal?  @db.Decimal(14, 2) // optional upper bound; null = open-ended (this slab applies at thresholdFrom and above, until a higher slab is reached)
+  rebatePct     Decimal   @db.Decimal(6, 4)
+  sortOrder     Int       @default(0)
 
   @@map("avr_slabs")
 }
@@ -1110,4 +1125,182 @@ model LoginFail {
   t BigInt
 
   @@map("login_fails")
+}
+
+// ---------------------------------------------------------------------------
+// Shared core used by every module (Media, Creative, Multimedia, Finance).
+// The platform stores LINKS to briefs, artwork, footage and deliverables, never the files themselves.
+// ---------------------------------------------------------------------------
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+// The shared parent every module attaches to: media plans now; creative requests, multimedia jobs and finance
+// documents link to it as those modules arrive.
+model Campaign {
+  id          String         @id @default(cuid())
+  code        String         @unique // CMP-0001, gapless (see DocumentSequence)
+  name        String
+  clientId    String
+  client      Client         @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  status      CampaignStatus @default(DRAFT)
+  startDate   DateTime?
+  endDate     DateTime?
+  budget      Decimal?       @db.Decimal(14, 2)
+  currency    String         @default("QAR")
+  ownerId     String?
+  owner       User?          @relation("CampaignOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  notes       String?
+  createdById String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  deliverables Deliverable[]
+  mediaPlans   MediaPlan[]
+
+  @@index([clientId])
+  @@map("campaigns")
+}
+
+enum DeliverableStatus {
+  PENDING
+  IN_PROGRESS
+  DELIVERED
+  APPROVED
+}
+
+model Deliverable {
+  id          String            @id @default(cuid())
+  campaignId  String
+  campaign    Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  dueDate     DateTime?
+  status      DeliverableStatus @default(PENDING)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([campaignId])
+  @@map("deliverables")
+}
+
+// A link to something that lives in the company's own cloud or local storage. Attaches to any record
+// (entityType + entityId, e.g. "Campaign", "Deliverable"); the URL is validated to http/https only.
+model Link {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  title      String
+  url        String
+  kind       String   @default("OTHER") // BRIEF | REFERENCE | ARTWORK | FOOTAGE | DELIVERABLE | OTHER
+  addedById  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@map("links")
+}
+
+model Comment {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  body       String
+  authorId   String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@map("comments")
+}
+
+// Gapless document numbers: one row per sequence key (e.g. "CMP"), incremented atomically.
+model DocumentSequence {
+  key       String @id
+  nextValue Int    @default(1)
+
+  @@map("document_sequences")
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ApprovalStepStatus {
+  WAITING
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED
+}
+
+// Who approves a kind of document, in order. Configured by an admin, copied onto each request so later
+// changes never rewrite a request that is already in flight. A step is assigned to a person or to a role.
+model ApprovalTemplate {
+  id           String   @id @default(cuid())
+  documentType String   @unique // e.g. "CAMPAIGN", "QUOTATION", "PURCHASE_ORDER"
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  steps ApprovalTemplateStep[]
+
+  @@map("approval_templates")
+}
+
+model ApprovalTemplateStep {
+  id             String           @id @default(cuid())
+  templateId     String
+  template       ApprovalTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  stepOrder      Int
+  label          String // "Manager", "Finance", "Director"
+  approverUserId String?
+  approverRole   UserRole?
+  minAmount      Decimal?         @db.Decimal(14, 2) // step applies only when the amount reaches this (null = always)
+
+  @@unique([templateId, stepOrder])
+  @@map("approval_template_steps")
+}
+
+model ApprovalRequest {
+  id            String         @id @default(cuid())
+  documentType  String
+  documentId    String
+  title         String
+  amount        Decimal?       @db.Decimal(14, 2)
+  status        ApprovalStatus @default(PENDING)
+  requestedById String
+  note          String?
+  createdAt     DateTime       @default(now())
+  decidedAt     DateTime?
+
+  steps ApprovalStep[]
+
+  @@index([documentType, documentId])
+  @@index([status])
+  @@map("approval_requests")
+}
+
+model ApprovalStep {
+  id             String             @id @default(cuid())
+  requestId      String
+  request        ApprovalRequest    @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  stepOrder      Int
+  label          String
+  approverUserId String?
+  approverRole   UserRole?
+  status         ApprovalStepStatus @default(WAITING)
+  actedById      String?
+  actedAt        DateTime?
+  comment        String?
+
+  @@unique([requestId, stepOrder])
+  @@index([approverUserId, status])
+  @@map("approval_steps")
 }

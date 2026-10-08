@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Inter, Inter_Tight } from "next/font/google";
 import { getSessionUser } from "@/lib/auth/session";
 import { getUserPermissions } from "@/lib/auth/permissions";
-import { getUserModules } from "@/lib/auth/modules";
+import { getUserModules, getUserSections } from "@/lib/auth/modules";
 import { MediaShell } from "@/components/media/MediaShell";
 import "./media.css";
 
@@ -15,12 +15,12 @@ export const dynamic = "force-dynamic";
 export default async function MediaLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  const [permissions, modules] = await Promise.all([getUserPermissions(user.id, user.role), getUserModules(user)]);
+  const [permissions, modules, sections] = await Promise.all([getUserPermissions(user.id, user.role), getUserModules(user), getUserSections(user, "media")]);
   const allowed = modules.includes("media");
 
   return (
     <div className={`${sans.variable} ${display.variable} media-root h-screen w-full`}>
-      <MediaShell user={user} permissions={Array.from(permissions)} modules={modules}>
+      <MediaShell user={user} permissions={Array.from(permissions)} modules={modules} sections={sections}>
         {allowed ? children : (
           <div className="mx-auto max-w-xl p-10">
             <h1 className="font-serif text-2xl">Media module</h1>

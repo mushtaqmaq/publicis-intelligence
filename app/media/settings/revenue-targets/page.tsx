@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 export const dynamic = "force-dynamic";
 
 export default async function RevenueTargetsPage() {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (!(await hasPermission(user, "dashboard.revenue.view"))) notFound();
 
   const targets = await prisma.revenueTarget.findMany({ orderBy: { year: "desc" } });

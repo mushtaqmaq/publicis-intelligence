@@ -45,7 +45,7 @@ export default async function ReviewRateCardPage({
   params: Promise<{ versionId: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("settings");
   const { versionId } = await params;
   const { error } = await searchParams;
 

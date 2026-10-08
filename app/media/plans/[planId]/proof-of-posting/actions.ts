@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 
 
 export async function uploadProofAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("plans");
   const planId = formData.get("planId") as string;
   const mediaPlanItemId = formData.get("mediaPlanItemId") as string;
   const postedDateRaw = formData.get("postedDate") as string;
@@ -55,7 +55,7 @@ export async function uploadProofAction(formData: FormData) {
 }
 
 export async function deleteProofAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("plans");
   const planId = formData.get("planId") as string;
   const proofId = formData.get("proofId") as string;
 

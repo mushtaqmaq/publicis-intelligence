@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { get } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth/session";
-import { hasModule } from "@/lib/auth/modules";
+import { hasModule, getUserSections } from "@/lib/auth/modules";
 
 /**
  * Streams an asset photo from the (private) Blob store.
@@ -18,6 +18,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ ima
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   if (!(await hasModule(user, "media"))) return NextResponse.json({ error: "You do not have access to the Media module." }, { status: 403 });
+  // Photos appear in inventory, plans, the map and suppliers; anyone with at least one of those may load them.
+  const mine = await getUserSections(user, "media");
+  if (!["inventory", "plans", "map", "suppliers", "settings"].some((x) => mine.includes(x))) return NextResponse.json({ error: "You do not have access to this section." }, { status: 403 });
 
   const { imageId } = await params;
 

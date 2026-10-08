@@ -10,7 +10,7 @@ import type { Prisma } from "@/generated/prisma/client";
 const ALL_SUPPLIERS = "__ALL__";
 
 export async function importKmzAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   const supplierId = formData.get("supplierId") as string;
   const file = formData.get("file") as File | null;
   const combined = supplierId === ALL_SUPPLIERS;

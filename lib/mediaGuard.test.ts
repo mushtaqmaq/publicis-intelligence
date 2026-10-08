@@ -7,7 +7,7 @@ import path from "node:path";
 const ROOT = path.resolve(__dirname, "../app/media");
 const walk = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]);
 const files = walk(ROOT).filter((f) => /\.(ts|tsx)$/.test(f));
-const GUARD = /requireMediaUser\(\)|hasModule\(/;
+const GUARD = /requireMediaUser\(\s*(?:"[a-z]+"|null)\s*\)|hasSection\(/;
 const rel = (f: string) => path.relative(path.resolve(__dirname, ".."), f);
 
 describe("Media module guard coverage", () => {
@@ -26,5 +26,33 @@ describe("Media module guard coverage", () => {
   it("finds the files it is supposed to check (guards against a silently empty scan)", () => {
     expect(files.filter((f) => path.basename(f) === "page.tsx").length).toBeGreaterThan(20);
     expect(files.filter((f) => /\.(ts)$/.test(f) && /^\s*["']use server["']/m.test(fs.readFileSync(f, "utf8"))).length).toBeGreaterThan(8);
+  });
+  it("guards each file with the section of the folder it lives in", () => {
+    const wrong = files.flatMap((f) => {
+      const section = path.relative(ROOT, f).split(path.sep)[0];
+      if (!/^(dashboard|plans|inventory|map|suppliers|reports|clients|settings)$/.test(section)) return [];
+      const text = fs.readFileSync(f, "utf8");
+      const used = [...text.matchAll(/requireMediaUser\("([a-z]+)"\)|hasSection\(\w+, "media", "([a-z]+)"\)/g)].map((m) => m[1] ?? m[2]);
+      return used.filter((u) => u !== section).map((u) => `${rel(f)} uses "${u}" but lives in ${section}`);
+    });
+    expect(wrong).toEqual([]);
+  });
+});
+
+// Campaigns and approvals belong to no single module, so each file must call requirePlatformUser (signed in + a working module).
+describe("Platform pages (campaigns, approvals) guard coverage", () => {
+  const roots = ["campaigns", "approvals"].map((d) => path.resolve(__dirname, "../app", d));
+  const pf = roots.flatMap((r) => walk(r)).filter((f) => /\.(ts|tsx)$/.test(f));
+  const G = /requirePlatformUser\(/;
+  it("covers every page, server action file and route", () => {
+    const need = pf.filter((f) => path.basename(f) === "page.tsx" || path.basename(f) === "route.ts" || /^\s*["']use server["']/m.test(fs.readFileSync(f, "utf8")));
+    expect(need.length).toBeGreaterThan(5);
+    expect(need.filter((f) => !G.test(fs.readFileSync(f, "utf8"))).map(rel)).toEqual([]);
+  });
+  it("only admins reach the approval settings", () => {
+    const f = pf.find((x) => x.endsWith(path.join("settings", "page.tsx")))!;
+    expect(fs.readFileSync(f, "utf8")).toMatch(/requirePlatformUser\(\{ admin: true \}\)/);
+    const a = fs.readFileSync(pf.find((x) => x.endsWith(path.join("approvals", "actions.ts")))!, "utf8");
+    expect(a).toMatch(/saveTemplateAction[\s\S]*requirePlatformUser\(\{ admin: true \}\)/);
   });
 });

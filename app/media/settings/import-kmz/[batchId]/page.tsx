@@ -42,7 +42,7 @@ export default async function KmzReviewPage({
   params: Promise<{ batchId: string }>;
   searchParams: Promise<{ page?: string; prefix?: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("settings");
   const { batchId } = await params;
   const { page: pageParam, prefix: prefixParam } = await searchParams;
   const page = Math.max(1, Number(pageParam ?? "1") || 1);

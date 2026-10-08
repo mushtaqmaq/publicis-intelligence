@@ -39,7 +39,7 @@ export default async function CompareVersionsPage({
   params: Promise<{ planId: string }>;
   searchParams: Promise<{ a?: string; b?: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("plans");
   const { planId } = await params;
   const search = await searchParams;
 

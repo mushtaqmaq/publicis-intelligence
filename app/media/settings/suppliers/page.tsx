@@ -13,7 +13,7 @@ export default async function SuppliersSettingsPage({
 }: {
   searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("settings");
   const { error, notice } = await searchParams;
 
   const suppliers = await prisma.supplier.findMany({

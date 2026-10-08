@@ -53,7 +53,7 @@ export default async function MediaPlanPage({
   const { planId } = await params;
   const search = await searchParams;
 
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("plans");
   const canManageWorkflow = await hasPermission(user, "campaigns.manage_status");
 
   const plan = await prisma.mediaPlan.findUnique({

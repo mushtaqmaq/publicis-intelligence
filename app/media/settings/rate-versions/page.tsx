@@ -16,7 +16,7 @@ export default async function RateVersionsPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("settings");
   const { q } = await searchParams;
 
   const assets = q

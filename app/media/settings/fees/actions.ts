@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireMediaUser } from "@/lib/auth/modules";
 
 export async function updateAssetFeeAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
     throw new Error("Only Admins can edit fees.");
   }

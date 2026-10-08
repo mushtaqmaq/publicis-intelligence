@@ -1,4 +1,4 @@
-import { hasModule } from "@/lib/auth/modules";
+import { hasSection } from "@/lib/auth/modules";
 import { NextRequest, NextResponse } from "next/server";
 import { gatherPlanListExportData, buildListXlsxBuffer, buildListCsvBuffer, buildListPdfBuffer, exportListFilename } from "@/lib/planning/exportPlanList";
 import { getSessionUser } from "@/lib/auth/session";
@@ -27,7 +27,7 @@ const VALID_STATUSES: MediaPlanStatus[] = [
 export async function GET(req: NextRequest) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  if (!(await hasModule(user, "media"))) return new Response("You do not have access to the Media module.", { status: 403 });
+  if (!(await hasSection(user, "media", "plans"))) return new Response("You do not have access to the Media module.", { status: 403 });
 
   const searchParams = req.nextUrl.searchParams;
   const statusParam = searchParams.get("status");

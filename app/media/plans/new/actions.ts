@@ -18,7 +18,7 @@ function generatePlanCode(campaignName: string, start: Date): string {
 }
 
 export async function createMediaPlanAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("plans");
   const clientName = (formData.get("clientName") as string)?.trim();
   const campaignName = (formData.get("campaignName") as string)?.trim();
   const campaignStartRaw = formData.get("campaignStart") as string;
@@ -37,11 +37,12 @@ export async function createMediaPlanAction(formData: FormData) {
     redirect("/media/plans/new?error=" + encodeURIComponent("Campaign End must be on or after Campaign Start."));
   }
 
-  const client = await prisma.client.upsert({
-    where: { name: clientName },
-    update: {},
-    create: { name: clientName },
-  });
+  // One client record for every department: Media may only plan for clients it handles.
+  let client = await prisma.client.findUnique({ where: { name: clientName } });
+  if (client && !client.departments.includes("media")) {
+    redirect("/media/plans/new?error=" + encodeURIComponent(`${clientName} is not handled by Media. Ask an admin to switch Media on for this client.`));
+  }
+  if (!client) client = await prisma.client.create({ data: { name: clientName, departments: ["media"] } });
 
   const budgetRaw = formData.get("budget") as string;
   const rawType = String(formData.get("planType") ?? "OFFLINE");

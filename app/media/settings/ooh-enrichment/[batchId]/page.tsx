@@ -18,7 +18,7 @@ function fmtPrices(prices: Record<string, number>) {
 }
 
 export default async function OohEnrichmentReviewPage({ params }: { params: Promise<{ batchId: string }> }) {
-  await requireMediaUser();
+  await requireMediaUser("settings");
   const { batchId } = await params;
 
   const batch = await prisma.oohEnrichmentBatch.findUnique({ where: { id: batchId } });

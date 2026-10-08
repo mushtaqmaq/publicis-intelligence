@@ -19,7 +19,7 @@ export default async function AuditLogPage({
 }: {
   searchParams: Promise<{ entityType?: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("settings");
   const { entityType } = await searchParams;
 
   const [logs, entityTypes] = await Promise.all([

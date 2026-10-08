@@ -15,7 +15,7 @@ export default async function SupplierAvrYearsPage({
   params: Promise<{ supplierId: string }>;
   searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (!(await hasPermission(user, "dashboard.avr.view"))) notFound();
 
   const { supplierId } = await params;

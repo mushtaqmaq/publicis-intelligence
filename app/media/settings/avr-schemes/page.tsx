@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 const SLAB_ROWS = 6;
 
 export default async function AvrSchemesPage({ searchParams }: { searchParams: Promise<{ error?: string; notice?: string }> }) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (!(await hasPermission(user, "dashboard.avr.view"))) notFound();
   const { error, notice } = await searchParams;
 

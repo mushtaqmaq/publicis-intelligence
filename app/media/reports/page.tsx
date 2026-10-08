@@ -48,7 +48,7 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<{ includeCancelled?: string; from?: string; to?: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("reports");
   const search = await searchParams;
   const includeCancelled = search.includeCancelled === "1";
   const fromDate = search.from ? new Date(search.from) : null;

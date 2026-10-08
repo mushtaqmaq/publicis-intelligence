@@ -6,7 +6,7 @@ import { requireMediaUser } from "@/lib/auth/modules";
 import type { PricingCalculationMethod } from "@/generated/prisma/enums";
 
 export async function updateAssetPricingMethodAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
     throw new Error("Only Admins can change pricing rules.");
   }
@@ -35,7 +35,7 @@ export async function updateAssetPricingMethodAction(formData: FormData) {
 }
 
 export async function updateSupplierDefaultDiscountAction(formData: FormData) {
-  const user = await requireMediaUser();
+  const user = await requireMediaUser("settings");
   if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
     throw new Error("Only Admins can change default discount rules.");
   }

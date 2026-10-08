@@ -85,6 +85,31 @@ async function setModules(userId, ids) {
   await db.prepare(`DELETE FROM user_permission_overrides WHERE "userId"=? AND "permissionId" IN (SELECT id FROM permissions WHERE key LIKE 'module.%')`).run(userId);
   for (const id of want) await db.prepare(`INSERT INTO user_permission_overrides(id,"userId","permissionId",granted) SELECT gen_random_uuid()::text, ?, p.id, true FROM permissions p WHERE p.key=? ON CONFLICT ("userId","permissionId") DO UPDATE SET granted=true`).run(userId, MOD.permKey(id));
 }
+// Section access inside a module (see lib/modules.js): { media: ['plans', 'inventory', ...] } for the modules the user holds.
+async function sectionsOf(user) {
+  if (user._secs) return user._secs;
+  const mods = await modulesOf(user);
+  const keys = MOD.SECTION_KEYS;
+  const overrides = MOD.isAdminRole(user.planner_role) ? [] : await db.prepare(`SELECT p.key, o.granted FROM user_permission_overrides o JOIN permissions p ON p.id=o."permissionId" WHERE o."userId"=? AND p.key = ANY(?::text[])`).all(user.id, keys);
+  const out = {};
+  for (const m of Object.keys(MOD.SECTIONS)) if (mods.includes(m)) out[m] = MOD.resolveSections(user.planner_role, mods, m, overrides);
+  return (user._secs = out);
+}
+// Stores a person's sections: `want` is { media: ['plans', ...] } (the sections to keep ON). Anything in the catalog
+// that is not listed is switched off with a granted=false override; listed sections have their override removed.
+// A module that is absent from `want` is left untouched.
+async function setSections(userId, want) {
+  if (!want || typeof want !== 'object') return;
+  for (const m of Object.keys(MOD.SECTIONS)) {
+    if (!Array.isArray(want[m])) continue;
+    const keep = new Set(want[m]);
+    for (const id of MOD.sectionIds(m)) {
+      const key = MOD.sectionKey(m, id);
+      if (keep.has(id)) await db.prepare(`DELETE FROM user_permission_overrides WHERE "userId"=? AND "permissionId" IN (SELECT id FROM permissions WHERE key=?)`).run(userId, key);
+      else await db.prepare(`INSERT INTO user_permission_overrides(id,"userId","permissionId",granted) SELECT gen_random_uuid()::text, ?, p.id, false FROM permissions p WHERE p.key=? ON CONFLICT ("userId","permissionId") DO UPDATE SET granted=false`).run(userId, key);
+    }
+  }
+}
 // Sends a 403 and returns false when the user may not use the module.
 async function allow(res, user, mod) {
   if (!mod || MOD.canUse(await modulesOf(user), mod)) return true;
@@ -312,7 +337,7 @@ async function route(req, res) {
   if (fd && req.method === 'DELETE') { const r = (await db.prepare('SELECT * FROM files WHERE id=?').get(fd[1])); if (r && (r.owner === user.id || user.role === 'admin')) { (await db.prepare('DELETE FROM files WHERE id=?').run(r.id)); } res.writeHead(204); return res.end(); }
 
   if (p === '/api/logout' && req.method === 'POST') { (await db.prepare('DELETE FROM sessions WHERE id=?').run(A.parseCookies(req).pi_session || '')); res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': A.sessionCookie(req, '', 0) }); return res.end('{"ok":true}'); }
-  if (p === '/api/me') { const s = (await settings()), i = P.info(); return send(res, 200, { ...pub(user), modules: await modulesOf(user), creditsPerUSD: s.creditsPerUSD, imageCredits: s.imageCredits, audioCredits: s.audioCredits, caps: { research: i.openrouter.configured, images: i.openai.configured, banana: i.openrouter.configured, audio: i.replicate.configured, seo: SEO.configured(), ai: i.openrouter.configured || i.hf.configured } }); }
+  if (p === '/api/me') { const s = (await settings()), i = P.info(); return send(res, 200, { ...pub(user), modules: await modulesOf(user), sections: await sectionsOf(user), creditsPerUSD: s.creditsPerUSD, imageCredits: s.imageCredits, audioCredits: s.audioCredits, caps: { research: i.openrouter.configured, images: i.openai.configured, banana: i.openrouter.configured, audio: i.replicate.configured, seo: SEO.configured(), ai: i.openrouter.configured || i.hf.configured } }); }
   if (p === '/api/me/password' && req.method === 'POST') {
     const b = await json(req);
     if (!A.verify(b.current || '', user.pass)) return fail(res, 400, 'Current password is incorrect.');
@@ -351,7 +376,7 @@ async function route(req, res) {
     if (p === '/api/admin/users' && req.method === 'GET') {
       const spent = Object.fromEntries((await db.prepare("SELECT user_id, -SUM(credits) AS c FROM ledger WHERE kind='usage' AND ts>=? GROUP BY user_id").all(Date.now() - 30 * 864e5)).map(r => [r.user_id, r.c]));
       const rows = await db.prepare(`SELECT ${uCols()} FROM users ORDER BY "createdAt"`).all();
-      return send(res, 200, await Promise.all(rows.map(async u => ({ ...pub(u), modules: await modulesOf(u), spent30: round(spent[u.id] || 0) }))));
+      return send(res, 200, await Promise.all(rows.map(async u => ({ ...pub(u), modules: await modulesOf(u), sections: await sectionsOf(u), spent30: round(spent[u.id] || 0) }))));
     }
     if (p === '/api/admin/users' && req.method === 'POST') {
       const b = await json(req), email = String(b.email || '').trim().toLowerCase();
@@ -361,6 +386,7 @@ async function route(req, res) {
       const id = A.newId(), credits = b.credits !== '' && b.credits != null ? Math.max(0, +b.credits || 0) : (await settings()).newUserCredits;
       (await db.prepare(`INSERT INTO users(id,email,name,"passwordHash",role,credits,"isActive","createdAt","updatedAt") VALUES(?,?,?,?,?::"UserRole",0,true,${UTC_NOW},${UTC_NOW})`).run(id, email, String(b.name || '').slice(0, 80), A.hash(b.password), b.role === 'admin' ? 'ADMIN' : 'PLANNER'));
       if (Array.isArray(b.modules)) await setModules(id, b.modules);
+      await setSections(id, b.sections);
       if (credits) await ledger(id, { kind: 'topup', credits, note: 'Opening balance', by: user.id });
       return send(res, 200, { id });
     }
@@ -372,6 +398,7 @@ async function route(req, res) {
       if (!um[2] && req.method === 'PATCH') {
         if (t.id === user.id && (b.active === false || b.role === 'member')) return fail(res, 400, 'You cannot demote or disable your own account.');
         if (Array.isArray(b.modules)) await setModules(t.id, b.modules);
+        await setSections(t.id, b.sections);
         if (b.name != null) (await db.prepare(`UPDATE users SET name=?, "updatedAt"=${UTC_NOW} WHERE id=?`).run(String(b.name).slice(0, 80), t.id));
         if (b.role) { const keep = t.planner_role === 'SUPER_ADMIN' && b.role === 'admin'; if (!keep) (await db.prepare(`UPDATE users SET role=?::"UserRole", "updatedAt"=${UTC_NOW} WHERE id=?`).run(b.role === 'admin' ? 'ADMIN' : 'PLANNER', t.id)); }
         if (b.active != null) { (await db.prepare(`UPDATE users SET "isActive"=?::boolean, "updatedAt"=${UTC_NOW} WHERE id=?`).run(!!b.active, t.id)); if (!b.active) (await db.prepare('DELETE FROM sessions WHERE "userId"=?').run(t.id)); }

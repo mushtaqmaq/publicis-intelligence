@@ -14,7 +14,7 @@ export default async function EditSupplierPage({
 }: {
   params: Promise<{ supplierId: string }>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("settings");
   const { supplierId } = await params;
   const supplier = await prisma.supplier.findUnique({ where: { id: supplierId } });
   if (!supplier) notFound();

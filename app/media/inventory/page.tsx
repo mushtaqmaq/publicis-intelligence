@@ -76,7 +76,7 @@ export default async function InventoryPage({
 }: {
   searchParams: Promise<InventorySearchParams>;
 }) {
-  await requireMediaUser();
+  await requireMediaUser("inventory");
   const params = await searchParams;
   const [{ suppliers }, { total, assets, page, pageCount }] = await Promise.all([
     getFilterOptions(),

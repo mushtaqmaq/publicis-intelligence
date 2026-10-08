@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   LayoutDashboard, FileStack, Boxes, Map as MapIcon, Building2, Users, Home, Zap, MessageCircle, Compass, Sparkles,
-  Megaphone, Wallet, Clapperboard, Search, Library, Gauge, ShieldCheck, LogOut, Menu, BarChart3, Settings, ChevronDown, ChevronRight,
+  Megaphone, Wallet, Clapperboard, Search, Library, Gauge, ShieldCheck, LogOut, Menu, BarChart3, Settings, ChevronDown, ChevronRight, Flag, CheckSquare,
 } from "lucide-react";
 
 type U = { name: string | null; email: string; role: string };
@@ -28,13 +28,13 @@ const pillars: { id: string; href: string; label: string; icon: Ico; color: stri
 ];
 // The OOH planner lives inside the Media module.
 const mediaTools = [
-  { href: "/media/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/media/plans", label: "Media plans", icon: FileStack },
-  { href: "/media/inventory", label: "Inventory", icon: Boxes },
-  { href: "/media/map", label: "Map", icon: MapIcon },
-  { href: "/media/suppliers", label: "Suppliers", icon: Building2 },
-  { href: "/media/reports", label: "Reports", icon: BarChart3 },
-  { href: "/media/clients", label: "Client accounts", icon: Users },
+  { section: "dashboard", href: "/media/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { section: "plans", href: "/media/plans", label: "Media plans", icon: FileStack },
+  { section: "inventory", href: "/media/inventory", label: "Inventory", icon: Boxes },
+  { section: "map", href: "/media/map", label: "Map", icon: MapIcon },
+  { section: "suppliers", href: "/media/suppliers", label: "Suppliers", icon: Building2 },
+  { section: "reports", href: "/media/reports", label: "Reports", icon: BarChart3 },
+  { section: "clients", href: "/media/clients", label: "Client accounts", icon: Users },
 ];
 // Media settings (rate cards, imports, fees, locations ...). Items with a permission are hidden unless granted.
 const settingsNav: { href: string; label: string; permission?: string }[] = [
@@ -57,6 +57,8 @@ const settingsNav: { href: string; label: string; permission?: string }[] = [
 const workspace = [
   { href: "/#/library", label: "Library", icon: Library },
   { href: "/#/clients", label: "Clients", icon: Building2 },
+  { href: "/campaigns", label: "Campaigns", icon: Flag },
+  { href: "/approvals", label: "Approvals", icon: CheckSquare },
   { href: "/#/usage", label: "Usage", icon: Gauge },
 ];
 
@@ -66,14 +68,14 @@ function Item({ href, label, icon: Icon, active, color, sub }: { href: string; l
     <span className="grid h-6 w-6 place-items-center rounded-lg" style={{ background: `${color}14`, color }}><Icon size={14} strokeWidth={1.75} /></span>
   ) : <Icon size={sub ? 14 : 16} strokeWidth={1.75} />;
   // Media tools use client-side links; platform links are plain anchors into the static app.
-  return href.startsWith("/media") ? <Link href={href} className={cls}>{icon}{label}</Link> : <a href={href} className={cls}>{icon}{label}</a>;
+  return href.startsWith("/media") || href.startsWith("/campaigns") || href.startsWith("/approvals") ? <Link href={href} className={cls}>{icon}{label}</Link> : <a href={href} className={cls}>{icon}{label}</a>;
 }
 
 function Section({ title }: { title: string }) {
   return <div className="px-3 pt-4 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted">{title}</div>;
 }
 
-export function MediaShell({ user, permissions, modules, children }: { user: U; permissions: string[]; modules: string[]; children: React.ReactNode }) {
+export function MediaShell({ user, permissions, modules, sections, children }: { user: U; permissions: string[]; modules: string[]; sections: string[]; children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
   const [open, setOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/media/settings"));
@@ -94,8 +96,8 @@ export function MediaShell({ user, permissions, modules, children }: { user: U; 
       {myPillars.map((p) => (
         <div key={p.id}>
           <Item href={p.href} label={p.label} icon={p.icon} color={p.color} active={p.id === "media" && pathname.startsWith("/media")} />
-          {p.id === "media" && mediaTools.map((t) => <Item key={t.href} {...t} sub active={pathname === t.href || pathname.startsWith(t.href + "/")} />)}
-          {p.id === "media" && (
+          {p.id === "media" && mediaTools.filter((t) => sections.includes(t.section)).map(({ section: _s, ...t }) => <Item key={t.href} {...t} sub active={pathname === t.href || pathname.startsWith(t.href + "/")} />)}
+          {p.id === "media" && sections.includes("settings") && (
             <>
               <button onClick={() => setSettingsOpen((v) => !v)} className="flex w-full items-center gap-2.5 rounded-xl py-2 pl-9 pr-3 text-sm text-[#3c3c43] hover:bg-black/5">
                 <Settings size={14} strokeWidth={1.75} />Settings{settingsOpen ? <ChevronDown size={14} className="ml-auto" /> : <ChevronRight size={14} className="ml-auto" />}
@@ -125,7 +127,7 @@ export function MediaShell({ user, permissions, modules, children }: { user: U; 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4 md:px-6">
           <button className="md:hidden" aria-label="Menu" onClick={() => setOpen((v) => !v)}><Menu size={20} /></button>
-          <div className="text-sm text-muted hidden md:block">Media</div>
+          <div className="text-sm text-muted hidden md:block">{pathname.startsWith("/campaigns") ? "Campaigns" : pathname.startsWith("/approvals") ? "Approvals" : "Media"}</div>
           <div className="flex items-center gap-3 text-sm">
             <div className="text-right leading-tight">
               <div className="font-medium">{user.name || user.email}</div>
