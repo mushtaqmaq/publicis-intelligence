@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { getSpendAggregation } from "@/lib/reports/spendAggregation";
 import type { SessionUser } from "@/lib/auth/session";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { AvrTracker } from "@/components/dashboard/AvrTracker";
+import { buildCards } from "@/lib/reports/avrCards";
 
 function money(n: number, currency = "QAR") {
   return `${currency} ${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -85,14 +87,11 @@ export async function AdminDashboard({ user }: { user: SessionUser }) {
     .sort((a, b) => b.total - a.total)
     .map((c, i) => ({ ...c, pct: spend > 0 ? (c.total / spend) * 100 : 0, color: CHART_PALETTE[i % CHART_PALETTE.length] }));
 
-  // Bundle AVR progress by supplier — several categories under Elan, for
-  // example, are grouped into one card instead of repeating the supplier
-  // name on every row.
-  const avrBySupplier = new Map<string, typeof avrProgress>();
-  for (const a of avrProgress) {
-    if (!avrBySupplier.has(a.supplierName)) avrBySupplier.set(a.supplierName, []);
-    avrBySupplier.get(a.supplierName)!.push(a);
-  }
+  // One card per supplier for the tracker (see lib/reports/avrCards.ts).
+  const avrCards = buildCards(
+    avrSchemes.map((x) => ({ id: x.id, supplierName: x.supplier.name, category: x.category, slabs: x.slabs.map((sl) => ({ thresholdFrom: Number(sl.thresholdFrom), rebatePct: Number(sl.rebatePct) })) })),
+    new Map(Array.from(aggregation.bySupplier.entries()).map(([name, v]) => [name, v.total])),
+  );
 
   return (
     <div className="p-8 max-w-6xl">
@@ -209,55 +208,7 @@ export async function AdminDashboard({ user }: { user: SessionUser }) {
         )}
       </section>
 
-      {/* Supplier AVR Tracker — bundled by supplier so a multi-category
-          supplier (e.g. Elan's 6 categories) reads as one card, not a wall
-          of repeated supplier-name rows. */}
-      {avrProgress.length > 0 && (
-        <section className="bg-surface border border-border rounded-lg p-5 mt-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-foreground">Supplier AVR Tracker — {currentYear}</h2>
-            <Link href="/media/settings/avr-schemes" className="text-xs text-accent underline">
-              Manage schemes
-            </Link>
-          </div>
-          <div className="space-y-4">
-            {Array.from(avrBySupplier.entries()).map(([supplierName, categories]) => (
-              <div key={supplierName} className="border border-border rounded-md">
-                <div className="px-3 py-2 border-b border-border bg-background flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">{supplierName}</span>
-                  <span className="text-xs text-muted">
-                    {categories.length} categor{categories.length === 1 ? "y" : "ies"}
-                  </span>
-                </div>
-                <table className="w-full text-sm border-collapse">
-                  <tbody>
-                    {categories.map((a) => (
-                      <tr key={a.key} className="border-b border-border last:border-0">
-                        <td className="py-2 pl-3 pr-2 text-foreground whitespace-nowrap">{a.category}</td>
-                        <td className="py-2 px-2 w-1/3">
-                          <div className="h-1.5 rounded bg-border overflow-hidden">
-                            <div className="h-full bg-accent" style={{ width: `${a.progressPct}%` }} />
-                          </div>
-                        </td>
-                        <td className="py-2 px-2 text-right text-muted tabular-nums whitespace-nowrap text-xs">
-                          {money(a.spend)} {a.nextSlab ? `/ ${money(Number(a.nextSlab.thresholdFrom))}` : "(max)"}
-                        </td>
-                        <td className="py-2 pl-2 pr-3 text-right text-xs text-muted whitespace-nowrap">
-                          {a.currentSlab ? `${(Number(a.currentSlab.rebatePct) * 100).toFixed(1)}% AVR` : "Below 1st slab"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-muted mt-3">
-            Spend shown is total spend with the supplier (not split per category) — bookings aren&apos;t tagged to an
-            AVR category yet.
-          </p>
-        </section>
-      )}
+      {avrCards.length > 0 && <AvrTracker cards={avrCards} year={currentYear} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <RankingTable title="Client Performance" rows={topClients} hrefBase="/clients" />
