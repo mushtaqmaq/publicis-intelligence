@@ -38,3 +38,21 @@ describe("Media module guard coverage", () => {
     expect(wrong).toEqual([]);
   });
 });
+
+// Campaigns and approvals belong to no single module, so each file must call requirePlatformUser (signed in + a working module).
+describe("Platform pages (campaigns, approvals) guard coverage", () => {
+  const roots = ["campaigns", "approvals"].map((d) => path.resolve(__dirname, "../app", d));
+  const pf = roots.flatMap((r) => walk(r)).filter((f) => /\.(ts|tsx)$/.test(f));
+  const G = /requirePlatformUser\(/;
+  it("covers every page, server action file and route", () => {
+    const need = pf.filter((f) => path.basename(f) === "page.tsx" || path.basename(f) === "route.ts" || /^\s*["']use server["']/m.test(fs.readFileSync(f, "utf8")));
+    expect(need.length).toBeGreaterThan(5);
+    expect(need.filter((f) => !G.test(fs.readFileSync(f, "utf8"))).map(rel)).toEqual([]);
+  });
+  it("only admins reach the approval settings", () => {
+    const f = pf.find((x) => x.endsWith(path.join("settings", "page.tsx")))!;
+    expect(fs.readFileSync(f, "utf8")).toMatch(/requirePlatformUser\(\{ admin: true \}\)/);
+    const a = fs.readFileSync(pf.find((x) => x.endsWith(path.join("approvals", "actions.ts")))!, "utf8");
+    expect(a).toMatch(/saveTemplateAction[\s\S]*requirePlatformUser\(\{ admin: true \}\)/);
+  });
+});

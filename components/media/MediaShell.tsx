@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   LayoutDashboard, FileStack, Boxes, Map as MapIcon, Building2, Users, Home, Zap, MessageCircle, Compass, Sparkles,
-  Megaphone, Wallet, Clapperboard, Search, Library, Gauge, ShieldCheck, LogOut, Menu, BarChart3, Settings, ChevronDown, ChevronRight,
+  Megaphone, Wallet, Clapperboard, Search, Library, Gauge, ShieldCheck, LogOut, Menu, BarChart3, Settings, ChevronDown, ChevronRight, Flag, CheckSquare,
 } from "lucide-react";
 
 type U = { name: string | null; email: string; role: string };
@@ -57,6 +57,8 @@ const settingsNav: { href: string; label: string; permission?: string }[] = [
 const workspace = [
   { href: "/#/library", label: "Library", icon: Library },
   { href: "/#/clients", label: "Clients", icon: Building2 },
+  { href: "/campaigns", label: "Campaigns", icon: Flag },
+  { href: "/approvals", label: "Approvals", icon: CheckSquare },
   { href: "/#/usage", label: "Usage", icon: Gauge },
 ];
 
@@ -66,7 +68,7 @@ function Item({ href, label, icon: Icon, active, color, sub }: { href: string; l
     <span className="grid h-6 w-6 place-items-center rounded-lg" style={{ background: `${color}14`, color }}><Icon size={14} strokeWidth={1.75} /></span>
   ) : <Icon size={sub ? 14 : 16} strokeWidth={1.75} />;
   // Media tools use client-side links; platform links are plain anchors into the static app.
-  return href.startsWith("/media") ? <Link href={href} className={cls}>{icon}{label}</Link> : <a href={href} className={cls}>{icon}{label}</a>;
+  return href.startsWith("/media") || href.startsWith("/campaigns") || href.startsWith("/approvals") ? <Link href={href} className={cls}>{icon}{label}</Link> : <a href={href} className={cls}>{icon}{label}</a>;
 }
 
 function Section({ title }: { title: string }) {
@@ -125,7 +127,7 @@ export function MediaShell({ user, permissions, modules, sections, children }: {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4 md:px-6">
           <button className="md:hidden" aria-label="Menu" onClick={() => setOpen((v) => !v)}><Menu size={20} /></button>
-          <div className="text-sm text-muted hidden md:block">Media</div>
+          <div className="text-sm text-muted hidden md:block">{pathname.startsWith("/campaigns") ? "Campaigns" : pathname.startsWith("/approvals") ? "Approvals" : "Media"}</div>
           <div className="flex items-center gap-3 text-sm">
             <div className="text-right leading-tight">
               <div className="font-medium">{user.name || user.email}</div>
