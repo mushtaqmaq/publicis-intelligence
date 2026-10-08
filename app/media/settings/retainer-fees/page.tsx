@@ -19,7 +19,7 @@ export default async function RetainerFeesPage({ searchParams }: { searchParams:
       include: { client: { select: { name: true } } },
       orderBy: [{ year: "desc" }, { month: "desc" }],
     }),
-    prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.client.findMany({ where: { departments: { has: "media" } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   const currentYear = new Date().getFullYear();

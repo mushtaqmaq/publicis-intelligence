@@ -208,9 +208,13 @@ export async function commitMediaPlanImportAction(rows: MediaPlanImportRow[]): P
 
     const client = row.clientId
       ? await prisma.client.findUnique({ where: { id: row.clientId } })
-      : await prisma.client.upsert({ where: { name: row.newClientName! }, update: {}, create: { name: row.newClientName! } });
+      : ((await prisma.client.findUnique({ where: { name: row.newClientName! } })) ?? (await prisma.client.create({ data: { name: row.newClientName!, departments: ["media"] } })));
     if (!client) {
       skipped.push({ sourceFile: row.sourceFile, reason: "Selected client no longer exists." });
+      continue;
+    }
+    if (!client.departments.includes("media")) {
+      skipped.push({ sourceFile: row.sourceFile, reason: `${client.name} is not handled by Media.` });
       continue;
     }
 

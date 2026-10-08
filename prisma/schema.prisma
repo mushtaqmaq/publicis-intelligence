@@ -723,6 +723,9 @@ model Client {
   taxId               String?
   billingAddress      String?
   creditLimit         Decimal? @db.Decimal(14, 2)
+  // Which departments handle this client (see lib/core/clients.ts). One client record for the whole platform;
+  // a department only offers the clients it handles. Finance sees every client.
+  departments         String[] @default([])
   accountManagerId    String? // null = unassigned; never guessed
   accountManager      User?    @relation("ClientAccountManager", fields: [accountManagerId], references: [id], onDelete: SetNull)
   createdAt           DateTime @default(now())

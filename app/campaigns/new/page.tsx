@@ -2,13 +2,14 @@ import { prisma } from "@/lib/prisma";
 import { requirePlatformUser } from "@/lib/auth/platform";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Banner, field, labelCls } from "@/components/platform/Banner";
+import { departmentLabels } from "@/lib/core/clients";
 import { createCampaignAction } from "../actions";
 
 export default async function NewCampaign({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const user = await requirePlatformUser();
   const [{ error }, clients, people] = await Promise.all([
     searchParams,
-    prisma.client.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.client.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, departments: true } }),
     prisma.user.findMany({ where: { isActive: true }, orderBy: { email: "asc" }, select: { id: true, name: true, email: true } }),
   ]);
   return (
@@ -19,7 +20,7 @@ export default async function NewCampaign({ searchParams }: { searchParams: Prom
         <div><label className={labelCls}>Campaign name</label><input name="name" required maxLength={200} className={field} /></div>
         <div className="grid grid-cols-2 gap-4">
           <div><label className={labelCls}>Client</label>
-            <select name="clientId" required className={field}><option value="">Choose a client</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+            <select name="clientId" required className={field}><option value="">Choose a client</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}{c.departments.length ? ` (${departmentLabels(c.departments).join(", ")})` : ""}</option>)}</select></div>
           <div><label className={labelCls}>Owner</label>
             <select name="ownerId" defaultValue={user.id} className={field}>{people.map((p) => <option key={p.id} value={p.id}>{p.name ?? p.email}</option>)}</select></div>
         </div>

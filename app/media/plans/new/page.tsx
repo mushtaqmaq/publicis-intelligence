@@ -12,7 +12,7 @@ export default async function NewMediaPlanPage({
 }) {
   await requireMediaUser("plans");
   const { error } = await searchParams;
-  const clients = await prisma.client.findMany({ orderBy: { name: "asc" }, select: { name: true } });
+  const clients = await prisma.client.findMany({ where: { departments: { has: "media" } }, orderBy: { name: "asc" }, select: { name: true } });
 
   const today = new Date().toISOString().slice(0, 10);
 
