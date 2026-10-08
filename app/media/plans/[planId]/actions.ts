@@ -1,6 +1,7 @@
 "use server";
 
 import { requireMediaUser } from "@/lib/auth/modules";
+import { priceAssetLine } from "@/lib/planning/planItem";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -80,50 +81,8 @@ export async function addAssetToPlanAction(formData: FormData) {
 
   await assertVersionEditable(versionId);
 
-  const [asset, rate, itemCount] = await Promise.all([
-    prisma.asset.findUniqueOrThrow({ where: { id: assetId } }),
-    prisma.assetRate.findUniqueOrThrow({
-      where: { id: assetRateId },
-      include: { fees: true, rateCardVersion: { include: { rateCard: { include: { supplier: true } } } } },
-    }),
-    prisma.mediaPlanItem.count({ where: { mediaPlanVersionId: versionId } }),
-  ]);
-
-  const { result } = buildAndCalculateLineItem({
-    calculationMethod: asset.pricingCalculationMethod as PricingCalculationMethod,
-    rate: {
-      grossRateStatus: rate.grossRateStatus,
-      grossRate: rate.grossRate ? Number(rate.grossRate) : null,
-      durationValue: rate.durationValue ? Number(rate.durationValue) : null,
-      durationUnit: rate.durationUnit,
-      fees: rate.fees.map((f) => ({ feeType: f.feeType, status: f.status, amount: f.amount ? Number(f.amount) : null })),
-    },
-    campaignStart: startDate,
-    campaignEnd: endDate,
-    quantity,
-    discountPct,
-    additionalDiscountPct,
-  });
-
-  const sourceDocument =
-    rate.rateCardVersion.rateCard.supplier.name === "__EXCEL_MIGRATION__"
-      ? "Excel migration"
-      : rate.rateCardVersion.originalFilename;
-
-  const rateSnapshot = {
-    rateId: rate.id,
-    rateYear: rate.rateYear,
-    sourceRateCard: sourceDocument,
-    sourcePage: rate.sourcePage,
-    pricingBasis: rate.pricingBasis,
-    grossRate: rate.grossRate ? Number(rate.grossRate) : null,
-    grossRateStatus: rate.grossRateStatus,
-    fees: rate.fees.map((f) => ({ feeType: f.feeType, status: f.status, amount: f.amount ? Number(f.amount) : null })),
-    calculationMethod: asset.pricingCalculationMethod,
-    quantity,
-    capturedAt: new Date().toISOString(),
-  };
-
+  const itemCount = await prisma.mediaPlanItem.count({ where: { mediaPlanVersionId: versionId } });
+  const { result, data: priced } = await priceAssetLine({ assetId, assetRateId, start: startDate, end: endDate, quantity, discountPct, additionalDiscountPct });
   const moneyOrNull = (v: { status: string; amount: number | null }) => (v.status === "KNOWN" ? v.amount : null);
 
   const item = await prisma.mediaPlanItem.create({
@@ -134,18 +93,9 @@ export async function addAssetToPlanAction(formData: FormData) {
       startDate,
       endDate,
       selectedCircuits: quantity,
-      rateSnapshot: rateSnapshot as unknown as Prisma.InputJsonValue,
       discountPct,
       additionalDiscountPct,
-      grossCost: moneyOrNull(result.grossCost),
-      netMedia: moneyOrNull(result.netMedia),
-      productionFee: moneyOrNull(result.productionFee),
-      uploadFee: moneyOrNull(result.uploadFee),
-      installationFee: moneyOrNull(result.installationFee),
-      serviceFee: moneyOrNull(result.serviceFee),
-      otherFees: moneyOrNull(result.otherFees),
-      lineTotal: moneyOrNull(result.lineTotal),
-      excludesPendingCost: result.excludesPendingCost,
+      ...priced,
       notes,
       buyingEntityId,
     },
