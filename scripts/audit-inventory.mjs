@@ -2,11 +2,12 @@
 // READ-ONLY inventory audit. Usage:
 //   DATABASE_URL=<postgres> node scripts/audit-inventory.mjs [--csv out.csv] [--sql retire.sql]
 // It only runs SELECT queries. --sql writes a proposed "retire" script (reversible) for you to review and run yourself.
-import fs from 'node:fs'; import pg from 'pg';
+import fs from 'node:fs'; import pg from 'pg'; import { createRequire } from 'node:module';
+const { withExplicitSsl } = createRequire(import.meta.url)('../lib/pgConn.js');
 import { classifyAsset, safeToRetire, retireSql } from './auditInventoryLib.mjs';
 const arg = n => { const i = process.argv.indexOf('--' + n); return i > 0 ? process.argv[i + 1] : null; };
 if (!process.env.DATABASE_URL) { console.error('Set DATABASE_URL (use a local copy or a Neon branch).'); process.exit(1); }
-const c = new pg.Client({ connectionString: process.env.DATABASE_URL }); await c.connect();
+const c = new pg.Client({ connectionString: withExplicitSsl(process.env.DATABASE_URL) }); await c.connect();
 try {
   await c.query('SET default_transaction_read_only = on');
   const { rows } = await c.query(`SELECT a.id, a."assetName", a."locationName", a.status, s.name AS supplier,
