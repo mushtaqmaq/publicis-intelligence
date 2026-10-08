@@ -5,7 +5,8 @@
 // Run it against a Neon BRANCH first, never straight at production. Existing users, settings and documents are never changed.
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs'; import path from 'node:path';
-import pg from 'pg';
+import pg from 'pg'; import { createRequire } from 'node:module';
+const { withExplicitSsl } = createRequire(import.meta.url)('../lib/pgConn.js');
 import { planImport, applyImport, ALL_MODULES } from './importSpaceLib.mjs';
 
 const arg = (n, d) => { const i = process.argv.indexOf('--' + n); return i > 0 ? process.argv[i + 1] : d; };
@@ -20,7 +21,7 @@ const all = t => { try { return src.prepare(`SELECT * FROM ${t}`).all(); } catch
 const rows = { users: all('users'), ledger: all('ledger'), docs: all('docs'), conversations: all('conversations'), settings: all('settings'), files: all('files') };
 
 const host = new URL(process.env.DATABASE_URL).host;
-const client = new pg.Client({ connectionString: process.env.DATABASE_URL }); await client.connect();
+const client = new pg.Client({ connectionString: withExplicitSsl(process.env.DATABASE_URL) }); await client.connect();
 try {
   const existing = { users: (await client.query('SELECT id, email FROM users')).rows, settingKeys: (await client.query('SELECT key FROM settings')).rows.map(r => r.key) };
   const plan = planImport(rows, existing, { modules });
