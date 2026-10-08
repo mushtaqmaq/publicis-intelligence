@@ -159,3 +159,15 @@ Production values are owner-managed; contributors use their own local `.env` (gi
 - Required environments: local: yes | preview: n/a | production: yes
 - Secret: yes
 
+
+## DATABASE_URL_UNPOOLED
+- Used by: `prisma.config.ts` (Prisma Migrate only)
+- Purpose: Neon direct (non-pooled) connection string; the pooled URL cannot run migrations
+- Required environments: local: only to run migrations | preview: n/a | production: only on the machine that runs `prisma migrate deploy` (not needed in Vercel)
+- Secret: yes
+
+## BLOB_STORE_ID and BLOB_WEBHOOK_PUBLIC_KEY
+- Used by: `@vercel/blob` (rate-card PDFs, asset photos, proof of posting)
+- Purpose: set automatically when the Blob store `ooh-media-planner-storage` is connected to the Vercel project; the SDK authenticates with the deployment's own identity
+- Required environments: production
+- Secret: no (managed by Vercel)
