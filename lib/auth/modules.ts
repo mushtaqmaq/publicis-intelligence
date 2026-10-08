@@ -1,4 +1,5 @@
 import "server-only";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import type { SessionUser } from "./session";
 // Shared rules live in lib/modules.js (also used by the API server).
@@ -26,8 +27,10 @@ export { permKey };
 // For server actions and route handlers under /media: the signed-in user MUST hold the Media module.
 // (Pages are guarded by the layout, but actions and routes are separate endpoints.)
 export async function requireMediaUser(): Promise<SessionUser> {
-  const { requireSessionUser } = await import("./session");
-  const user = await requireSessionUser();
+  const { getSessionUser } = await import("./session");
+  const user = await getSessionUser();
+  // Signed out: send them to the login page (no error), whether this runs in a page or a server action.
+  if (!user) redirect("/login");
   if (!(await hasModule(user, "media"))) throw new Error("You do not have access to the Media module.");
   return user;
 }

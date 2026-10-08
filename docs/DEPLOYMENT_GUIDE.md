@@ -1,27 +1,48 @@
 # Deployment Guide
 
-Production: Vercel (team `maq5`, project `publicis-intelligence`) with Neon Postgres. Nothing else is required.
+Production: Vercel (team `maq5`, project `publicis-intelligence`) with Neon Postgres (the planner's database, `ooh-media-planner-db`). Blob store `ooh-media-planner-storage` (private) is shared with the standalone planner.
 
 ## Developer workflow
 ```text
-feature branch -> Pull Request -> CI -> review -> merge
+feature branch -> Pull Request -> CI -> review -> merge to main
 ```
-CI syntax-checks the code, boots the server against a Postgres service, signs in, and builds the Docker image. `main` has no technical branch protection (GitHub free plan on a private repo); the rule is: nobody pushes to `main` directly.
+CI runs the unit tests, a syntax check, the type-check and Next.js build, applies the Prisma migrations to a Postgres 18 service, boots the app, signs in, and builds the Docker image. Nobody pushes to `main` directly (this is a convention; the free GitHub plan cannot enforce it).
+
+Local setup: see README.md. Local development must use a local Postgres or a Neon branch, never the production connection string.
 
 ## Production workflow
-```text
-approved main -> Actions > Deploy Production (manual) -> Vercel production
-```
-`deploy-production.yml` is `workflow_dispatch` only, refuses to run off `main`, and uses the `production` environment. It needs the GitHub secret `VERCEL_TOKEN` and the variables `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`. Alternatively the owner deploys from their own machine: `vercel deploy --prod --scope maq5` from a clean `main`.
+1. Merge the PR into `main`.
+2. If the PR adds a Prisma migration, apply it to the production database first (it only ever adds things; check the migration before running it):
+   ```bash
+   set -a && . <env file with DATABASE_URL_UNPOOLED> && set +a && DATABASE_URL="$DATABASE_URL_UNPOOLED" ./node_modules/.bin/prisma migrate deploy
+   ```
+   Use the direct (unpooled) URL; the pooled one cannot run migrations. Never run this from CI or at build time.
+3. Deploy from a clean `main`: `vercel deploy --prod --scope maq5` (or run **Actions > Deploy Production**, which needs the `VERCEL_TOKEN` secret and the `production` environment).
+4. Smoke test: `/`, `/login`, `/api/health` return 200; `/api/me` returns 401 and `/media` redirects to login when signed out. Check `vercel logs --environment production` for new errors.
 
-## Environment variables
-Set in Vercel (Project > Settings > Environment Variables, Production): `DATABASE_URL` (injected by the Neon integration), `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`, and the provider keys listed in `ENVIRONMENT_VARIABLES.md`. Never commit values.
+If a deploy fails with "Not authorized", retry once; it has been transient.
+
+## Environment variables (Vercel, Production)
+`DATABASE_URL` (pooled Neon URL), `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PASSWORD`, `OPENROUTER_API_KEY`, and any other provider keys from ENVIRONMENT_VARIABLES.md. Set secrets with the dashboard or `vercel env add ... --sensitive`; never commit them or paste them in chat. `ADMIN_PASSWORD` only matters when the admin account is first created. `RESET_ADMIN_PASSWORD=1` forces a reset on the next cold start; remove it straight after.
 
 ## Rollback
-- Vercel dashboard > Deployments > pick the last good one > Promote to Production (or `vercel rollback`).
-- Or `git revert <sha>` on `main` through a PR, then redeploy.
-- Database: restore from a Neon branch/point-in-time restore taken before the change.
-- The Hugging Face Space is untouched and remains the legacy fallback until the owner confirms the migration is complete.
+- Vercel dashboard > Deployments > Promote a previous deployment (or `vercel rollback`).
+- Or `git revert <sha>` through a PR and redeploy.
+- Database migrations are additive, so older code keeps working against a newer schema. To go back further, restore from Neon point-in-time restore or a `pg_dump` taken before the change.
+- The Hugging Face Space remains untouched as the legacy fallback until the owner decides otherwise.
 
-## Importing data from the Space (not done)
-The Space's SQLite file (`/data/publicis-intelligence.db` and `files/`) can be converted into the Postgres tables above. Take a Neon branch first, run the import against the branch, verify, then promote. Not performed yet.
+## Backups
+Take a dump before migrations or imports (use the same major version as the server; Neon runs Postgres 18):
+```bash
+docker run --rm -e U="$DATABASE_URL_UNPOOLED" postgres:18-alpine sh -c 'pg_dump "$U" --no-owner --no-acl -Fc' > backup.dump
+```
+
+## Importing data from the Hugging Face Space
+Tool: `scripts/import-space.mjs`. It reads the Space's SQLite file and `files/` folder and writes into the unified database. It is a dry run unless `--apply` is given, runs in one transaction, is safe to repeat, and never changes an existing user, setting or document. It creates the Space's users (their old passwords keep working), gives non-admins the modules you choose (default all six), and imports their credit history, saved documents, conversations and files.
+
+1. Export the Space's `/data` folder (the SQLite file `publicis-intelligence.db` and the `files/` folder).
+2. Create a Neon branch of the production database and use its connection string as the target.
+3. Dry run: `DATABASE_URL=<branch url> node scripts/import-space.mjs --db <path>/publicis-intelligence.db --files <path>/files`
+4. If the summary looks right, add `--apply`, and check the result (users, credits, a document, a file).
+5. Only then repeat steps 3 and 4 against production, after a backup.
+Add `--modules media,strategy` to limit which modules imported members receive.

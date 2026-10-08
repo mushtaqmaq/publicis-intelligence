@@ -1,5 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
+import { withExplicitSsl } from "@/lib/pgConn";
 
 // Prisma 7 needs an explicit driver adapter at runtime. The client is created lazily on first use
 // (not at import) so `next build` and tooling never need a database connection.
@@ -13,7 +14,7 @@ function createPrismaClient() {
   if (!connectionString) {
     throw new Error("DATABASE_URL is not set");
   }
-  const adapter = new PrismaPg({ connectionString });
+  const adapter = new PrismaPg({ connectionString: withExplicitSsl(connectionString) });
   return new PrismaClient({ adapter });
 }
 
