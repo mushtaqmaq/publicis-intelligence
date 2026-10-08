@@ -15,7 +15,7 @@ const btn = "rounded-md bg-foreground px-3 py-1.5 text-sm text-white";
 export default async function RequestPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; ok?: string }> }) {
   const { user, actor } = await requireCreativeUser();
   const [{ id }, { error, ok }] = await Promise.all([params, searchParams]);
-  const r = await prisma.creativeRequest.findUnique({ where: { id }, include: { client: true, campaign: { select: { id: true, code: true, name: true } }, deliverable: { select: { title: true } }, versions: { orderBy: { versionNo: "desc" } } } });
+  const r = await prisma.creativeRequest.findUnique({ where: { id }, include: { client: true, campaign: { select: { id: true, code: true, name: true } }, deliverable: { select: { title: true } }, versions: { orderBy: { versionNo: "desc" } }, multimediaJobs: { select: { id: true, code: true, title: true } } } });
   if (!r) notFound();
   const [links, comments, staff] = await Promise.all([
     prisma.link.findMany({ where: { entityType: "CreativeRequest", entityId: id }, orderBy: { createdAt: "asc" } }),
@@ -103,6 +103,11 @@ export default async function RequestPage({ params, searchParams }: { params: Pr
           <div><label className={labelCls}>Kind</label><select name="kind" defaultValue="REFERENCE" className={field}>{LINK_KINDS.map((k) => <option key={k} value={k}>{k.toLowerCase()}</option>)}</select></div>
           <button className={btn}>Add</button>
         </form>
+      </section>
+
+      <section className={card}>
+        <div className="flex items-center"><h2 className="font-medium">Multimedia jobs for this request</h2><Link href={`/multimedia/new?creative=${r.id}${r.campaignId ? `&campaign=${r.campaignId}` : ""}`} className="ml-auto text-sm text-accent">New job</Link></div>
+        <ul className="mt-2 text-sm">{r.multimediaJobs.map((q) => <li key={q.id}><Link href={`/multimedia/${q.id}`} className="text-accent">{q.code} {q.title}</Link></li>)}{r.multimediaJobs.length === 0 && <li className="text-muted">None yet.</li>}</ul>
       </section>
 
       <section className={card}>

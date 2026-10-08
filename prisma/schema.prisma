@@ -735,6 +735,7 @@ model Client {
   retainerFees     RetainerFee[]
   campaigns        Campaign[]
   creativeRequests CreativeRequest[]
+  multimediaJobs   MultimediaJob[]
 
   @@map("clients")
 }
@@ -1164,6 +1165,7 @@ model Campaign {
   deliverables     Deliverable[]
   mediaPlans       MediaPlan[]
   creativeRequests CreativeRequest[]
+  multimediaJobs   MultimediaJob[]
 
   @@index([clientId])
   @@map("campaigns")
@@ -1188,6 +1190,7 @@ model Deliverable {
   updatedAt   DateTime          @updatedAt
 
   creativeRequests CreativeRequest[]
+  multimediaJobs   MultimediaJob[]
 
   @@index([campaignId])
   @@map("deliverables")
@@ -1349,7 +1352,8 @@ model CreativeRequest {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
-  versions CreativeVersion[]
+  versions       CreativeVersion[]
+  multimediaJobs MultimediaJob[]
 
   @@index([status])
   @@index([assigneeId])
@@ -1373,4 +1377,122 @@ model CreativeVersion {
 
   @@unique([requestId, versionNo])
   @@map("creative_versions")
+}
+
+// ---------------------------------------------------------------------------
+// Multimedia module: photo/video shoots, voice-over, editing and post-production.
+// Jobs have tasks, scheduled resource bookings (no double-booking), versions reviewed through the shared
+// approval engine, and links (never files) for briefs, scripts, footage and finals.
+// ---------------------------------------------------------------------------
+
+enum MultimediaStatus {
+  PLANNED
+  SCHEDULED
+  IN_PROGRESS
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  DELIVERED
+  CANCELLED
+}
+
+model MultimediaJob {
+  id                String           @id @default(cuid())
+  code              String           @unique // MMJ-0001
+  title             String
+  jobType           String           @default("VIDEO_SHOOT") // PHOTO_SHOOT | VIDEO_SHOOT | VOICE_OVER | EDITING | POST_PRODUCTION | OTHER
+  brief             String
+  status            MultimediaStatus @default(PLANNED)
+  clientId          String
+  client            Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  campaignId        String?
+  campaign          Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  deliverableId     String?
+  deliverable       Deliverable?     @relation(fields: [deliverableId], references: [id], onDelete: SetNull)
+  creativeRequestId String? // the Creative request this job realises, if any
+  creativeRequest   CreativeRequest? @relation(fields: [creativeRequestId], references: [id], onDelete: SetNull)
+  requestedById     String
+  producerId        String? // owns the job
+  reviewerId        String? // used when no approval steps are configured
+  location          String?
+  startsAt          DateTime?
+  endsAt            DateTime?
+  dueDate           DateTime?
+  deliveredAt       DateTime?
+  deliveryNote      String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  tasks    MultimediaTask[]
+  bookings ResourceBooking[]
+  versions MultimediaVersion[]
+
+  @@index([status])
+  @@index([producerId])
+  @@index([clientId])
+  @@index([campaignId])
+  @@map("multimedia_jobs")
+}
+
+model MultimediaTask {
+  id         String        @id @default(cuid())
+  jobId      String
+  job        MultimediaJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  title      String
+  assigneeId String?
+  status     String        @default("TODO") // TODO | DOING | DONE | BLOCKED
+  dueDate    DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([jobId])
+  @@index([assigneeId])
+  @@map("multimedia_tasks")
+}
+
+model Resource {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  kind      String   @default("CREW") // CREW | EQUIPMENT | LOCATION | STUDIO | TALENT
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  bookings ResourceBooking[]
+
+  @@map("resources")
+}
+
+model ResourceBooking {
+  id          String        @id @default(cuid())
+  resourceId  String
+  resource    Resource      @relation(fields: [resourceId], references: [id], onDelete: Restrict)
+  jobId       String
+  job         MultimediaJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  startsAt    DateTime
+  endsAt      DateTime
+  note        String?
+  createdById String?
+  createdAt   DateTime      @default(now())
+
+  @@index([resourceId, startsAt])
+  @@index([jobId])
+  @@map("resource_bookings")
+}
+
+model MultimediaVersion {
+  id            String        @id @default(cuid())
+  jobId         String
+  job           MultimediaJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  versionNo     Int
+  url           String // link to the cut / audio / photo set in the company's own storage
+  notes         String?
+  status        String        @default("SUBMITTED") // SUBMITTED | APPROVED | CHANGES_REQUESTED
+  submittedById String
+  feedback      String?
+  createdAt     DateTime      @default(now())
+  decidedAt     DateTime?
+
+  @@unique([jobId, versionNo])
+  @@map("multimedia_versions")
 }

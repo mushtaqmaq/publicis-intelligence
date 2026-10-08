@@ -3,7 +3,7 @@ export const LINK_KINDS = ["BRIEF", "REFERENCE", "ARTWORK", "FOOTAGE", "DELIVERA
 export type LinkKind = (typeof LINK_KINDS)[number];
 
 // Records a link may be attached to. Add a type here when a module starts using links.
-export const LINKABLE_TYPES = ["Campaign", "Deliverable", "CreativeRequest"] as const;
+export const LINKABLE_TYPES = ["Campaign", "Deliverable", "CreativeRequest", "MultimediaJob"] as const;
 export type LinkableType = (typeof LINKABLE_TYPES)[number];
 
 const MAX_URL = 2000;
