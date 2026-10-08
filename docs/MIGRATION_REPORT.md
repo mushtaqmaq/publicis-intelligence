@@ -30,7 +30,7 @@ Features migrated: all preserved; the Media planner tool was replaced by the uni
 - Visual and workflow parity of every feature against the original Space (FEATURE_PARITY_TEST.md).
 
 ## Outstanding items
-- Import the Space's accounts and data: tool is ready (`scripts/import-space.mjs`, dry run by default); needs the Space's `/data` export. See DEPLOYMENT_GUIDE.md.
+- Space data import: CANCELLED by the owner on 2026-10-08 (there is no production data; existing records are test data). `scripts/import-space.mjs` stays in the repo, unused.
 - Retire the standalone planner (deliberately not done: it is still live against the same database; switch it off only once everyone has moved). The empty `neon-coral-pillar` database was deleted on 2026-10-08.
 - Vercel request bodies are limited to about 4.5 MB (the original allowed 30 MB): large uploads fail with 413.
 - Generated media is stored in Postgres; move to Vercel Blob if Neon's storage quota becomes a constraint.
@@ -42,4 +42,4 @@ Environment variables required: see ENVIRONMENT_VARIABLES.md
 Database changes: one Neon database shared with the planner; 22 Prisma migrations (see DATABASE_AUDIT.md)
 Authentication changes: planner `users`/`sessions` tables are now the single identity store; roles map SUPER_ADMIN/ADMIN to admin, others to member
 Production readiness: LIVE; functional parity checks and the items above remain
-Recommended next action: run the live checks listed under "Not verified", then the Space import, then retire the standalone planner
+Recommended next action: confirm the decisions in INTEGRATION_PLAN.md section 9, then build Creative, Multimedia (renamed from Production) and Finance as one connected system
