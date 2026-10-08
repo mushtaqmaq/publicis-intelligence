@@ -1,6 +1,6 @@
 # Module Integration Plan: Creative, Multimedia, Finance and Media as one system
 
-Status: PLAN, awaiting owner confirmation of the decisions in section 9. Written 2026-10-08. No code has been changed for this plan.
+Status: PLAN, decisions confirmed by the owner on 2026-10-08 (section 9). Implementation starts at P0.
 
 ## 1. Updated scope (owner message, 2026-10-08)
 - The system is a development/testing environment; no real users, no production data. Existing records are disposable. We still change the database only through reviewed Prisma migrations.
@@ -45,7 +45,7 @@ Best source `creolanza-media-agency`: `CreativeRequest`, `ClientBrief`, `Creativ
 Best source `creolanza-projects`: `Task` with subtasks, dependencies (`scheduling.ts`, cycle checks), `CalendarEvent`, workload summary, templates, files and comments, change-request approvals, project health, a task-tree UI. Nothing multimedia-specific exists (shoots, voice-over, editing jobs, equipment, date-ranged booking); those are new, modelled as job types over the task/calendar foundation.
 
 ### Biggest gaps across everything
-Video-sized file storage (Creolanza keeps files in Postgres, which will not scale), real status workflows, date-based resource booking, AP, margins, forecasting, dashboards.
+Real status workflows, date-based resource booking, AP, margins, forecasting, dashboards. (File storage is no longer a gap: links only.)
 
 ## 4. Target architecture
 
@@ -54,8 +54,8 @@ Video-sized file storage (Creolanza keeps files in Postgres, which will not scal
 - **Supplier** (extend planner `suppliers`): payment terms, tax id, currency, bank details (for AP).
 - **Campaign** (new): the shared parent. Fields: client, name, code, dates, owner, status, budget, currency. Everything links to it: media plans (nullable `campaignId` on `media_plans`), creative requests, multimedia jobs, quotations, booking orders, purchase orders, invoices, bills, cost lines.
 - **Deliverable** (new): belongs to a campaign; can be linked from a creative request or multimedia job.
-- **Attachment** (new, generic: `entityType`, `entityId`, file metadata) with files in **Vercel Blob** (private) using direct-to-Blob client uploads, so videos and large artwork bypass the 4.5 MB request cap.
-- **Comment**, **Approval** (port of the procurement engine: request, steps, thresholds, generic over entity types), **Notification** (optional), **DocumentSequence** (gapless numbering).
+- **Link** (new, generic attachment: `entityType`, `entityId`, title, URL or storage path, kind, added by). **The platform stores no files for these modules**: briefs, reference material, artwork, footage and deliverables live in the company's own cloud and local storage, and the platform keeps only the links. (Decision 5.)
+- **Comment**, **Approval** (port of the procurement engine, changed so each step is assigned to a **named person or role chosen per document type**, for example first approval by the manager, then finance, then director; sequential steps, nobody approves their own request, amount bands optional), **Notification** (optional), **DocumentSequence** (gapless numbering).
 - **Audit**: keep `audit_logs`; every module writes through one helper.
 
 ### 4.2 Modules and routes
@@ -91,7 +91,7 @@ Money uses Prisma Decimal everywhere (not floats). Base currency QAR; tax rates 
 ## 8. Phases, order and gates
 | Phase | Content | Done when |
 |---|---|---|
-| P0 | Rename Production to Multimedia (code, permission key and label by migration, docs); shared core: Campaign, Deliverable, Attachment (Blob direct upload), Comment, Approval engine, sequences; client unification; capability permissions; guard-coverage test generalised | tests pass; rename verified; a file over 4.5 MB uploads and downloads |
+| P0 | Rename Production to Multimedia (code, permission key and label by migration, docs); shared core: Campaign, Deliverable, Link (attachments as links), Comment, Approval engine with person-assigned steps, sequences; client unification; capability permissions; guard-coverage test generalised | tests pass; rename verified; links add/open; a multi-step approval with assigned approvers works end to end |
 | P1 | Creative module | full request-to-delivery workflow tested, incl. versions and permissions |
 | P2 | Multimedia module | job and resource workflows tested, incl. booking conflicts |
 | P3 | Finance F1 | quote -> booking order -> PO -> invoice flows generated from a media plan |
@@ -100,15 +100,15 @@ Money uses Prisma Decimal everywhere (not floats). Base currency QAR; tax rates 
 | P6 | Hardening: end-to-end scenario script, access-control matrix test, security review, documentation, owner acceptance | owner signs off before any production use |
 Every phase: work on a branch, tests plus a local run on a Postgres restore, a PR, CI green. Migrations are additive and applied by the owner; production deploys happen only on the explicit phrase "Deploy to production".
 
-## 9. Decisions needed from the owner
-1. "Standalone Planner" means this unified platform (Publicis Intelligence including Media). Confirm. (Assumed yes.)
-2. **General ledger (F5)**: is double-entry accounting in scope for the first release, or are documents, AR/AP, margin and cash flow enough? Recommendation: build F1 to F4 first, add F5 after.
-3. **Tax and currency**: base currency QAR. Is VAT/WHT needed on invoices (the standard terms mention it), and is multi-currency needed? Recommendation: configurable tax per document/line, default 0, QAR only first.
-4. **Client unification**: the SPA workspace Clients list is replaced by the planner clients table. Confirm.
-5. **Large files**: use Vercel Blob for video/artwork. Typical largest file size and expected monthly volume? (Blob has storage and transfer costs.)
-6. **Approvals**: who approves what (amount thresholds for quotations, POs, invoices, credit notes; artwork reviewers; shoot sign-off)? Defaults can be configured later in settings.
-7. **Standalone planner app** (`creolanza-oryntiq`): since nothing is live, it can be switched off now. Confirm if you want that done.
-8. **Department roles**: confirm the six module teams (Strategy, Creative, Media, Finance, Multimedia, Search) are the only departments, plus administrators.
+## 9. Decisions (confirmed by the owner, 2026-10-08)
+1. "Standalone planner" means the OLD separate OOH media planner app; this unified platform (including the Media module) is the system being built.
+2. **General ledger deferred**: build documents, AR/AP, margin, forecast and cash flow first; the ledger (F5) comes later.
+3. **QAR only.** Tax is a configurable rate per document or line (default 0); no multi-currency in the first release.
+4. **Planner clients replace the workspace Clients list** (one client record for every module).
+5. **Links only, no file storage**: the platform stores no briefs, artwork, footage or deliverables; users add links to the company's cloud and local storage.
+6. **Approvals by assigned people**: each approval step is assigned to a person (or role) per document type, multi-step, for example manager first, then the next approver. Configured in settings and overridable per request.
+7. **The old standalone planner app is switched off.** It was paused on 2026-10-08 (`creolanza-oryntiq.vercel.app` returns 503). Its database and file store are shared with this platform and were not touched. To undo: `vercel api -X POST /v1/projects/prj_gB7YGNnLmF3px5tm8XchCsaBI0tD/unpause --scope maq5`.
+8. Department roles: Strategy, Creative, Media, Finance, Multimedia, Search, plus administrators.
 
 ## 10. Risks
-Scope is large; mitigated by phase gates. Creolanza code is Next 15/Prisma 6 and tenant-coupled, so each port needs adaptation and tests. AP, margin and forecasting are new code, not reuse. Video storage and upload reliability need early validation (P0). Finance correctness needs a real finance review before real money flows; the Creolanza accounting module itself records that no real finance review was done.
+Scope is large; mitigated by phase gates. Creolanza code is Next 15/Prisma 6 and tenant-coupled, so each port needs adaptation and tests. AP, margin and forecasting are new code, not reuse. Finance correctness needs a real finance review before real money flows; the Creolanza accounting module itself records that no real finance review was done.
