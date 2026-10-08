@@ -2,7 +2,7 @@
 // Pure planning (planImport) is separate from the database writes (applyImport) so it can be tested.
 // Rules: never modify or overwrite an existing user, setting or document; skip, never merge, on conflict.
 
-export const ALL_MODULES = ['strategy', 'creative', 'media', 'finance', 'production', 'search'];
+export const ALL_MODULES = ['strategy', 'creative', 'media', 'finance', 'multimedia', 'search'];
 
 /** rows: { users, ledger, docs, conversations, settings, files } straight from the Space's SQLite. */
 export function planImport(rows, existing, opts = {}) {

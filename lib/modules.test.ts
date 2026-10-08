@@ -6,6 +6,7 @@ describe("moduleOfRoute", () => {
     expect(moduleOfRoute("media/plan")).toBe("media");
     expect(moduleOfRoute("strategy/competitor")).toBe("strategy");
     expect(moduleOfRoute("creative/image-prompt")).toBe("creative");
+    expect(moduleOfRoute("multimedia/job")).toBe("multimedia");
   });
   it("leaves shared routes ungated", () => {
     expect(moduleOfRoute("assistant")).toBeNull();
@@ -16,6 +17,7 @@ describe("moduleOfRoute", () => {
   });
   it("does not treat unknown prefixes as modules", () => {
     expect(moduleOfRoute("hr/anything")).toBeNull();
+    expect(moduleOfRoute("production/job")).toBeNull();
   });
 });
 
@@ -37,5 +39,16 @@ describe("resolveModules", () => {
   it("answers canUse by membership, never by guessing", () => {
     expect(canUse(["media"], "media")).toBe(true);
     expect(canUse(["media"], "strategy")).toBe(false);
+  });
+});
+
+describe("multimedia module", () => {
+  it("replaces production in the module list", () => {
+    expect(IDS).toContain("multimedia");
+    expect(IDS).not.toContain("production");
+  });
+  it("is granted through module.multimedia", () => {
+    expect(resolveModules("PLANNER", [], [{ key: "module.multimedia", granted: true }])).toEqual(["multimedia"]);
+    expect(resolveModules("PLANNER", [], [{ key: "module.production", granted: true }])).toEqual([]);
   });
 });

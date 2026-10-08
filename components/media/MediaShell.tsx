@@ -23,7 +23,7 @@ const pillars: { id: string; href: string; label: string; icon: Ico; color: stri
   { id: "creative", href: "/#/p/creative", label: "Creative", icon: Sparkles, color: "#E5487A" },
   { id: "media", href: "/#/p/media", label: "Media", icon: Megaphone, color: "#0EA5A0" },
   { id: "finance", href: "/#/p/finance", label: "Finance", icon: Wallet, color: "#C9971A" },
-  { id: "production", href: "/#/p/production", label: "Production", icon: Clapperboard, color: "#7C5CFF" },
+  { id: "multimedia", href: "/#/p/multimedia", label: "Multimedia", icon: Clapperboard, color: "#7C5CFF" },
   { id: "search", href: "/#/p/search", label: "Search", icon: Search, color: "#16A36A" },
 ];
 // The OOH planner lives inside the Media module.

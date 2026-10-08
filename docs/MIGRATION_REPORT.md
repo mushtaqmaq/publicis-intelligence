@@ -11,7 +11,7 @@ Production deployed: YES. Fly.io was tried first and removed (free trial stops m
 
 ## What the platform is now
 - One product, one database, one login. The OOH Media Planner (inventory, rates, plans, imports) was rebuilt inside this repo as part of the **Media** module; the old standalone planner is still live against the same database and should be retired once everyone has moved.
-- Each pillar is a module (Strategy, Creative, Media, Finance, Production, Search). Admins hold all; everyone else only the modules granted to them. Enforced on every page, server action, route handler and AI/tool route; a test fails CI if a `/media` page, action or route lacks the guard.
+- Each pillar is a module (Strategy, Creative, Media, Finance, Multimedia, Search; Multimedia was called Production until 2026-10-08). Admins hold all; everyone else only the modules granted to them. Enforced on every page, server action, route handler and AI/tool route; a test fails CI if a `/media` page, action or route lacks the guard.
 - Media planner: online, offline/OOH and hybrid plans in one plan model with versions and locking; online block with AI draft; inventory suggestions (AI picks from real inventory at real rates, every pick re-priced by the engine); agency-format Excel and PDF; settings (rate cards, imports, KMZ, fees, AVR, revenue targets, audit log).
 
 ## Features

@@ -13,7 +13,7 @@ Honest status as of 2026-10-08. "Verified" means I observed it working (local wi
 | Admin: people, modules, credits, roles | n/a | Verified locally and live (screenshot of Admin) | Owner to check | n/a | |
 | Admin: AI engine health check | n/a | Verified live (owner screenshot): Opus, Sonnet, Haiku, Sonar Pro working | Owner to check | n/a | Deep research model failed upstream (Perplexity); audio needs a Replicate key |
 | Credits metering and 402 at zero | n/a | Verified locally (ledger rows written, atomic update) | n/a | n/a | |
-| Strategy / Creative / Media / Finance / Production / Search agents (28) | n/a | Owner to check each with a real key | Owner to check | n/a | Routing and module checks verified; model output not verified |
+| Strategy / Creative / Media / Finance / Multimedia / Search agents (28) | n/a | Owner to check each with a real key | Owner to check | n/a | Routing and module checks verified; model output not verified |
 | Image generation | n/a | Not verified (needs `OPENAI_API_KEY`) | | | |
 | Audio generation | n/a | Not verified (needs `REPLICATE_API_TOKEN`) | | | |
 | Live SEO data (competitor, keywords) | n/a | Not verified (needs DataForSEO) | | | |

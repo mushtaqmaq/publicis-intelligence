@@ -67,7 +67,7 @@ PI.PILLARS = [
       blurb: 'Margin by client or project from fees, hours and costs.', fields: [],
       task: 'Calculate profitability: margin table, effective hourly rate, over-servicing flags, and actions to protect margin.' }
   ] },
-  { id: 'production', name: 'Production', icon: 'clapperboard', color: '#7C5CF5', desc: 'Job planning, delivery specs, vendor briefs and timelines.', agents: [
+  { id: 'multimedia', name: 'Multimedia', icon: 'clapperboard', color: '#7C5CF5', desc: 'Photography and video shoots, voice-over recording, editing and post-production: job planning, delivery specs, vendor briefs and timelines.', agents: [
     { id: 'job', name: 'Job planner', icon: 'list-checks', tier: 'default', brief: 'Approved brief', ph: 'Paste the brief, or drop it here',
       blurb: 'Job bag, timeline and owners from an approved brief.', fields: [text('deadline', 'Go-live date', 'e.g. 20 October 2026')],
       task: 'Create the job bag: deliverables list, a timeline table working back from the go-live date (task, owner role, start, due, dependency), approval gates, and risks with mitigations.' },
@@ -99,7 +99,7 @@ PI.PILLARS = [
       task: 'Write the full article: meta title, meta description, H1, a direct answer paragraph at the top, structured body with H2 and H3, an FAQ section, and a suggested schema type.' }
   ] }
 ];
-PI.MODULES = [{ id: 'strategy', label: 'Strategy' }, { id: 'creative', label: 'Creative' }, { id: 'media', label: 'Media' }, { id: 'finance', label: 'Finance' }, { id: 'production', label: 'Production' }, { id: 'search', label: 'Search' }];
+PI.MODULES = [{ id: 'strategy', label: 'Strategy' }, { id: 'creative', label: 'Creative' }, { id: 'media', label: 'Media' }, { id: 'finance', label: 'Finance' }, { id: 'multimedia', label: 'Multimedia' }, { id: 'search', label: 'Search' }];
 PI.pillar = id => PI.PILLARS.find(p => p.id === id);
 PI.agentOf = (p, a) => (PI.pillar(p) || { agents: [] }).agents.find(x => x.id === a);
 PI.routeName = r => { if (!r) return 'Other'; if (r.startsWith('assistant')) return 'Assistant'; if (r.startsWith('command')) return 'Command'; if (r === 'creative/image') return 'Image studio'; if (r === 'creative/audio') return 'Audio studio'; const [p, a] = r.split('/'); const ag = PI.agentOf(p, a); return ag ? ag.name : r; };
