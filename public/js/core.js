@@ -115,13 +115,7 @@ PI.saveOutput = async o => {
 PI.deleteOutput = async o => { await PI.api('DELETE', 'db/outputs/' + o.id); (o.files || []).forEach(f => PI.api('DELETE', 'files/' + f.id).catch(() => { })); S.outputs = S.outputs.filter(x => x.id !== o.id); };
 
 /* ---------- Credits ---------- */
-// Each pillar is a module: people only see (and may only use) the modules an admin gave them. Admins see all.
-PI.applyModules = () => {
-  if (!PI.ALL_PILLARS && PI.PILLARS) PI.ALL_PILLARS = PI.PILLARS.slice();
-  const mods = S.me && S.me.modules;
-  if (PI.ALL_PILLARS) PI.PILLARS = mods ? PI.ALL_PILLARS.filter(p => mods.includes(p.id)) : PI.ALL_PILLARS;
-};
-PI.refreshMe = async () => { try { S.me = await PI.api('GET', 'me'); PI.applyModules(); PI.paintMe(); } catch (_) { } };
+PI.refreshMe = async () => { try { S.me = await PI.api('GET', 'me'); PI.paintMe(); } catch (_) { } };
 PI.setBalance = b => { if (S.me && b != null) { const used = Math.max(0, S.me.credits - b); S.me.credits = b; S.spent30 += used; PI.paintMe(); } };
 PI.paintMe = () => {
   const m = S.me; if (!m) return;

@@ -25,4 +25,4 @@ hotfix/description
 
 Developers must not push directly to `main`. `main` is production-ready code only; `develop` is the integration branch. Production deployment and production credentials are owner-controlled; contributors never need Vercel access.
 
-Never commit secrets or `.env` files. Add new variable NAMES to `.env.example` and `docs/ENVIRONMENT_VARIABLES.md`.
+Never commit secrets or `.env` files. Add new variable NAMES to `.env.example` and the table in `README.md`.

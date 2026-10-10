@@ -1,10 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "git": {
-    "deploymentEnabled": false
-  },
-  "framework": "nextjs",
-  "buildCommand": "next build",
-  "outputDirectory": ".next",
-  "installCommand": "npm ci"
+  "git": { "deploymentEnabled": false },
+  "framework": null,
+  "installCommand": "npm ci --omit=dev",
+  "buildCommand": "",
+  "outputDirectory": "public",
+  "functions": { "api/index.js": { "maxDuration": 300 } },
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/index.js" },
+    { "source": "/files/:path*", "destination": "/api/index.js" },
+    { "source": "/login", "destination": "/login.html" }
+  ]
 }

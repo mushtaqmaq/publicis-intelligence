@@ -514,5 +514,3 @@ pre.code{background:#111114;color:#E8E8ED;font:12.5px/1.55 ui-monospace,SFMono-R
   .sb,.top,.refine,.out-bar,.sticky-bar{display:none!important}
   .shell{display:block}.view{padding:0}
 }
-
-.chk{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}
