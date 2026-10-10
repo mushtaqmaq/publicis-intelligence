@@ -5,25 +5,19 @@ const { $, $$, esc, I, S, num } = PI;
 PI.tools = PI.tools || {};
 
 PI.render = () => {
-  PI.applyModules();
   PI.renderNav();
   const r = PI.route(), v = $('#view');
   v.style.animation = 'none'; void v.offsetWidth; v.style.animation = '';
   if (r === 'home') return viewHome(v);
   if (r === 'command') return viewCommand(v);
   if (r === 'assistant' || r.startsWith('assistant/')) return viewAssistant(v, r.split('/')[1]);
-  if (r.startsWith('p/')) { const [, pid, aid] = r.split('/'); if (PI.pillar(pid)) return viewPillar(v, pid, aid); if ((PI.ALL_PILLARS || []).some(p => p.id === pid)) return viewNoAccess(v, pid); }
+  if (r.startsWith('p/')) { const [, pid, aid] = r.split('/'); if (PI.pillar(pid)) return viewPillar(v, pid, aid); }
   if (r === 'library' || r.startsWith('library/')) return viewLibrary(v, r.split('/')[1]);
   if (r === 'clients') return viewClients(v);
   if (r === 'usage') return viewUsage(v);
   if (r === 'admin' && S.me && S.me.role === 'admin') return viewAdmin(v);
   PI.go('home');
 };
-
-function viewNoAccess(v, pid) {
-  const p = (PI.ALL_PILLARS || []).find(x => x.id === pid) || { name: pid };
-  v.innerHTML = `${PI.pageHead('lock', '#111114', p.name, 'This module is not on your account.')}<div class="notice">${I('circle-alert')}<div>You do not have access to the ${esc(p.name)} module. Ask an admin to add it to your account.</div></div>`;
-}
 
 /* ================= Home ================= */
 function viewHome(v) {
@@ -420,30 +414,16 @@ async function viewAdmin(v) {
 async function admUsers(box) {
   const users = await PI.api('GET', 'admin/users');
   box.innerHTML = `<div class="work" style="grid-template-columns:1fr minmax(280px,340px)">
-    <div class="card tw"><table class="t"><thead><tr><th>Person</th><th>Role</th><th>Modules</th><th class="num">Balance</th><th class="num">Used, 30 days</th><th></th></tr></thead><tbody>
-      ${users.map(u => `<tr><td><b>${esc(u.name || u.email.split('@')[0])}</b><div class="hint" style="margin:0">${esc(u.email)}</div></td><td>${u.role === 'admin' ? '<span class="pill mut">Admin</span>' : 'Member'}${u.active ? '' : ' <span class="pill bad">Disabled</span>'}</td><td>${u.role === 'admin' ? '<span class="hint" style="margin:0">All modules</span>' : (u.modules && u.modules.length ? u.modules.map(m => { const all = (PI.SECTIONS[m] || []).length, got = ((u.sections || {})[m] || []).length; return `<span class="pill mut">${esc((PI.MODULES.find(x => x.id === m) || { label: m }).label)}${all && got < all ? ` (${got}/${all})` : ''}</span>`; }).join(' ') : '<span class="hint" style="margin:0">None</span>')}</td><td class="num"><b>${num(u.credits)}</b></td><td class="num">${num(u.spent30)}</td>
-        <td><div class="actions" style="justify-content:flex-end"><button class="btn sm" data-top="${u.id}">${I('plus')}Credits</button>${u.role === 'admin' ? '' : `<button class="btn sm" data-mods="${u.id}" data-have="${esc((u.modules || []).join(','))}" data-secs="${esc(JSON.stringify(u.sections || {}))}">${I('layout-grid')}Modules</button>`}<button class="btn ghost sm" data-more="${u.id}" data-active="${u.active ? 1 : 0}" data-role="${u.role}">More ${I('chevron-down')}</button></div></td></tr>`).join('')}</tbody></table></div>
+    <div class="card tw"><table class="t"><thead><tr><th>Person</th><th>Role</th><th class="num">Balance</th><th class="num">Used, 30 days</th><th></th></tr></thead><tbody>
+      ${users.map(u => `<tr><td><b>${esc(u.name || u.email.split('@')[0])}</b><div class="hint" style="margin:0">${esc(u.email)}</div></td><td>${u.role === 'admin' ? '<span class="pill mut">Admin</span>' : 'Member'}${u.active ? '' : ' <span class="pill bad">Disabled</span>'}</td><td class="num"><b>${num(u.credits)}</b></td><td class="num">${num(u.spent30)}</td>
+        <td><div class="actions" style="justify-content:flex-end"><button class="btn sm" data-top="${u.id}">${I('plus')}Credits</button><button class="btn ghost sm" data-more="${u.id}" data-active="${u.active ? 1 : 0}" data-role="${u.role}">More ${I('chevron-down')}</button></div></td></tr>`).join('')}</tbody></table></div>
     <div class="card pad form"><h3>${I('user-plus')} Add a person</h3><p class="desc">They sign in with this login and password.</p>
       <div class="field"><label for="nu_name">Name</label><input id="nu_name"></div><div class="field"><label for="nu_email">Email or username</label><input id="nu_email"></div>
       <div class="field"><label for="nu_pw">Temporary password</label><input id="nu_pw" type="text" placeholder="At least 8 characters"></div>
       <div class="row2"><div class="field"><label for="nu_cr">Starting credits</label><input id="nu_cr" type="number" min="0" placeholder="Default"></div><div class="field"><label for="nu_role">Role</label><select id="nu_role"><option value="member">Member</option><option value="admin">Admin</option></select></div></div>
-      <div class="field"><label>Modules (admins always see all)</label><div style="display:grid;gap:6px">${PI.MODULES.map(m => `<label class="chk"><input type="checkbox" class="nu_mod" value="${m.id}"> ${esc(m.label)}</label>`).join('')}</div></div>
       <button class="btn pri" id="nuGo">${I('user-plus')}Create account</button></div></div>`;
   const reload = () => admUsers(box);
-  $('#nuGo').onclick = async () => { try { await PI.api('POST', 'admin/users', { name: $('#nu_name').value, email: $('#nu_email').value, password: $('#nu_pw').value, credits: $('#nu_cr').value, role: $('#nu_role').value, modules: $$('.nu_mod:checked').map(c => c.value) }); PI.toast('Account created'); reload(); } catch (e) { PI.toast(e.message); } };
-  $$('[data-mods]').forEach(b => b.onclick = () => {
-    const have = (b.dataset.have || '').split(',').filter(Boolean);
-    const secs = JSON.parse(b.dataset.secs || '{}');
-    // A module with sections shows them indented underneath; unticking one removes just that area for this person.
-    const sectionBox = x => (PI.SECTIONS[x.id] ? `<div class="md_secs" data-mod="${x.id}" style="display:grid;gap:6px;margin:2px 0 6px 26px;${have.includes(x.id) ? '' : 'opacity:.45'}">${PI.SECTIONS[x.id].map(sc => `<label class="chk"><input type="checkbox" class="md_sec" data-mod="${x.id}" value="${sc.id}" ${(secs[x.id] || PI.SECTIONS[x.id].map(y => y.id)).includes(sc.id) ? 'checked' : ''} ${have.includes(x.id) ? '' : 'disabled'}> ${esc(sc.label)}</label>`).join('')}</div>` : '');
-    const m = PI.modal(`<h3>Modules</h3><p class="hint">What this person can open and use. Untick sections inside a module to hide them for this person only.</p><div style="display:grid;gap:8px;margin:12px 0">${PI.MODULES.map(x => `<label class="chk"><input type="checkbox" class="md_chk" value="${x.id}" ${have.includes(x.id) ? 'checked' : ''}> ${esc(x.label)}</label>${sectionBox(x)}`).join('')}</div><div class="actions" style="justify-content:flex-end"><button class="btn ghost" id="mdNo">Cancel</button><button class="btn pri" id="mdYes">Save</button></div>`);
-    m.el.querySelectorAll('.md_chk').forEach(c => c.onchange = () => { const box = m.el.querySelector(`.md_secs[data-mod="${c.value}"]`); if (!box) return; box.style.opacity = c.checked ? '' : '.45'; box.querySelectorAll('input').forEach(i => { i.disabled = !c.checked; }); });
-    m.el.querySelector('#mdNo').onclick = m.close;
-    m.el.querySelector('#mdYes').onclick = async () => {
-      const sections = {}; Object.keys(PI.SECTIONS).forEach(k => { sections[k] = [...m.el.querySelectorAll(`.md_sec[data-mod="${k}"]:checked`)].map(c => c.value); });
-      try { await PI.api('PATCH', 'admin/users/' + b.dataset.mods, { modules: [...m.el.querySelectorAll('.md_chk:checked')].map(c => c.value), sections }); m.close(); PI.toast('Modules updated'); reload(); } catch (e) { PI.toast(e.message); }
-    };
-  });
+  $('#nuGo').onclick = async () => { try { await PI.api('POST', 'admin/users', { name: $('#nu_name').value, email: $('#nu_email').value, password: $('#nu_pw').value, credits: $('#nu_cr').value, role: $('#nu_role').value }); PI.toast('Account created'); reload(); } catch (e) { PI.toast(e.message); } };
   $$('[data-top]').forEach(b => b.onclick = async () => { const a = await PI.ask('Adjust credits', 'Credits to add (use a minus sign to remove)', '1000'); if (a === null || a === '') return; try { await PI.api('POST', 'admin/users/' + b.dataset.top + '/credits', { amount: +a, note: 'Admin top-up' }); PI.toast('Credits updated'); reload(); PI.refreshMe(); } catch (e) { PI.toast(e.message); } });
   $$('[data-more]').forEach(b => b.onclick = () => PI.menu(b, [
     { label: 'Reset password', icon: 'pencil', run: async () => { const p = await PI.ask('Reset password', 'New password (at least 8 characters)'); if (!p) return; try { await PI.api('PATCH', 'admin/users/' + b.dataset.more, { password: p }); PI.toast('Password reset'); } catch (e) { PI.toast(e.message); } } },

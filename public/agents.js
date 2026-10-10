@@ -76,7 +76,7 @@
         fields: [area('data', 'Fees, hours and costs', 'Paste the numbers or attach the file', true)],
         task: 'Calculate profitability: margin table, effective hourly rate, over-servicing flags and actions to protect margin.' }
     ] },
-    { id: 'multimedia', name: 'Multimedia', icon: 'clapperboard', color: '#7C5CF5', desc: 'Photography and video shoots, voice-over recording, editing and post-production: job planning, delivery specs, vendor briefs and timelines.', agents: [
+    { id: 'production', name: 'Production', icon: 'clapperboard', color: '#7C5CF5', desc: 'Job planning, delivery specs, vendor briefs and timelines.', agents: [
       { id: 'job', name: 'Job planner', icon: 'list-checks', tier: 'default', blurb: 'Job bag, timeline and owners from an approved brief.',
         fields: [area('brief', 'Approved brief', 'Paste the brief', true), text('deadline', 'Go-live date', 'e.g. 20 October 2026')],
         task: 'Create the job bag: deliverables list, a timeline table working back from the go-live date (task, owner role, start, due, dependency), approval gates, and risks with mitigations.' },

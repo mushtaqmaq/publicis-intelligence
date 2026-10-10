@@ -46,7 +46,7 @@ PI.PILLARS = [
       task: 'Write the video script as a table (timecode, visual, VO English, VO Arabic, super, sound). Then storyboard frame descriptions, a shot list, and one AI video prompt per shot covering subject, action, camera move, lens, lighting and style. Keep VO word counts realistic for the duration.' }
   ] },
   { id: 'media', name: 'Media', icon: 'megaphone', color: '#0EA5A0', desc: 'Online, OOH and hybrid media plans, campaign builds, mix modelling, reporting and analysis.', agents: [
-    { id: 'plan', name: 'Media planner', icon: 'calendar-clock', tool: 'mediaplan', blurb: 'Online, OOH or hybrid plans with real inventory and rates, versions and approvals, and agency-format Excel or PDF export.' },
+    { id: 'plan', name: 'Media planner', icon: 'calendar-clock', tool: 'mediaplan', blurb: 'Online, OOH or hybrid plans in the agency format, with live totals and Excel or PDF export.' },
     { id: 'setup', name: 'Campaign setup', icon: 'settings-2', tool: 'setup', blurb: 'Full platform builds with copy, targeting and tracking, exported as bulk-upload files.' },
     { id: 'optimize', name: 'Optimization', icon: 'sliders-horizontal', tool: 'optimize', blurb: 'Marketing mix modelling with saturation curves and a budget optimiser, plus live campaign diagnosis.' },
     { id: 'report', name: 'Reporting', icon: 'chart-column', tool: 'report', blurb: 'Drop platform exports and get a dashboard and a client-ready report.' },
@@ -67,7 +67,7 @@ PI.PILLARS = [
       blurb: 'Margin by client or project from fees, hours and costs.', fields: [],
       task: 'Calculate profitability: margin table, effective hourly rate, over-servicing flags, and actions to protect margin.' }
   ] },
-  { id: 'multimedia', name: 'Multimedia', icon: 'clapperboard', color: '#7C5CF5', desc: 'Photography and video shoots, voice-over recording, editing and post-production: job planning, delivery specs, vendor briefs and timelines.', agents: [
+  { id: 'production', name: 'Production', icon: 'clapperboard', color: '#7C5CF5', desc: 'Job planning, delivery specs, vendor briefs and timelines.', agents: [
     { id: 'job', name: 'Job planner', icon: 'list-checks', tier: 'default', brief: 'Approved brief', ph: 'Paste the brief, or drop it here',
       blurb: 'Job bag, timeline and owners from an approved brief.', fields: [text('deadline', 'Go-live date', 'e.g. 20 October 2026')],
       task: 'Create the job bag: deliverables list, a timeline table working back from the go-live date (task, owner role, start, due, dependency), approval gates, and risks with mitigations.' },
@@ -99,9 +99,6 @@ PI.PILLARS = [
       task: 'Write the full article: meta title, meta description, H1, a direct answer paragraph at the top, structured body with H2 and H3, an FAQ section, and a suggested schema type.' }
   ] }
 ];
-PI.MODULES = [{ id: 'strategy', label: 'Strategy' }, { id: 'creative', label: 'Creative' }, { id: 'media', label: 'Media' }, { id: 'finance', label: 'Finance' }, { id: 'multimedia', label: 'Multimedia' }, { id: 'search', label: 'Search' }];
-// Sections inside a module that an admin can switch off per person (kept in step with lib/modules.js; a test checks it).
-PI.SECTIONS = { media: [{ id: 'dashboard', label: 'Dashboard' }, { id: 'plans', label: 'Media plans' }, { id: 'inventory', label: 'Inventory' }, { id: 'map', label: 'Map' }, { id: 'suppliers', label: 'Suppliers' }, { id: 'reports', label: 'Reports' }, { id: 'clients', label: 'Client accounts' }, { id: 'settings', label: 'Settings & imports' }] };
 PI.pillar = id => PI.PILLARS.find(p => p.id === id);
 PI.agentOf = (p, a) => (PI.pillar(p) || { agents: [] }).agents.find(x => x.id === a);
 PI.routeName = r => { if (!r) return 'Other'; if (r.startsWith('assistant')) return 'Assistant'; if (r.startsWith('command')) return 'Command'; if (r === 'creative/image') return 'Image studio'; if (r === 'creative/audio') return 'Audio studio'; const [p, a] = r.split('/'); const ag = PI.agentOf(p, a); return ag ? ag.name : r; };

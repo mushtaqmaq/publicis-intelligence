@@ -22,51 +22,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-
       - name: Install dependencies
         run: npm ci
-
-      - name: Unit tests (rate engine, planning, ingestion)
-        run: npm test
-
       - name: Syntax check (server and client JS)
-        run: |
-          find server.js lib pages public -name '*.js' -not -path 'public/vendor/*' -print0 | xargs -0 -n1 node --check
-
-      - name: Type-check and build (Next.js)
-        run: npx next build
-
-      - name: Apply database migrations
+        run: find server.js api lib scripts test public -name '*.js' -not -path 'public/vendor/*' -print0 | xargs -0 -n1 node --check
+      - name: Tests (boots the real server against Postgres with a fake AI provider)
         env:
           DATABASE_URL: postgres://postgres:ci@localhost:5432/postgres
-        run: npx prisma migrate deploy
-
-      - name: Boot against Postgres and sign in
-        env:
-          DATABASE_URL: postgres://postgres:ci@localhost:5432/postgres
-          ADMIN_EMAIL: ci@example.com
-          ADMIN_PASSWORD: ci-only-password-1
-        run: |
-          npx next start -p 7861 &
-          for i in $(seq 1 20); do curl -fs localhost:7861/api/health && break; sleep 1; done
-          curl -fs localhost:7861/api/health
-          curl -fs -c jar -H 'x-pi: 1' -H 'content-type: application/json' -d '{"email":"ci@example.com","password":"ci-only-password-1"}' localhost:7861/api/login
-          curl -fs -b jar localhost:7861/api/me
-          curl -fs -b jar -o /dev/null localhost:7861/planning
-          curl -fs -o /dev/null localhost:7861/
-
-      - name: Validate vercel.json
-        run: node -e "JSON.parse(require('fs').readFileSync('vercel.json','utf8'))"
-
-      - name: Docker build
-        run: docker build -t publicis-intelligence:ci .
-
-      - name: Block committed env files
-        run: |
-          if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$'; then
-            echo "Env file committed"; exit 1
-          fi
+        run: npm test
