@@ -142,7 +142,7 @@ PI.renderNav = () => {
   $('#nav').innerHTML = PI.NAV().map(n => n.h !== undefined ? (n.h ? `<div class="nav-h">${esc(n.h)}</div>` : '') :
     `<button class="nav-i" data-go="${n.id}" title="${esc(n.name)}" ${cur === n.id || cur.startsWith(n.id + '/') ? 'aria-current="page"' : ''}><span class="t" ${n.color ? `style="background:color-mix(in srgb,${n.color} 13%,white);color:${n.color}"` : ''}>${PI.I(n.icon)}</span><span class="lbl">${esc(n.name)}</span></button>`).join('');
 };
-PI.renderClientSel = () => { $('#clientSel').innerHTML = '<option value="">All clients</option>' + S.clients.map(c => `<option value="${c.id}" ${c.id === S.clientId ? 'selected' : ''}>${esc(c.name)}</option>`).join(''); };
+PI.renderClientSel = () => { };   // replaced by the client picker in brain.js
 PI.go = r => { if (PI.route() === r) PI.render(); else location.hash = '#/' + r; };
 PI.crumb = (icon, title, color) => { $('#crumb').innerHTML = (icon ? `<span style="color:${color || 'var(--muted)'};display:inline-flex">${PI.I(icon)}</span>` : '') + `<span>${esc(title)}</span>`; document.title = title + ' · Publicis Intelligence'; };
 PI.closeMenu = () => { $('#sb').classList.remove('open'); $('#scrim').classList.remove('show'); };
