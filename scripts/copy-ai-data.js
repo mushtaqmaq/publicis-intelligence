@@ -3,21 +3,22 @@
 // accounts and credit balances, the credit ledger, Library and Clients workspace documents, conversations,
 // settings and saved files. Nothing operational (media plans, inventory, finance...) is read or copied.
 //
-//   OLD_DATABASE_URL=...  DATABASE_URL=...  node scripts/copy-ai-data.js            # dry run: counts only
-//   OLD_DATABASE_URL=...  DATABASE_URL=...  node scripts/copy-ai-data.js --apply    # writes (safe to re-run)
+//   OLD_DATABASE_URL=...  PI_DB_DATABASE_URL=...  node scripts/copy-ai-data.js            # dry run: counts only
+//   OLD_DATABASE_URL=...  PI_DB_DATABASE_URL=...  node scripts/copy-ai-data.js --apply    # writes (safe to re-run)
 //
 // The old database is only ever SELECTed from. Existing rows in the new database are never overwritten.
 const { Pool, types } = require('pg');
 const { withExplicitSsl } = require('../lib/pgConn');
 types.setTypeParser(20, Number);
 
-const OLD = process.env.OLD_DATABASE_URL, NEW = process.env.DATABASE_URL, apply = process.argv.includes('--apply');
-if (!OLD || !NEW) { console.error('Set OLD_DATABASE_URL (the previous database) and DATABASE_URL (this app\'s new database).'); process.exit(1); }
+const { databaseUrl } = require('../lib/pgConn');
+const OLD = process.env.OLD_DATABASE_URL, NEW = databaseUrl(), apply = process.argv.includes('--apply');
+if (!OLD || !NEW) { console.error('Set OLD_DATABASE_URL (the previous database) and PI_DB_DATABASE_URL (this app\'s new database).'); process.exit(1); }
 if (OLD === NEW) { console.error('OLD_DATABASE_URL and DATABASE_URL are the same database. Stopping.'); process.exit(1); }
 
 (async () => {
   const from = new Pool({ connectionString: withExplicitSsl(OLD), max: 1 }), to = new Pool({ connectionString: withExplicitSsl(NEW), max: 2 });
-  const { init } = require('../lib/db'); process.env.DATABASE_URL = NEW; await init(); // creates the tables in the new database
+  const { init } = require('../lib/db'); process.env.PI_DB_DATABASE_URL = NEW; await init(); // creates the tables in the new database
   const q = (p, s, a) => p.query(s, a);
   const plan = [];
 

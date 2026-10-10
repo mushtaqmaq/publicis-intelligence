@@ -18,7 +18,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 | Name | Purpose |
 |---|---|
-| `DATABASE_URL` | Postgres connection string |
+| `PI_DB_DATABASE_URL` | Postgres connection string for this app's own database (`DATABASE_URL` is the fallback for local runs) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | first admin sign-in (created on first start) |
 | `OPENROUTER_API_KEY` | text, research, vision and Nano Banana images |
 | `OPENAI_API_KEY` | GPT Image |
