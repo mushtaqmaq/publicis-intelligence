@@ -10,7 +10,7 @@ Publicis Intelligence is an AI media intelligence, research, analysis and recomm
 | `server.js` | The original Node router: sign-in, AI answers (streaming), images, audio, files, Library documents, conversations, credits and the admin console. |
 | `lib/providers.js`, `lib/llm.js` | AI providers: OpenRouter (Claude, GPT, Gemini, Perplexity Sonar research, Nano Banana images), OpenAI (GPT Image), Replicate (audio), Hugging Face (open-model fallback). The newest suitable model is discovered per job tier. |
 | `lib/dataforseo.js`, `lib/search.js`, `lib/webpage.js`, `lib/mmm.js` | Live search and keyword data, optional web search, page audits, and the marketing-mix model. |
-| `lib/db.js` | Postgres storage with the original SQLite layer's shape. Creates its tables on first use. |
+| `lib/db.js` | Postgres storage with the original SQLite layer's shape. Creates its tables on first use. Reads `PI_DB_DATABASE_URL` (the dedicated Neon database `publicis-intelligence-ai-db`), falling back to `DATABASE_URL`; refuses to run on the previous operations database. |
 | `lib/auth.js` | Password hashing (scrypt), cookie sessions. Older password formats still verify. |
 | `api/index.js` | The Vercel function that hosts `server.js`. `vercel.json` routes `/api/*` and `/files/*` to it and serves `public/` statically. |
 
