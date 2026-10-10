@@ -206,6 +206,16 @@ function editor(box) {
     };
     el.addEventListener(el.tagName === 'SELECT' || el.type === 'date' ? 'change' : 'input', handler);
   });
+  // The client name is recognised: suggestions as you type; a name that exists is linked to it, a new name becomes a new client.
+  const clIn = box.querySelector('input[data-p="header.client"]');
+  if (clIn) {
+    const link = c => { if (c && c.id !== S.clientId) PI.setClient(c.id, { keepView: true }).then(() => PI.toast('Working in ' + c.name)); };
+    PI.clientPicker(clIn, { onPick: link });
+    clIn.addEventListener('change', async () => {
+      const name = clIn.value.trim(); if (!name) return;
+      try { const r = await PI.brain.ensureClient(name); if (!r || r.similar) return; if (clIn.value !== r.client.name) { clIn.value = r.client.name; clIn.dispatchEvent(new Event('input', { bubbles: true })); } if (r.created) PI.toast('New client created: ' + r.client.name); link(r.client); } catch (_) { }
+    });
+  }
   box.querySelectorAll('[data-wk]').forEach(b => b.onclick = () => { const path = b.dataset.wk, v = !get(path); set(path, v); b.classList.toggle('on', v); b.setAttribute('aria-pressed', v); S.mplanSaved = false; });
   box.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { const [si, m] = b.dataset.mode.split(':'); const s = P.online.sections[+si]; if (s.mode === m) return;
     const c = calcOnline(P)[+si]; if (m === 'manual') s.rows.forEach((r, ri) => r.qar = Math.round(c.rows[ri].qar)); else { s.total = Math.round(c.qar); s.rows.forEach((r, ri) => r.alloc = c.qar ? c.rows[ri].qar / c.qar : 0); } s.mode = m; editor(box); });

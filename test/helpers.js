@@ -10,7 +10,15 @@ function fakeProvider() {
         const b = JSON.parse(body); calls.push(b);
         if (/FAIL_ME/.test(JSON.stringify(b.messages))) { res.writeHead(500, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: { message: 'provider down' } })); }
         res.writeHead(200, { 'content-type': 'text/event-stream' });
-        for (const t of ['Hello ', 'from the ', 'mock model.']) res.write('data: ' + JSON.stringify({ choices: [{ delta: { content: t } }] }) + '\n\n');
+        const all = JSON.stringify(b.messages) + JSON.stringify(b.system || '');
+        if (/BRAIN_TASK/.test(all)) {   // the client brain asks for JSON: answer from what the material says
+          const m = JSON.stringify(b.messages), facts = [];
+          if (/Q4 budget/.test(m)) facts.push({ topic: 'budget', text: 'Q4 2026 budget is QAR 400,000', confidence: 'high' });
+          if (/20%/.test(m)) facts.push({ topic: 'goals', text: 'Goal: 20% more card applications in Q4 2026', confidence: 'high' });
+          if (/Spend: numeric/.test(m)) facts.push({ topic: 'performance', text: 'Spend in the uploaded sheet totals 1,800', confidence: 'medium' });
+          const out = JSON.stringify({ note: '', profile: facts.length ? { overview: 'Retail bank in Qatar.' } : {}, facts, questions: ['Who approves the plan?'] });
+          res.write('data: ' + JSON.stringify({ choices: [{ delta: { content: out } }] }) + '\n\n');
+        } else for (const t of ['Hello ', 'from the ', 'mock model.']) res.write('data: ' + JSON.stringify({ choices: [{ delta: { content: t } }] }) + '\n\n');
         res.write('data: ' + JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.01 } }) + '\n\n');
         res.write('data: [DONE]\n\n'); return res.end();
       }

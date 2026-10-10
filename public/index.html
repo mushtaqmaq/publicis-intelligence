@@ -17,7 +17,7 @@
 <div class="shell" id="shell">
   <aside class="sb" id="sb" aria-label="Navigation">
     <div class="brand"><span class="mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M11 23V9h6.2a4.6 4.6 0 010 9.2H11" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="brand-t"><b>Publicis</b> <span>Intelligence</span></span><button class="collapse" id="collapse" aria-label="Collapse sidebar" title="Collapse sidebar"></button></div>
-    <label class="client"><span class="sr">Client workspace</span><select id="clientSel"></select></label>
+    <div class="client"><button type="button" class="clientbtn" id="clientBtn" aria-haspopup="listbox" aria-label="Client workspace"></button></div>
     <nav id="nav"></nav>
     <div class="sb-foot">
       <button class="credit-card" data-go="usage" title="Credits"><span class="cc-label">Credits</span><span class="cc-val" id="ccVal">–</span><span class="cc-bar"><i id="ccBar"></i></span></button>
@@ -37,7 +37,9 @@
 <div class="dropzone-page" id="pageDrop" aria-hidden="true"><div>Drop to attach<small>PDF, Word, Excel, PowerPoint, CSV, images or audio</small></div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="/js/core.js"></script>
+<script src="/js/brain-core.js"></script>
 <script src="/js/composer.js"></script>
+<script src="/js/brain.js"></script>
 <script src="/js/export.js"></script>
 <script src="/js/charts.js"></script>
 <script src="/js/agents.js"></script>

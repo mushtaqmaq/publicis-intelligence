@@ -350,23 +350,37 @@ function viewClients(v) {
   PI.crumb('building-2', 'Clients');
   const ed = S.editClient !== undefined ? S.editClient : (PI.client() ? PI.client().id : '__new');
   const c = ed === '__new' ? {} : (S.clients.find(x => x.id === ed) || {});
+  const tab = ed !== '__new' && S.clientTab === 'brain' ? 'brain' : 'profile';
   v.innerHTML = `${PI.pageHead('building-2', '#111114', 'Clients', 'Each workspace holds the brand context every agent reads before it starts.')}
     <div class="work" style="grid-template-columns:minmax(260px,340px) 1fr">
       <div class="card list" style="align-self:start"><button class="li ${ed === '__new' ? 'on' : ''}" data-ed="__new"><span class="tile">${I('plus')}</span><span class="grow"><div class="t">Add a client</div><div class="m">Create a workspace</div></span></button>
         ${S.clients.map(x => `<button class="li ${ed === x.id ? 'on' : ''}" data-ed="${x.id}"><span class="tile" style="font-weight:700">${esc((x.name || '?').charAt(0).toUpperCase())}</span><span class="grow"><div class="t">${esc(x.name)}</div><div class="m">${esc(x.industry || '')}</div></span></button>`).join('')}</div>
-      <div class="card pad form"><h3>${ed === '__new' ? 'New client' : esc(c.name || '')}</h3><p class="desc">The more specific this is, the sharper every agent's output.</p>
+      <div>${ed === '__new' ? '' : `<div class="tabs" role="tablist"><button role="tab" data-tab="profile" aria-selected="${tab === 'profile'}">Profile</button><button role="tab" data-tab="brain" aria-selected="${tab === 'brain'}">${I('brain')} Brain</button></div>`}
+      ${tab === 'brain' && ed !== '__new' ? '<div class="card pad" id="brainBox"><div class="empty"><span class="spin"></span></div></div>' : `<div class="card pad form"><h3>${ed === '__new' ? 'New client' : esc(c.name || '')}</h3><p class="desc">${ed === '__new' ? 'Start typing: existing clients are suggested, so the same client is never added twice.' : 'The more specific this is, the sharper every agent\'s output. The Brain tab fills in a lot of this on its own.'}</p>
         <div class="row2">${CF.slice(0, 4).map(([k, l, t, ph]) => `<div class="field"><label for="cl_${k}">${l}</label><input id="cl_${k}" dir="auto" value="${esc(c[k] || '')}" placeholder="${esc(ph)}"></div>`).join('')}</div>
         ${CF.slice(4).map(([k, l, t, ph]) => t === 'textarea' ? `<div class="field"><label for="cl_${k}">${l}</label><textarea id="cl_${k}" dir="auto" placeholder="${esc(ph)}">${esc(c[k] || '')}</textarea></div>` : `<div class="field"><label for="cl_${k}">${l}</label><input id="cl_${k}" dir="auto" value="${esc(c[k] || '')}" placeholder="${esc(ph)}"></div>`).join('')}
-        <div class="actions"><button class="btn pri" id="clSave">${I('check')}${ed === '__new' ? 'Create client' : 'Save changes'}</button>${ed !== '__new' ? `<button class="btn" id="clUse">Work in this client</button><button class="btn ghost danger" id="clDel">${I('trash-2')}Delete</button>` : ''}</div></div></div>`;
+        <div class="actions"><button class="btn pri" id="clSave">${I('check')}${ed === '__new' ? 'Create client' : 'Save changes'}</button>${ed !== '__new' ? `<button class="btn" id="clUse">Work in this client</button><button class="btn ghost danger" id="clDel">${I('trash-2')}Delete</button>` : ''}</div></div>`}</div></div>`;
   $$('[data-ed]').forEach(b => b.onclick = () => { S.editClient = b.dataset.ed; viewClients(v); });
+  $$('[data-tab]').forEach(b => b.onclick = () => { S.clientTab = b.dataset.tab; viewClients(v); });
+  if (tab === 'brain') { PI.brain.panel($('#brainBox'), c).catch(e => { $('#brainBox').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }); return; }
+  if (ed === '__new') {
+    // Typing a name suggests the clients that already exist, so one client is never added twice.
+    PI.clientPicker($('#cl_name'), { onPick: (cl, created) => { S.editClient = cl.id; S.clientId = cl.id; PI.lsSet('pi.client', cl.id); PI.renderClientSel(); PI.toast(created ? 'New client created. Add what you know, or open the Brain tab.' : cl.name + ' already exists. Opened it.'); viewClients(v); } });
+  }
   $('#clSave').onclick = async () => {
     const data = {}; CF.forEach(([k]) => data[k] = $('#cl_' + k).value.trim().slice(0, 20000));
     if (!data.name) { PI.toast('Client name is empty'); $('#cl_name').focus(); return; }
-    const id = ed === '__new' ? PI.uid() : ed;
-    try { await PI.saveDoc('clients', id, { ...c, ...data, id: undefined, createdAt: c.createdAt || Date.now() }); await PI.refreshData(); if (ed === '__new') { S.clientId = id; PI.lsSet('pi.client', id); PI.renderClientSel(); } S.editClient = id; PI.toast(ed === '__new' ? 'Client created' : 'Saved'); viewClients(v); } catch (e) { PI.toast(e.message); }
+    let id = ed === '__new' ? PI.uid() : ed;
+    if (ed === '__new') {
+      const same = PI.brainCore.recognise(data.name, S.clients), look = PI.brainCore.lookalike(data.name, S.clients);
+      if (same) { S.editClient = same.id; PI.toast(same.name + ' already exists. Opened it.'); viewClients(v); return; }
+      if (look && !confirm(`There is already a client called “${look.client.name}”. Add “${data.name}” as a separate client anyway?`)) { S.editClient = look.client.id; viewClients(v); return; }
+    }
+    const aliases = new Set(c.aliases || []); if (ed !== '__new' && c.name && c.name !== data.name) aliases.add(c.name);   // the old name still finds this client
+    try { await PI.saveDoc('clients', id, { ...c, ...data, aliases: [...aliases], autoLearn: c.autoLearn !== false, id: undefined, createdAt: c.createdAt || Date.now() }); await PI.refreshData(); if (ed === '__new') { S.clientId = id; PI.lsSet('pi.client', id); PI.renderClientSel(); S.clientTab = 'brain'; } S.editClient = id; PI.toast(ed === '__new' ? 'Client created. Teach its brain next.' : 'Saved'); viewClients(v); } catch (e) { PI.toast(e.message); }
   };
-  const u = $('#clUse'); if (u) u.onclick = () => { S.clientId = ed; PI.lsSet('pi.client', ed); PI.renderClientSel(); PI.toast('Now working in ' + c.name); };
-  const d = $('#clDel'); if (d) d.onclick = async () => { if (!confirm('Delete this client workspace? Its library items stay under All clients.')) return; try { await PI.api('DELETE', 'db/clients/' + ed); await PI.refreshData(); S.editClient = '__new'; viewClients(v); PI.toast('Client deleted'); } catch (e) { PI.toast(e.message); } };
+  const u = $('#clUse'); if (u) u.onclick = () => PI.setClient(ed).then(() => PI.toast('Now working in ' + c.name));
+  const d = $('#clDel'); if (d) d.onclick = async () => { if (!confirm('Delete this client workspace and its brain? Its library items stay under All clients.')) return; try { await PI.brain.dropAll(c); await PI.api('DELETE', 'db/clients/' + ed); await PI.refreshData(); S.editClient = '__new'; viewClients(v); PI.toast('Client deleted'); } catch (e) { PI.toast(e.message); } };
 }
 
 /* ================= Usage ================= */
@@ -490,7 +504,6 @@ $('#scrim').onclick = PI.closeMenu;
 $('#collapse').onclick = () => { const m = $('#shell').classList.toggle('mini'); PI.lsSet('pi.mini', m ? '1' : ''); };
 if (PI.lsGet('pi.mini')) $('#shell').classList.add('mini');
 $('#signOut').onclick = async () => { try { await PI.api('POST', 'logout'); } catch (_) { } location.href = '/login'; };
-$('#clientSel').onchange = e => { S.clientId = e.target.value; PI.lsSet('pi.client', S.clientId); S.project = null; PI.render(); };
 window.addEventListener('hashchange', () => { if (S.running && S.running.ctl && !S.running.keep) S.running.ctl.abort(); PI.render(); window.scrollTo(0, 0); });
 (async () => {
   PI.renderNav();

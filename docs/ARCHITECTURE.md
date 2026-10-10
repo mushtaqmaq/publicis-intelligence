@@ -18,6 +18,17 @@ Publicis Intelligence is an AI media intelligence, research, analysis and recomm
 
 Only the original application's data: `users`, `sessions`, `ledger` (credits and usage), `docs` (Library and Clients workspace), `conversations`, `settings`, `files` (generated images and audio), `login_fails` (sign-in throttle). No clients, bookings, suppliers, campaigns or financial transactions.
 
+## Client brain
+
+Each client in the Clients workspace has a brain that grows as the team adds material. It is knowledge, not operational data: nothing here books, bills or tracks anything.
+
+- **Teaching it:** the Brain tab on a client takes pasted notes and files (PDF, Word, PowerPoint, Excel/CSV, text, images). The browser extracts the text; for spreadsheets it computes the real figures (totals, ranges, top values) itself, so the model never does the arithmetic. With "learn automatically" on (the default per client), files used in agent runs and work saved to the Library for that client are learned too.
+- **Learning:** an AI call (`brain/learn`, metered like any other) reads one piece of material against what the brain already holds and returns only new facts and changed profile fields. Facts are atomic, carry the source they came from, and duplicates are dropped. Removing a source removes what it taught.
+- **Using it:** whenever a client is selected, a bounded digest of the brain (profile, strongest and newest facts, open questions) is added to every agent's client context.
+- **Storage:** workspace documents only: collection `brain` (one document per client) and `brainsrc` (the extracted text of each source). No new tables.
+- **Recognising clients:** typing a client name anywhere (sidebar picker, new client form, media plan header) suggests existing clients, treats a re-typed name (case, spacing, "LLC", Arabic letter variants) as the same client, warns before adding a look-alike, and creates a new client when the name is new. A renamed client keeps its old name as an alias.
+- **Code:** `public/js/brain-core.js` (pure logic, unit tested) and `public/js/brain.js` (browser and AI orchestration).
+
 ## Credits and access
 
 Every AI call spends the user's credits (real provider cost times the admin's rate and markup, or a per-token rate). Admins create accounts, top up credits and set model routing in Admin. Everyone with an account can use every pillar, as in the original.
