@@ -83,3 +83,20 @@ test('the original AI app end to end against Postgres', { skip: !process.env.DAT
     assert.deepEqual(r.rows.map(x => x.table_name), ['conversations', 'docs', 'files', 'ledger', 'login_fails', 'sessions', 'settings', 'users']);
   });
 });
+
+test('refuses to start on a database that belongs to another application', { skip: !process.env.DATABASE_URL }, async () => {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
+  await pool.query('CREATE TABLE users(id text primary key, email text, "passwordHash" text)'); // the previous platform's shape
+  await pool.query("INSERT INTO users VALUES ('1','a@b.c','x')");
+  const app = await boot();
+  try {
+    const r = await fetch(app.base + '/api/me');
+    assert.equal(r.status, 500);
+    await new Promise(ok => setTimeout(ok, 400)); // let the server's error log arrive
+    assert.match(app.log(), /another application/);
+    const t = await pool.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY 1");
+    assert.deepEqual(t.rows.map(x => x.table_name), ['users'], 'no tables were added to the foreign database');
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM users')).rows[0].n, 1, 'its data is untouched');
+  } finally { await app.stop(); await pool.end(); }
+});
