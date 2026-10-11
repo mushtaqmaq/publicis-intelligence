@@ -29,6 +29,12 @@ async function settings() {
 }
 const saveSettings = async s => (await db.prepare('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run('app3', JSON.stringify(s)));
 
+// Per-person tool access: a list of "pillar/tool" keys. No entry (or admin) means everything.
+const PILLARS = ['strategy', 'creative', 'media', 'finance', 'production', 'search'];
+const accessMap = async () => { const r = await db.prepare('SELECT value FROM settings WHERE key=?').get('access'); try { return r ? JSON.parse(r.value) : {}; } catch (_) { return {}; } };
+const accessOf = async u => (u.role === 'admin' ? null : ((await accessMap())[u.id] || null));
+const lacks = (acc, pillar) => !!acc && !acc.some(k => k.startsWith(pillar + '/'));
+
 /* ---------- First admin ---------- */
 async function bootstrap() {
   const email = (process.env.ADMIN_EMAIL || '').trim().toLowerCase(), pw = process.env.ADMIN_PASSWORD || '';
@@ -97,6 +103,8 @@ async function answer(req, res, user) {
   const p = await json(req, 30e6), s = (await settings());
   if (user.credits <= 0) return fail(res, 402, 'You have no credits left. Ask an admin to top up your account.');
   const route = String(p.route || 'assistant').slice(0, 60);
+  const pm = /^([a-z]+)\/[\w-]+$/.exec(route);
+  if (pm && PILLARS.includes(pm[1]) && lacks(await accessOf(user), pm[1])) return fail(res, 403, 'You do not have access to this tool.');
   let role = p.role === 'web' ? 'web' : (ROLE_OF_TIER[p.tier] || 'default');
   const messages = (Array.isArray(p.messages) ? p.messages : []).filter(m => m && m.content).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content) }));
   if (!messages.length || messages[messages.length - 1].role !== 'user') return fail(res, 400, 'The request must end with a user message.');
@@ -276,7 +284,7 @@ async function route(req, res) {
   if (fd && req.method === 'DELETE') { const r = (await db.prepare('SELECT * FROM files WHERE id=?').get(fd[1])); if (r && (r.owner === user.id || user.role === 'admin')) { (await db.prepare('DELETE FROM files WHERE id=?').run(r.id)); } res.writeHead(204); return res.end(); }
 
   if (p === '/api/logout' && req.method === 'POST') { (await db.prepare('DELETE FROM sessions WHERE token=?').run(A.parseCookies(req).pi_session || '')); res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': A.sessionCookie(req, '', 0) }); return res.end('{"ok":true}'); }
-  if (p === '/api/me') { const s = (await settings()), i = P.info(); return send(res, 200, { ...pub(user), creditsPerUSD: s.creditsPerUSD, imageCredits: s.imageCredits, audioCredits: s.audioCredits, caps: { research: i.openrouter.configured, images: i.openai.configured, banana: i.openrouter.configured, audio: i.replicate.configured, seo: SEO.configured(), ai: i.openrouter.configured || i.hf.configured } }); }
+  if (p === '/api/me') { const s = (await settings()), i = P.info(); return send(res, 200, { ...pub(user), access: await accessOf(user), creditsPerUSD: s.creditsPerUSD, imageCredits: s.imageCredits, audioCredits: s.audioCredits, caps: { research: i.openrouter.configured, images: i.openai.configured, banana: i.openrouter.configured, audio: i.replicate.configured, seo: SEO.configured(), ai: i.openrouter.configured || i.hf.configured } }); }
   if (p === '/api/me/password' && req.method === 'POST') {
     const b = await json(req);
     if (!A.verify(b.current || '', user.pass)) return fail(res, 400, 'Current password is incorrect.');
@@ -294,6 +302,7 @@ async function route(req, res) {
     return send(res, 200, { file: await saveFile(user.id, Buffer.from(m[2], 'base64'), m[1], String(b.name || 'file').replace(/[^\w\- ]/g, '').slice(0, 80), b.kind === 'audio' ? 'audio' : 'image') });
   }
   if (p === '/api/ai' && req.method === 'POST') return answer(req, res, user);
+  if ((p === '/api/image' || p === '/api/audio') && lacks(await accessOf(user), 'creative')) return fail(res, 403, 'You do not have access to this tool.');
   if (p === '/api/image' && req.method === 'POST') return makeImage(req, res, user);
   if (p === '/api/audio' && req.method === 'POST') return makeAudio(req, res, user);
   if (p === '/api/mmm' && req.method === 'POST') { const b = await json(req, 20e6); try { return send(res, 200, MMM.run(b)); } catch (e) { return fail(res, 400, e.message); } }
@@ -326,6 +335,17 @@ async function route(req, res) {
       await db.prepare('INSERT INTO users(id,email,name,pass,role,credits,created_at) VALUES(?,?,?,?,?,?,?)').run(id, email, String(b.name || '').slice(0, 80), A.hash(b.password), b.role === 'admin' ? 'admin' : 'member', 0, Date.now());
       if (credits) await ledger(id, { kind: 'topup', credits, note: 'Opening balance', by: user.id });
       return send(res, 200, { id });
+    }
+    const ac = /^\/api\/admin\/users\/([\w-]{1,80})\/access$/.exec(p);
+    if (ac) {
+      const m = await accessMap();
+      if (req.method === 'GET') return send(res, 200, { tools: m[ac[1]] || null });
+      if (req.method === 'PUT') {
+        const b = await json(req);
+        if (b.tools == null) delete m[ac[1]]; else m[ac[1]] = [...new Set((Array.isArray(b.tools) ? b.tools : []).map(String).filter(k => /^[a-z]+\/[\w-]+$/.test(k) && PILLARS.includes(k.split('/')[0])))];
+        await db.prepare('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run('access', JSON.stringify(m));
+        return send(res, 200, { ok: true });
+      }
     }
     const um = /^\/api\/admin\/users\/([\w-]{1,80})(\/credits)?$/.exec(p);
     if (um) {

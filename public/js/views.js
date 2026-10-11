@@ -9,8 +9,6 @@ PI.render = () => {
   const r = PI.route(), v = $('#view');
   v.style.animation = 'none'; void v.offsetWidth; v.style.animation = '';
   if (r === 'home') return viewHome(v);
-  if (r === 'command') return viewCommand(v);
-  if (r === 'assistant' || r.startsWith('assistant/')) return viewAssistant(v, r.split('/')[1]);
   if (r.startsWith('p/')) { const [, pid, aid] = r.split('/'); if (PI.pillar(pid)) return viewPillar(v, pid, aid); }
   if (r === 'library' || r.startsWith('library/')) return viewLibrary(v, r.split('/')[1]);
   if (r === 'clients') return viewClients(v);
@@ -24,21 +22,20 @@ function viewHome(v) {
   PI.crumb('house', 'Home');
   const h = new Date().getHours(), greet = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
   const name = S.me ? (S.me.name || S.me.email.split('@')[0]).split(' ')[0] : '';
-  const d = S.drafts.home || (S.drafts.home = { brief: '', files: [] });
   const recent = S.outputs.filter(o => !S.clientId || (o.clientId || '') === S.clientId).slice(0, 6);
   const caps = (S.me && S.me.caps) || {};
+  const cards = PI.PILLARS.filter(p => PI.can(p.id)).map(p => `<div class="lcard reveal" style="--c:${p.color}"><button class="lhead" data-go="p/${p.id}"><span class="tile">${I(p.icon, 'lg')}</span><span><h3>${esc(p.name)}</h3><p>${esc(p.desc)}</p></span></button><div class="chips">${p.agents.filter(a => PI.can(p.id, a.id)).map(a => `<button data-go="p/${p.id}/${a.id}">${I(a.icon)}${esc(a.name)}</button>`).join('')}</div></div>`).join('');
   v.innerHTML = `${PI.creditNotice()}
-    <section class="hero"><span class="orb o1" data-par="0.12"></span><span class="orb o2" data-par="0.2"></span><span class="orb o3" data-par="0.08"></span>
+    <section class="hero small"><span class="orb o1" data-par="0.12"></span><span class="orb o2" data-par="0.2"></span>
       <div class="hero-in">
         <h1 class="hello">${greet}${name ? ',<br><span class="g">' + esc(name) + '.</span>' : '.'}</h1>
-        <p class="hello-sub">What are we making${PI.client() ? ' for ' + esc(PI.client().name) : ''} today?</p>
-        ${PI.composer({ id: 'home', placeholder: 'Paste a brief, drop an RFP, or describe the job. Command plans it across every pillar.', size: 'tall', submit: { icon: 'zap', label: 'Plan with Command' }, extras: `<button type="button" class="btn ghost sm" data-go="assistant">${I('message-circle')}Ask the Assistant</button>` })}
-        <div class="quick">${[['p/strategy/research', 'book-open', 'Deep research'], ['p/media/plan', 'calendar-clock', 'Build a media plan'], ['p/creative/image', 'image', 'Create an image'], ['p/creative/audio', 'audio-lines', 'Make a voiceover'], ['p/media/analyst', 'chart-line', 'Analyse data']].map(([r, ic, l]) => `<button data-go="${r}">${I(ic)}${l}</button>`).join('')}</div>
+        <p class="hello-sub">Where to${PI.client() ? ' for ' + esc(PI.client().name) : ''}? Pick a tool, or ask anything with the chat button.</p>
       </div>
     </section>
     <section class="band">
-      <div class="band-h reveal"><h2>Six pillars. One brief.</h2><p>Every discipline of the agency, working from the same client context.</p></div>
-      <div class="pillars">${PI.PILLARS.map(p => `<button class="pillar reveal" style="--c:${p.color}" data-go="p/${p.id}"><span class="tile">${I(p.icon, 'lg')}</span><h3>${esc(p.name)}</h3><p>${esc(p.desc)}</p><span class="more">${p.agents.length} tools ${I('arrow-right')}</span></button>`).join('')}</div>
+      <div class="launch">${cards || `<div class="empty">${I('shield')}<b>No tools yet</b>Ask an admin to give you access.</div>`}
+        <div class="lcard reveal" style="--c:#86868B"><div class="lhead static"><span class="tile">${I('library', 'lg')}</span><span><h3>Workspace</h3><p>Saved work and client context.</p></span></div><div class="chips"><button data-go="library">${I('library')}Library</button><button data-go="clients">${I('building-2')}Clients</button><button data-go="usage">${I('gauge')}Usage</button></div></div>
+      </div>
     </section>
     <section class="band">
       <div class="two">
@@ -51,7 +48,6 @@ function viewHome(v) {
         </div>
       </div>
     </section>`;
-  PI.bindComposer('home', d, { onSubmit: () => { if (!d.brief.trim() && !PI.readyFiles(d).length) { PI.toast('Write or drop a brief first'); return; } const c = S.drafts.cmd || (S.drafts.cmd = { brief: '', lang: PI.LANGS[0], files: [] }); c.brief = d.brief; c.files = d.files.slice(); c.autoPlan = true; PI.go('command'); } });
   PI.reveal(v);
 }
 function libRow(o) {
@@ -63,10 +59,12 @@ PI.libRow = libRow;
 
 /* ================= Pillar and generic agent ================= */
 function viewPillar(v, pid, aid) {
-  const p = PI.pillar(pid), a = PI.agentOf(pid, aid) || p.agents[0];
+  const p = PI.pillar(pid), list = p.agents.filter(x => PI.can(pid, x.id));
+  if (!list.length) return PI.go('home');
+  const a = list.find(x => x.id === aid) || list[0];
   PI.crumb(p.icon, p.name + ' · ' + a.name, p.color);
   v.innerHTML = `${PI.creditNotice()}${PI.pageHead(p.icon, p.color, p.name, p.desc)}
-    <div class="agents" role="tablist">${p.agents.map(x => `<button class="agent-b" role="tab" aria-selected="${x.id === a.id}" data-go="p/${p.id}/${x.id}">${I(x.icon)}${esc(x.name)}</button>`).join('')}</div>
+    <div class="agents" role="tablist">${list.map(x => `<button class="agent-b" role="tab" aria-selected="${x.id === a.id}" data-go="p/${p.id}/${x.id}">${I(x.icon)}${esc(x.name)}</button>`).join('')}</div>
     <div id="tool"></div>`;
   const box = $('#tool');
   if (a.tool) { if (PI.tools[a.tool]) return PI.tools[a.tool](box, p, a); box.innerHTML = '<div class="empty">This tool is unavailable.</div>'; return; }
@@ -159,123 +157,40 @@ async function stream(p, a, cur, key) {
   finally { S.running = null; if (live()) { busyUI(false); paintOut(p, a, cur); } }
 }
 
-/* ================= Command ================= */
-function catalogue() { return PI.PILLARS.map(p => p.agents.filter(a => !a.tool).map(a => `${p.id}/${a.id}: ${a.name} (${p.name}). ${a.blurb}`).join('\n')).join('\n'); }
-function viewCommand(v) {
-  PI.crumb('zap', 'Command');
-  const d = S.drafts.cmd || (S.drafts.cmd = { brief: '', lang: PI.LANGS[0], files: [] });
-  const projects = S.projects.filter(p => (p.clientId || '') === (S.clientId || ''));
-  if (S.project && (S.project.clientId || '') !== (S.clientId || '')) S.project = null;
-  v.innerHTML = `${PI.creditNotice()}${PI.pageHead('zap', '#111114', 'Command', 'One brief in. Every pillar working in sequence, each building on the last.')}
-    <div class="cmd"><div style="display:grid;gap:18px">
-      <div class="card pad form"><h3>New brief${PI.client() ? ' for ' + esc(PI.client().name) : ''}</h3><p class="desc">Paste the brief or drop the RFP.</p>
-        ${PI.composer({ id: 'cmd', placeholder: 'e.g. Launch the new travel credit card to affluent Qatari nationals ahead of summer. Budget QAR 1.2M, 8 weeks.', size: 'tall', submit: false })}
-        <div class="field" style="margin-top:14px"><label for="cLang">Output language</label><select id="cLang">${PI.LANGS.map(l => `<option ${l === d.lang ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
-        <div class="actions"><button class="btn pri" id="plan">${I('list-checks')}Plan the work</button><button class="btn" id="cstop" hidden>${I('square')}Stop</button><span class="status" id="cst"></span></div></div>
-      <div class="card"><div class="sec-h" style="padding:16px 18px 4px"><h3>Recent projects</h3></div><div class="list">${projects.length ? projects.slice(0, 10).map(p => `<button class="li" data-proj="${p.id}"><span class="tile">${I('clipboard-list')}</span><span class="grow"><div class="t" dir="auto">${esc(String(p.brief || '').split('\n')[0].slice(0, 80))}</div><div class="m">${(p.tasks || []).filter(t => t.outputId).length} of ${(p.tasks || []).length} done · ${PI.when(p.createdAt)}</div></span></button>`).join('') : `<div class="empty">Planned briefs appear here.</div>`}</div></div>
-    </div><div class="card" id="planCard"></div></div>`;
-  $('#cLang').onchange = e => d.lang = e.target.value;
-  PI.bindComposer('cmd', d, { onSubmit: () => planBrief(d) });
-  $('#plan').onclick = () => planBrief(d);
-  $('#cstop').onclick = () => { if (S.running) { S.running.stopAll = true; S.running.ctl.abort(); } };
-  $$('[data-proj]').forEach(b => b.onclick = () => { S.project = S.projects.find(x => x.id === b.dataset.proj); S.openTask = null; paintPlan(); });
-  paintPlan();
-  if (d.autoPlan) { d.autoPlan = false; planBrief(d); }
-}
-function cmdBusy(on) { const pl = $('#plan'), cs = $('#cstop'); if (pl) pl.disabled = on; if (cs) cs.hidden = !on; $$('[data-run],#runAll').forEach(b => b.disabled = on); }
-function paintPlan() {
-  const box = $('#planCard'); if (!box) return; const P = S.project;
-  if (!P) { box.innerHTML = `<div class="empty" style="padding:90px 20px">${I('list-checks')}<b>No plan yet</b>Plan a brief to see what each pillar will deliver.</div>`; return; }
-  const tasks = P.tasks || [], done = tasks.filter(t => t.outputId).length;
-  box.innerHTML = `<div class="pad" style="border-bottom:1px solid var(--hair)"><div class="sec-h" style="margin:0"><h3>The plan</h3><span class="pill ${done === tasks.length ? 'ok' : 'mut'}">${done} of ${tasks.length} done</span></div>
-      <p style="font-size:14px;color:var(--ink-2);margin:8px 0 0">${esc(P.summary || '')}</p><div class="actions" style="margin-top:14px"><button class="btn pri sm" id="runAll">${I('zap')}Run all remaining</button>${done ? `<button class="btn sm" id="expAll">${I('download')}Export all ${I('chevron-down')}</button>` : ''}</div></div>
-    ${tasks.map((t, i) => { const p = PI.pillar(t.pillar) || {}, a = PI.agentOf(t.pillar, t.agent) || {}; const live = S.running && S.running.idx === i;
-      const out = t.outputId && S.outputs.find(o => o.id === t.outputId);
-      return `<div class="task"><div class="task-row"><span class="tile" style="background:color-mix(in srgb,${p.color} 12%,white);color:${p.color}">${I(a.icon || p.icon)}</span>
-        <div><div class="task-t">${esc(t.title)}</div><div class="task-m">${esc(p.name)} · ${esc(a.name)} ${live ? '<span class="pill run">Running</span>' : t.error ? '<span class="pill bad">Failed</span>' : t.outputId ? '<span class="pill ok">Done</span>' : ''}</div><div class="task-i" dir="auto">${esc(t.instructions)}</div>${t.error ? `<div class="hint" style="color:var(--bad)">${esc(t.error)}</div>` : ''}</div>
-        <div class="actions">${out ? `<button class="btn ghost sm" data-open="${i}">${S.openTask === i ? 'Hide' : 'View'}</button>` : ''}<button class="btn sm" data-run="${i}">${t.outputId ? 'Rerun' : 'Run'}</button></div></div>
-        ${live ? `<div class="task-o"><div class="md caret" id="liveMd" dir="auto">${S.running.text ? PI.md(S.running.text) : '<p class="muted">' + esc(S.running.status || 'Thinking') + '…</p>'}</div></div>` : ''}
-        ${!live && S.openTask === i && out ? `<div class="task-o"><div class="md" dir="auto">${PI.md(out.text)}</div><div class="actions" style="margin-top:12px"><button class="btn sm" data-ex="${i}">${I('download')}Export ${I('chevron-down')}</button></div></div>` : ''}</div>`; }).join('')}`;
-  $('#runAll').onclick = () => runPlan(null);
-  const ea = $('#expAll'); if (ea) ea.onclick = e => { const md = tasks.filter(t => t.outputId).map(t => { const o = S.outputs.find(x => x.id === t.outputId); return o ? `# ${t.title}\n\n${o.text}` : ''; }).join('\n\n---\n\n'); PI.exportMenu(e.currentTarget, { title: 'Project: ' + String(P.brief).split('\n')[0].slice(0, 60), md }); };
-  $$('[data-run]').forEach(b => b.onclick = () => runPlan(+b.dataset.run));
-  $$('[data-open]').forEach(b => b.onclick = () => { S.openTask = S.openTask === +b.dataset.open ? null : +b.dataset.open; paintPlan(); });
-  $$('[data-ex]').forEach(b => b.onclick = e => { const t = P.tasks[+b.dataset.ex], o = S.outputs.find(x => x.id === t.outputId); PI.exportMenu(e.currentTarget, { title: t.title, md: o ? o.text : '', tables: o && o.data && o.data.tables }); });
-  cmdBusy(!!S.running);
-}
-async function planBrief(d) {
-  if (S.running) return;
-  if (PI.stillReading(d)) return PI.toast('Still reading your files');
-  const docs = PI.readyFiles(d).filter(f => f.kind === 'doc');
-  if (!String(d.brief || '').trim() && !docs.length) { PI.toast('Write a brief or drop a document'); return; }
-  const ctl = new AbortController(); S.running = { ctl }; cmdBusy(true);
-  const st = $('#cst'); if (st) { st.innerHTML = '<span class="spin"></span>Planning'; st.classList.remove('err'); }
-  try {
-    const r = await PI.ai({ tier: 'complex', route: 'command/plan', json: true, signal: ctl.signal,
-      system: `You are the orchestrator (account director) of Publicis Intelligence at Publicis Media Qatar. Break the brief into a work plan across pillars.\n\n${PI.clientBlock()}\n\nAvailable agents (id: name. purpose):\n${catalogue()}\n\nReturn only JSON in this shape:\n{"summary":"two sentences on the approach","tasks":[{"agent":"strategy/research","title":"short task title","instructions":"specific instructions for this agent, 2 to 4 sentences, carrying every relevant detail from the brief"}]}\nUse between 4 and 10 tasks, ordered so research and strategy come first, then creative, media, production, search and finance as relevant. Only include agents the brief needs. Use only agent ids from the list. Never use em dashes.`,
-      prompt: `Brief:\n${d.brief || '(See the attached documents.)'}\n\n${PI.docsBlock(docs, 40000)}` });
-    const res = PI.parseJSON(r.text);
-    const tasks = (Array.isArray(res.tasks) ? res.tasks : []).map(t => { const [pp, aa] = String(t.agent || '').split('/'); return { pillar: pp, agent: aa, title: String(t.title || '').slice(0, 120), instructions: String(t.instructions || '').slice(0, 1500) }; }).filter(t => { const a = PI.agentOf(t.pillar, t.agent); return a && !a.tool; });
-    if (!tasks.length) throw new Error('The plan came back empty. Run it again.');
-    const P = { id: PI.uid(), clientId: S.clientId || '', brief: d.brief || 'Brief supplied in ' + docs.map(f => f.name).join(', '), docs: docs.map(f => ({ name: f.name, kind: 'doc', text: f.text.slice(0, Math.floor(60000 / Math.max(docs.length, 1))) })), lang: d.lang, summary: String(res.summary || '').slice(0, 600), tasks, createdAt: Date.now() };
-    try { await PI.saveDoc('projects', P.id, P); S.projects.unshift(P); } catch (e) { PI.toast('Plan created but not saved: ' + e.message); }
-    S.project = P; S.openTask = null; if (st) st.textContent = r.meta ? PI.metaLine(r.meta) : '';
-  } catch (e) { if (st) { st.textContent = e.code === 'cancelled' ? 'Stopped' : e.message; st.classList.toggle('err', e.code !== 'cancelled'); } }
-  finally { S.running = null; if (PI.route() === 'command') viewCommand($('#view')); }
-}
-function priorContext(P, upto) {
-  const parts = []; let total = 0;
-  P.tasks.forEach((t, i) => { if (i === upto || !t.outputId) return; const o = S.outputs.find(x => x.id === t.outputId); if (!o) return; const c = `### ${t.title}\n${o.text.slice(0, 3500)}`; if (total + c.length > 18000) return; total += c.length; parts.push(c); });
-  return parts.length ? 'Work already produced by other pillars on this brief. Stay consistent with it:\n\n' + parts.join('\n\n') : '';
-}
-async function runPlan(only) {
-  const P = S.project; if (!P || S.running) return;
-  const queue = only != null ? [only] : P.tasks.map((t, i) => i).filter(i => !P.tasks[i].outputId);
-  if (!queue.length) return PI.toast('Every task is done');
-  S.running = { ctl: new AbortController(), idx: null, text: '' }; cmdBusy(true);
-  for (const i of queue) {
-    if (!S.running || S.running.stopAll) break;
-    const t = P.tasks[i], p = PI.pillar(t.pillar), a = PI.agentOf(t.pillar, t.agent);
-    S.running.ctl = new AbortController(); S.running.idx = i; S.running.text = ''; S.running.status = 'Thinking'; t.error = ''; S.openTask = null;
-    if (PI.route() === 'command') paintPlan();
-    const vals = { brief: `${t.instructions}\n\nOriginal client brief:\n${P.brief}`, files: P.docs || [], docBudget: 24000, lang: P.lang };
-    flat(a).forEach(f => { if (!vals[f.key]) vals[f.key] = f.type === 'select' ? f.options[0] : ''; });
-    const pr = PI.agentPrompt(p, a, vals, priorContext(P, i));
-    let raf = 0;
-    try {
-      const r = await PI.ai({ system: pr.system, prompt: pr.user, tier: a.tier, route: p.id + '/' + a.id, tools: toolsFor(p, a, vals), signal: S.running.ctl.signal,
-        onStatus: s => { S.running.status = s; const el = $('#liveMd'); if (el && !S.running.text) el.innerHTML = '<p class="muted">' + esc(s) + '…</p>'; },
-        onText: tx => { S.running.text = tx; if (!raf) raf = requestAnimationFrame(() => { raf = 0; const el = $('#liveMd'); if (el) el.innerHTML = PI.md(S.running.text); }); } });
-      const id = await PI.saveOutput({ pillar: p.id, agent: a.id, title: t.title, text: r.text, data: r.data, projectId: P.id });
-      if (id) { t.outputId = id; try { await PI.api('PATCH', 'db/projects/' + P.id, { tasks: P.tasks }); } catch (_) { } }
-    } catch (e) { if (e.code === 'cancelled') break; t.error = e.message; if (e.code === 'credits') break; }
-  }
-  S.running = null; if (PI.route() === 'command') viewCommand($('#view'));
-}
 
 /* ================= Assistant ================= */
 const AV = '<span class="av"><svg viewBox="0 0 32 32"><path d="M11 23V9h6.2a4.6 4.6 0 010 9.2H11" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
-async function viewAssistant(v, convId) {
-  PI.crumb('message-circle', 'Assistant');
+/* The floating chat: one button on every screen, one conversation panel. */
+let chatCmp = null;
+function fillHist() {
+  const A = S.chat, sel = $('#fhist'); if (!sel) return;
+  const cur = A.cur && A.cur.id;
+  sel.innerHTML = `<option value="">${A.cur && A.cur.messages.length ? esc(A.cur.title) : 'New conversation'}</option>` + A.list.filter(c => c.id !== cur).map(c => `<option value="${c.id}">${esc(c.title)}</option>`).join('');
+}
+async function initChat(f) {
   const A = S.chat || (S.chat = { list: [], cur: null, mode: 'default', web: false, brief: '', files: [] });
-  v.innerHTML = `${PI.creditNotice()}<div class="chat">
-    <div class="card threads"><div class="pad" style="padding:12px"><button class="btn pri" style="width:100%" id="newChat">${I('plus')}New conversation</button></div><div class="list" id="thr"></div></div>
-    <div class="card thread"><div class="msgs" id="msgs"></div>
-      <div class="dock">${PI.composer({ id: 'chat', placeholder: 'Ask anything, or drop files. Enter to send, Shift + Enter for a new line.', size: 'short', submit: { icon: 'arrow-up', label: 'Send' },
-        extras: `<div class="seg" role="group" aria-label="Mode">${[['quick', 'Fast'], ['default', 'Balanced'], ['complex', 'Deep']].map(([k, l]) => `<button type="button" data-mode="${k}" aria-pressed="${A.mode === k}">${l}</button>`).join('')}</div>${S.me && S.me.caps && S.me.caps.research ? `<label class="toggle" style="margin-left:6px"><input type="checkbox" id="cweb" ${A.web ? 'checked' : ''}>${I('globe')}Web</label>` : ''}` })}</div></div></div>`;
-  const cmp = PI.bindComposer('chat', A, { enterToSend: true, max: 220, onSubmit: () => sendChat(cmp) });
+  f.innerHTML = `<div class="fc-h"><b>Ask</b><select id="fhist" aria-label="Conversations"></select><button class="icon-btn" id="newChat" title="New conversation" aria-label="New conversation">${I('plus')}</button><button class="icon-btn" id="fcx" title="Close" aria-label="Close">${I('x')}</button></div>
+    <div class="msgs" id="msgs"></div>
+    <div class="dock">${PI.composer({ id: 'chat', placeholder: 'Ask anything, or drop files. Enter to send.', size: 'short', submit: { icon: 'arrow-up', label: 'Send' },
+      extras: `<div class="seg" role="group" aria-label="Mode">${[['quick', 'Fast'], ['default', 'Balanced'], ['complex', 'Deep']].map(([k, l]) => `<button type="button" data-mode="${k}" aria-pressed="${A.mode === k}">${l}</button>`).join('')}</div>${S.me && S.me.caps && S.me.caps.research ? `<label class="toggle" style="margin-left:6px"><input type="checkbox" id="cweb" ${A.web ? 'checked' : ''}>${I('globe')}Web</label>` : ''}` })}</div>`;
+  chatCmp = PI.bindComposer('chat', A, { enterToSend: true, max: 160, onSubmit: () => sendChat(chatCmp) });
   $$('[data-mode]').forEach(b => b.onclick = () => { A.mode = b.dataset.mode; $$('[data-mode]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
   const w = $('#cweb'); if (w) w.onchange = () => A.web = w.checked;
-  $('#newChat').onclick = () => { A.cur = { id: PI.uid(), title: 'New conversation', messages: [] }; if (PI.route() !== 'assistant') PI.go('assistant'); else { paintThreads(); paintThread(); } cmp.focus(); };
+  $('#fcx').onclick = () => toggleChat(false);
+  const fresh = () => { A.cur = { id: PI.uid(), title: 'New conversation', messages: [] }; fillHist(); paintThread(); chatCmp.focus(); };
+  $('#newChat').onclick = () => { if (S.running && S.running.chat) return PI.toast('Still working on the last answer'); fresh(); };
+  $('#fhist').onchange = async e => { const id = e.target.value; if (!id || (S.running && S.running.chat)) return fillHist(); try { A.cur = await PI.api('GET', 'conversations/' + id); } catch (_) { return; } fillHist(); paintThread(); };
+  A.cur = { id: PI.uid(), title: 'New conversation', messages: [] };
   try { A.list = await PI.api('GET', 'conversations'); } catch (_) { }
-  if (convId && (!A.cur || A.cur.id !== convId)) { try { A.cur = await PI.api('GET', 'conversations/' + convId); } catch (_) { A.cur = null; } }
-  if (!A.cur) A.cur = { id: PI.uid(), title: 'New conversation', messages: [] };
-  paintThreads(); paintThread(); cmp.focus();
+  fillHist(); paintThread();
 }
-function paintThreads() {
-  const A = S.chat, box = $('#thr'); if (!box) return;
-  box.innerHTML = A.list.length ? A.list.map(c => `<button class="li ${A.cur && A.cur.id === c.id ? 'on' : ''}" data-go="assistant/${c.id}"><span class="grow"><div class="t" dir="auto">${esc(c.title)}</div><div class="m">${PI.when(c.updated_at)}</div></span><span class="icon-btn" role="button" tabindex="0" data-del="${c.id}" aria-label="Delete">${I('trash-2')}</span></button>`).join('') : `<div class="empty">No conversations yet.</div>`;
-  box.querySelectorAll('[data-del]').forEach(b => b.onclick = async e => { e.stopPropagation(); e.preventDefault(); if (!confirm('Delete this conversation?')) return; try { await PI.api('DELETE', 'conversations/' + b.dataset.del); A.list = A.list.filter(x => x.id !== b.dataset.del); if (A.cur && A.cur.id === b.dataset.del) A.cur = { id: PI.uid(), title: 'New conversation', messages: [] }; paintThreads(); paintThread(); } catch (x) { PI.toast(x.message); } });
+function toggleChat(open) {
+  const f = $('#fchat'), b = $('#fab'); if (!f) return;
+  if (open === undefined) open = f.hidden;
+  f.hidden = !open; b.classList.toggle('on', open); b.setAttribute('aria-expanded', open);
+  b.innerHTML = I(open ? 'x' : 'message-circle', 'lg');
+  if (!open) return;
+  if (!f.dataset.ready) { f.dataset.ready = '1'; initChat(f).then(() => chatCmp && chatCmp.focus()); } else chatCmp && chatCmp.focus();
 }
 function paintThread() {
   const A = S.chat, box = $('#msgs'); if (!box) return;
@@ -296,7 +211,7 @@ async function sendChat(cmp) {
   A.cur.messages.push(user); if (A.cur.messages.length === 1) A.cur.title = (text || files[0]?.name || 'Conversation').slice(0, 60);
   const reply = { role: 'assistant', content: '', status: A.web ? 'Searching the web' : 'Thinking', busy: true }; A.cur.messages.push(reply);
   cmp.set(''); A.files = []; cmp.paint();
-  const ctl = new AbortController(); S.running = { ctl, chat: true }; cmp.busy(true); paintThread();
+  const ctl = new AbortController(); S.running = { ctl, chat: true, keep: true }; cmp.busy(true); paintThread();
   const history = A.cur.messages.slice(0, -1).slice(-24).map(m => ({ role: m.role, content: m.role === 'user' ? (m.sent || m.content) : m.content })).filter(m => m.content);
   let raf = 0;
   try {
@@ -308,7 +223,7 @@ async function sendChat(cmp) {
   finally {
     S.running = null; reply.busy = false; delete reply.status; cmp.busy(false); paintThread();
     try { await PI.api('PUT', 'conversations/' + A.cur.id, { title: A.cur.title, messages: A.cur.messages.map(m => ({ role: m.role, content: m.content, sent: m.sent, files: m.files, meta: m.meta, error: m.error })) });
-      if (!A.list.find(c => c.id === A.cur.id)) A.list.unshift({ id: A.cur.id, title: A.cur.title, updated_at: Date.now() }); paintThreads(); } catch (_) { }
+      if (!A.list.find(c => c.id === A.cur.id)) A.list.unshift({ id: A.cur.id, title: A.cur.title, updated_at: Date.now() }); fillHist(); } catch (_) { }
   }
 }
 
@@ -442,8 +357,23 @@ async function admUsers(box) {
   $$('[data-more]').forEach(b => b.onclick = () => PI.menu(b, [
     { label: 'Reset password', icon: 'pencil', run: async () => { const p = await PI.ask('Reset password', 'New password (at least 8 characters)'); if (!p) return; try { await PI.api('PATCH', 'admin/users/' + b.dataset.more, { password: p }); PI.toast('Password reset'); } catch (e) { PI.toast(e.message); } } },
     { label: b.dataset.active === '1' ? 'Disable account' : 'Enable account', icon: 'shield', run: async () => { try { await PI.api('PATCH', 'admin/users/' + b.dataset.more, { active: b.dataset.active !== '1' }); reload(); } catch (e) { PI.toast(e.message); } } },
+    ...(b.dataset.role === 'admin' ? [] : [{ label: 'Tool access', icon: 'shield', run: () => accessDialog(b.dataset.more) }]),
     { label: b.dataset.role === 'admin' ? 'Make member' : 'Make admin', icon: 'users', run: async () => { try { await PI.api('PATCH', 'admin/users/' + b.dataset.more, { role: b.dataset.role === 'admin' ? 'member' : 'admin' }); reload(); } catch (e) { PI.toast(e.message); } } }
   ]));
+}
+async function accessDialog(id) {
+  let cur; try { cur = (await PI.api('GET', 'admin/users/' + id + '/access')).tools; } catch (e) { return PI.toast(e.message); }
+  const all = cur == null, on = new Set(cur || []);
+  const m = PI.modal(`<h2>Tool access</h2><p class="hint" style="margin:6px 0 12px">Tick what this person can use. Admins always see everything.</p>
+    <label class="b-auto" style="margin:0 0 10px"><input type="checkbox" id="acAll" ${all ? 'checked' : ''}><span><b>Everything</b> (no restrictions, including tools added later)</span></label>
+    <div id="acList" style="max-height:52vh;overflow:auto;display:grid;gap:14px">${PI.PILLARS.map(p => `<div><label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" data-pil="${p.id}">${esc(p.name)}</label><div style="display:grid;gap:4px;margin:6px 0 0 24px">${p.agents.map(a => `<label style="display:flex;gap:8px;align-items:center;font-size:13.5px"><input type="checkbox" data-t="${p.id}/${a.id}" ${on.has(p.id + '/' + a.id) ? 'checked' : ''}>${esc(a.name)}</label>`).join('')}</div></div>`).join('')}</div>
+    <div class="actions" style="justify-content:flex-end;margin-top:14px"><button class="btn" id="acNo">Cancel</button><button class="btn pri" id="acOk">Save</button></div>`);
+  const E = m.el, tools = () => [...E.querySelectorAll('[data-t]')], sync = () => { E.querySelector('#acList').style.opacity = E.querySelector('#acAll').checked ? .4 : 1; E.querySelector('#acList').style.pointerEvents = E.querySelector('#acAll').checked ? 'none' : ''; E.querySelectorAll('[data-pil]').forEach(p => { const t = tools().filter(x => x.dataset.t.startsWith(p.dataset.pil + '/')); p.checked = t.every(x => x.checked); }); };
+  E.querySelector('#acAll').onchange = sync;
+  E.querySelectorAll('[data-pil]').forEach(p => p.onchange = () => { tools().filter(x => x.dataset.t.startsWith(p.dataset.pil + '/')).forEach(x => x.checked = p.checked); });
+  E.querySelectorAll('[data-t]').forEach(x => x.onchange = sync); sync();
+  E.querySelector('#acNo').onclick = m.close;
+  E.querySelector('#acOk').onclick = async () => { try { await PI.api('PUT', 'admin/users/' + id + '/access', { tools: E.querySelector('#acAll').checked ? null : tools().filter(x => x.checked).map(x => x.dataset.t) }); m.close(); PI.toast('Access saved'); } catch (e) { PI.toast(e.message); } };
 }
 async function admEngine(box) {
   const m = await PI.api('GET', 'admin/engine');
@@ -504,6 +434,8 @@ $('#scrim').onclick = PI.closeMenu;
 $('#collapse').onclick = () => { const m = $('#shell').classList.toggle('mini'); PI.lsSet('pi.mini', m ? '1' : ''); };
 if (PI.lsGet('pi.mini')) $('#shell').classList.add('mini');
 $('#signOut').onclick = async () => { try { await PI.api('POST', 'logout'); } catch (_) { } location.href = '/login'; };
+const fab = $('#fab'); if (fab) { fab.innerHTML = I('message-circle', 'lg'); fab.onclick = () => toggleChat(); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#fchat') && !$('#fchat').hidden && !document.querySelector('.modal-bg')) toggleChat(false); });
 window.addEventListener('hashchange', () => { if (S.running && S.running.ctl && !S.running.keep) S.running.ctl.abort(); PI.render(); window.scrollTo(0, 0); });
 (async () => {
   PI.renderNav();

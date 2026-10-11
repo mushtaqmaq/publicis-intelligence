@@ -130,9 +130,11 @@ PI.paintMe = () => {
 PI.creditNotice = () => S.me && S.me.credits <= 0 ? `<div class="notice err">${PI.I('circle-alert')}<div>You have no credits left. Ask an admin to top up your account.</div></div>` : '';
 
 /* ---------- Navigation ---------- */
+// access is null for admins and unrestricted people, else a list of 'pillar/tool' keys
+PI.can = (pid, aid) => { const a = S.me && S.me.access; return !a || (aid ? a.includes(pid + '/' + aid) : a.some(k => k.startsWith(pid + '/'))); };
 PI.NAV = () => [
-  { h: '' }, { id: 'home', name: 'Home', icon: 'house' }, { id: 'command', name: 'Command', icon: 'zap' }, { id: 'assistant', name: 'Assistant', icon: 'message-circle' },
-  { h: 'Pillars' }, ...PI.PILLARS.map(p => ({ id: 'p/' + p.id, name: p.name, icon: p.icon, color: p.color })),
+  { h: '' }, { id: 'home', name: 'Home', icon: 'house' },
+  { h: 'Pillars' }, ...PI.PILLARS.filter(p => PI.can(p.id)).map(p => ({ id: 'p/' + p.id, name: p.name, icon: p.icon, color: p.color })),
   { h: 'Workspace' }, { id: 'library', name: 'Library', icon: 'library' }, { id: 'clients', name: 'Clients', icon: 'building-2' },
   { h: 'Account' }, { id: 'usage', name: 'Usage', icon: 'gauge' }, ...(S.me && S.me.role === 'admin' ? [{ id: 'admin', name: 'Admin', icon: 'shield' }] : [])
 ];
