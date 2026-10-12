@@ -1,7 +1,7 @@
 const test = require('node:test'), assert = require('node:assert');
 const { boot, client } = require('./helpers');
 const { Pool } = require('pg');
-const geom = require('../lib/geo/geom'), INV = require('../lib/geo/inventory'), Q = require('../lib/geo/quota'), S = require('../lib/geo/score');
+const geom = require('../lib/geo/geom'), INV = require('../lib/geo/inventory'), Q = require('../lib/geo/quota'), S = require('../lib/geo/score'), BL = require('../lib/geo/billing');
 
 test('geometry: known distance, Qatar plausibility, never swaps coordinates, clusters', () => {
   const corniche = { lat: 25.2854, lon: 51.5310 }, pearl = { lat: 25.3700, lon: 51.5500 };
@@ -36,11 +36,14 @@ test('scoring: weights adapt to the recipe, missing categories are left out (not
   assert.equal(S.confidence(1, true), 'High'); assert.equal(S.confidence(0.5, true), 'Low');
 });
 
-test('quota month rolls over on the Qatar calendar', () => {
-  assert.equal(Q.monthKey(new Date('2026-10-31T21:30:00Z')), '2026-11');   // already 00:30 on 1 Nov in Qatar (UTC+3)
-  assert.equal(Q.monthKey(new Date('2026-10-31T20:30:00Z')), '2026-10');
-  assert.equal(Q.stateOf(6999), 'normal'); assert.equal(Q.stateOf(7000), 'watch'); assert.equal(Q.stateOf(8000), 'conservation'); assert.equal(Q.stateOf(8500), 'critical'); assert.equal(Q.stateOf(9000), 'stop');
+test('billing period follows Google (Pacific), not Qatar midnight', () => {
+  const B = require('../lib/geo/billing');
+  assert.equal(B.period(new Date('2026-11-01T06:59:59Z')).key, '2026-10'); assert.equal(B.period(new Date('2026-11-01T07:00:00Z')).key, '2026-11');   // PDT midnight
+  assert.equal(B.period(new Date('2026-12-01T07:59:59Z')).key, '2026-11'); assert.equal(B.period(new Date('2026-12-01T08:00:00Z')).key, '2026-12');   // PST midnight
+  assert.equal(B.qatarMonth(new Date('2026-10-31T21:30:00Z')), '2026-11', 'Qatar reporting month is separate from the billing guard');
+  assert.deepEqual([B.globalState(3499), B.globalState(3500), B.globalState(4000), B.globalState(4500), B.globalState(4800), B.globalState(5000)], ['normal', 'watch', 'conservation', 'critical', 'emergency', 'stop']);
 });
+
 
 test('Google gateway, cache and analysis against a fake Google and a real database', { skip: !process.env.DATABASE_URL }, async (t) => {
   process.env.GOOGLE_MAPS_API_KEY = 'test-key'; t.after(() => { delete process.env.GOOGLE_MAPS_API_KEY; });
@@ -88,20 +91,21 @@ test('Google gateway, cache and analysis against a fake Google and a real databa
   mode = 'flaky'; flakyLeft = 1; const u0 = await used(); await G.nearby(ctx, { ...near, radius: 700, type: 'cafe' }); assert.equal(await used() - u0, 2);
   mode = 'ok';
 
-  // atomic final reservation: two callers at 8,999, one wins
-  const m = Q.monthKey(); await pool.query('UPDATE geo_quota SET used=8999 WHERE month=$1', [m]);
-  const res = await Promise.allSettled([Q.reserve(db, {}), Q.reserve(db, {})]);
-  assert.equal(res.filter(x => x.status === 'fulfilled').length, 1); assert.equal(await used(), 9000);
-  // at 9,000 nothing is sent; cached evidence still serves
+  // atomic final reservation: two callers at 4,999 units, one wins
+  const setUsed = (scope, n, cap) => pool.query('INSERT INTO geo_billing(period,scope,used,cap) VALUES($1,$2,$3,$4) ON CONFLICT (period,scope) DO UPDATE SET used=$3', [BL.period().key, scope, n, cap]);
+  const geo1 = BL.classify({ api: 'geocoding' }); await setUsed('global', 4999, 5000);
+  const res = await Promise.allSettled([Q.reserve(db, geo1, 'a'), Q.reserve(db, geo1, 'b')]);
+  assert.equal(res.filter(x => x.status === 'fulfilled').length, 1); assert.equal(await used(), 5000);
+  // at 5,000 nothing is sent; cached evidence still serves
   const b3 = calls.length;
   await assert.rejects(G.nearby(ctx, { ...near, radius: 900, type: 'hotel' }), e => e.code === 'quota-exhausted'); assert.equal(calls.length, b3);
   assert.equal((await G.nearby(ctx, { ...near, radius: 700, type: 'cafe' })).cached, true);
   // a broken quota store blocks Google
-  const broken = { fetchImpl, db: { prepare: () => { throw new Error('down'); } } };
-  await assert.rejects(Q.gateway(broken, {}, 'https://x'), e => e.code === 'quota-store-unavailable'); assert.equal(calls.length, b3);
+  const broken = { fetchImpl, db: { prepare: () => { throw new Error('down'); }, tx: async () => { throw new Error('down'); } } };
+  await assert.rejects(Q.gateway(broken, { api: 'geocoding' }, 'https://x'), e => e.code === 'quota-store-unavailable'); assert.equal(calls.length, b3);
 
   // analysis: score from observed counts, official zone context, honest limits
-  await pool.query('UPDATE geo_quota SET used=0 WHERE month=$1', [m]);
+  await pool.query('DELETE FROM geo_billing');
   const out = await A.run(ctx, { sites: [{ id: 's1', name: 'Site 1', ...near, zone: 'West Bay' }], radius: 1000, recipe: 'families', competitor: 'bank' });
   const one = out.results[0];
   assert.equal(one.features.school.count, 3); assert.equal(one.features.supermarket.count, 41); assert.equal(one.features.supermarket.exact, true); assert.equal(one.features.supermarket.capped, false); assert.ok(one.score.value > 0 && one.score.coverage === 1);
@@ -122,7 +126,7 @@ test('Google gateway, cache and analysis against a fake Google and a real databa
   // places for the map and the nearest distance, on demand
   const pl = await A.placesFor(ctx, { ...near, radius: 500, categories: ['school', 'nonsense'] }); assert.deepEqual(Object.keys(pl.byCat), ['school']); assert.equal(pl.byCat.school.places.length, 3); assert.ok(pl.byCat.school.nearestM >= 0);
   // establishments are live (name, rating, hours) and never written to the cache
-  const bn = await pool.query("SELECT count(*)::int n FROM geo_cache"); const est = await G.establishments(ctx, { ...near, radius: 500, type: 'bank' }); assert.equal(est[0].name, 'Bank A'); assert.equal(est[0].rating, 4.2);
+  const bn = await pool.query("SELECT count(*)::int n FROM geo_cache"); const est = await G.establishments(ctx, { ...near, radius: 500, type: 'bank' }); assert.equal(est[0].name, 'Bank A'); assert.equal(est[0].rating, undefined, 'ratings are Enterprise-tier and not requested');
   assert.equal((await pool.query("SELECT count(*)::int n FROM geo_cache")).rows[0].n, bn.rows[0].n, 'rated, named places are not stored');
   // opt-in: with GEO_CACHE_FULL_RESPONSES=1 named results are stored and reused too (the operator accepts Google's storage terms)
   process.env.GEO_CACHE_FULL_RESPONSES = '1'; const ec = () => calls.filter(c => /displayName/.test((c.init.headers || {})['X-Goog-FieldMask'] || '') && /searchNearby/.test(c.url)).length, e0 = ec();
@@ -137,12 +141,12 @@ test('Google gateway, cache and analysis against a fake Google and a real databa
   assert.deepEqual(await G.route(ctx, near, { lat: 25.32, lon: 51.52 }), { seconds: 600, meters: 7000 });
   // verification marks Google VERIFIED only when every API passes
   const PR = require('../lib/geo/providers'); assert.equal((await PR.status(db)).google.state, 'CONFIGURED_UNVERIFIED');
-  await pool.query('UPDATE geo_quota SET used=0 WHERE month=$1', [m]); const vr = await PR.verify(ctx); assert.ok(Object.values(vr.results).every(x => x.ok), JSON.stringify(vr)); assert.equal((await PR.status(db)).google.state, 'VERIFIED');
+  await pool.query('DELETE FROM geo_billing'); const vr = await PR.verify(ctx); assert.ok(Object.values(vr.results).every(x => x.ok), JSON.stringify(vr)); assert.equal((await PR.status(db)).google.state, 'VERIFIED');
   delete process.env.GOOGLE_MAPS_API_KEY; assert.equal((await PR.status(db)).google.state, 'NOT_CONFIGURED'); process.env.GOOGLE_MAPS_API_KEY = 'test-key';
   // low allowance re-scopes the plan, it never overspends
-  await pool.query('UPDATE geo_quota SET used=8998 WHERE month=$1', [m]);
+  await setUsed('global', 4998, 5000); await setUsed('places.aggregate.pro', 3998, 4000);
   const small = await A.run(ctx, { sites: [{ id: 's2', ...near, lat: 25.33, lon: 51.5 }], radius: 500, recipe: 'tourists' });
-  assert.ok(small.limits.some(l => /Only 2 Google requests remain/.test(l))); assert.ok((await Q.usage(db)).used <= 9000);
+  assert.ok(small.limits.some(l => /Only 2 Google lookups remain/.test(l))); assert.ok((await Q.usage(db)).used <= 5000);
   assert.ok(small.results[0].score.coverage < 1);
   // official lookup: unmatched names give null, not a guess
   assert.equal(await QA.zoneContext(ctx, ['Nowhereville']), null);
@@ -154,7 +158,7 @@ test('geo routes: respond truthfully without Google, validate uploads, honour to
   await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
   const app = await boot(); t.after(async () => { await app.stop(); await pool.end(); });
   const admin = client(app.base); await admin.login('admin@test.local', 'adminpass123');
-  const st = (await admin.call('GET', '/api/geo/status')).json; assert.equal(st.google, false); assert.equal(st.quota.cap, 9000);
+  const st = (await admin.call('GET', '/api/geo/status')).json; assert.equal(st.google, false); assert.equal(st.quota.cap, 5000);
   const an = await admin.call('POST', '/api/geo/analyze', { sites: [{ id: 'a', lat: 25.2854, lon: 51.531 }], radius: 500, recipe: 'families' });
   assert.equal(an.status, 200); assert.equal(an.json.results[0].score.value, null); assert.ok(an.json.limits.some(l => /not connected/.test(l)));
   assert.equal((await admin.call('POST', '/api/geo/analyze', { sites: [{ lat: 48, lon: 2 }], recipe: 'tourists' })).status, 400);

@@ -32,7 +32,7 @@ PI.tools.geo = async (box, p, a) => {
   const quota = v.st.quota && v.st.quota.used != null ? `<span class="gx-pill" title="Google requests sent this month, and how many times a stored result was reused instead">${num(v.st.quota.used)} / ${num(v.st.quota.cap)}${v.st.quota.reused ? ' · ' + num(v.st.quota.reused) + ' reused' : ''}</span>` : '';
 
   box.innerHTML = `<div class="gx"><div class="gx-head"><div><h2>Geo Intelligence</h2><p>Location. People. Context. Opportunity.</p></div>
-      <div class="gx-status"><span class="gx-pill ok" title="State of Qatar Open Data">Qatar Open Data · Available</span><span class="gx-pill ${gc}" title="Google Maps Platform">Google Maps · ${gl}</span><span class="gx-pill ${ai ? 'ok' : 'mut'}" title="AI engine (used only when you ask)">AI · ${ai ? 'Configured' : 'Not configured'}</span>${quota}${S.me && S.me.role === 'admin' && pr().serverKey ? `<button class="btn xs" id="gverify" title="Runs one request per Google API (5 of the monthly allowance)">${I('check')}Run Google check</button>` : ''}</div></div>
+      <div class="gx-status"><span class="gx-pill ok" title="State of Qatar Open Data">Qatar Open Data · Available</span><span class="gx-pill ${gc}" title="Google Maps Platform">Google Maps · ${gl}</span><span class="gx-pill ${ai ? 'ok' : 'mut'}" title="AI engine (used only when you ask)">AI · ${ai ? 'Configured' : 'Not configured'}</span>${quota}${S.me && S.me.role === 'admin' ? `<button class="btn xs" id="gusage">${I('gauge')}Usage</button>` : ''}${S.me && S.me.role === 'admin' && pr().serverKey ? `<button class="btn xs" id="gverify" title="Runs one request per Google API (5 of the monthly allowance)">${I('check')}Run Google check</button>` : ''}</div></div>
     ${pr().state === 'NOT_CONFIGURED' ? `<div class="notice info">${I('info')}<div>Google Maps data is not configured. Official Qatar data and first-party analysis remain available.</div></div>` : ''}
     <div class="gx-bar"><div class="gx-search"><input id="gq" dir="auto" value="${esc(v.q)}" placeholder="Search location, OOH site, area or client…" aria-label="Search"><button class="btn sm" id="gfind">${I('search')}Find</button><div id="gcand" class="gx-cand"></div></div>
       ${sel('ginv', [['', 'Single location'], [BUILTIN, 'Qatar OOH assets (24 Sep 2026) · 1,351 sites'], ...(v.found ? [[FOUND, `Search: ${v.found.query} · ${v.found.items.length} found`]] : []), ...oohInvs.map(i => [i.id, `${i.name} · ${i.rows.length} sites${i.version > 1 ? ' · v' + i.version : ''}`])], v.inv, 'OOH inventory')}
@@ -90,7 +90,7 @@ PI.tools.geo = async (box, p, a) => {
   };
   G.open = d => { const s = d.state; Object.assign(v, { radius: s.radius, recipe: s.recipe, competitor: s.competitor, objective: s.objective, brief: s.brief, weights: s.weights, sites: s.sites, cmp: s.cmp || [], result: d.result, ai: d.ai, sel: 0, places: {}, routes: {}, savedId: d.id, tab: 'map', inv: '' }); PI.tools.geo(box, p, a); };   // shows saved evidence; nothing is re-run
   G.refresh = () => { if (!v.sites) return; G.analyse(v.sites, { savedId: v.savedId }); };
-  G.mapReady = async (el, cb) => { if (!v.st.browserKey || M.failed) return cb(false); const g = await M.load(v.st.browserKey); if (!g || M.failed) return cb(false); const ok = M.mount(el); if (ok) M.setType(v.mapType); cb(ok); };
+  G.mapReady = async (el, cb) => { if (!v.st.browserKey || M.failed) return cb(false); if (!v.mapInitDone) { try { await PI.api('POST', 'geo/map-init'); v.mapInitDone = true; v.mapNote = ''; } catch (e) { v.mapNote = e.message; return cb(false); } } const g = await M.load(v.st.browserKey); if (!g || M.failed) return cb(false); const ok = M.mount(el); if (ok) M.setType(v.mapType); cb(ok); };
   M.onFail = () => { if (['map', 'compare'].includes(v.tab)) G.show(); };
   G.refreshAll = () => PI.tools.geo(box, p, a);
   PI.geoG = G;
@@ -112,6 +112,19 @@ PI.tools.geo = async (box, p, a) => {
   $('#gcl').onchange = e => { v.clientLoc = e.target.value; if (v.result) G.show(); else G.show(); };
   const us = $('#gusual'); if (us) us.onclick = () => { const u = BR.usual(v.brain); Object.assign(v, { recipe: u.recipe, radius: u.radius, competitor: u.competitor, objective: u.objective }); PI.tools.geo(box, p, a); }; $('#gc').onchange = e => v.competitor = e.target.value; $('#gz').oninput = e => v.zone = e.target.value; $('#gb').oninput = e => v.brief = e.target.value;
   $$('#grad [data-r]').forEach(b => b.onclick = () => { v.radius = +b.dataset.r; $$('#grad [data-r]').forEach(x => x.classList.toggle('on', x === b)); if (v.result && v.tab === 'map') $('#ggo').click(); });
+  const ub = $('#gusage'); if (ub) ub.onclick = async () => {
+    try {
+      const u = await PI.api('GET', 'geo/usage'), row = (l, a, c, s) => `<tr><td>${esc(l)}</td><td>${num(a)} / ${num(c)}</td><td><span class="gx-pill ${s === 'normal' ? '' : s === 'stop' || s === 'critical' || s === 'emergency' ? 'bad' : 'warn'}">${esc(s)}</span></td></tr>`;
+      const m = PI.modal(`<h2>Google usage</h2><p class="gx-fine" style="margin:0 0 10px">Billing period ${esc(u.period.key)} (resets at midnight Pacific, ${esc(u.period.end.slice(0, 10))}). These are the app's own safety counters. Google Cloud billing remains the record.</p>
+        <table class="gx-t"><thead><tr><th>Counter</th><th>Units used / limit</th><th>State</th></tr></thead><tbody>${row('All Google lookups', u.used, u.cap, u.state)}${u.skus.map(s => row(s.sku, s.used, s.cap, s.state)).join('')}${row('Map loads (browser)', u.mapInit.used, u.mapInit.cap, u.mapInit.remaining ? 'normal' : 'stop')}</tbody></table>
+        <p class="gx-fine">Answered from the database instead of Google: <b>${num(u.reused)}</b> · failed or uncertain attempts: <b>${num(u.failed)}</b> · Qatar reporting month ${esc(u.qatarMonth)}.</p>
+        <p class="gx-fine">Ratings, hours and contact fields: <b>${u.flags.enterpriseFields ? 'enabled' : 'off'}</b>. Switches: Google ${u.flags.enabled ? 'on' : 'OFF'}, maps ${u.flags.maps ? 'on' : 'OFF'}, places ${u.flags.places ? 'on' : 'OFF'}, routes ${u.flags.routes ? 'on' : 'OFF'}.</p>
+        <div class="actions" style="justify-content:flex-end"><button class="btn" id="guStop">Stop all Google lookups</button><button class="btn" id="guGo">Allow Google lookups</button><button class="btn pri" id="guX">Close</button></div>`);
+      m.el.querySelector('#guX').onclick = m.close;
+      m.el.querySelector('#guStop').onclick = async () => { await PI.api('POST', 'geo/policy', { emergencyStop: true }); PI.toast('All Google lookups are stopped. Saved and cached data still work.'); m.close(); };
+      m.el.querySelector('#guGo').onclick = async () => { await PI.api('POST', 'geo/policy', { emergencyStop: false }); PI.toast('Google lookups are allowed again'); m.close(); };
+    } catch (e) { PI.toast(e.message); }
+  };
   const vb = $('#gverify'); if (vb) vb.onclick = async () => { vb.disabled = true; try { await PI.api('POST', 'geo/verify'); v.st = await PI.api('GET', 'geo/status'); PI.tools.geo(box, p, a); } catch (e) { PI.toast(e.message); vb.disabled = false; } };
   const cands = () => {
     const q = v.q.trim().toLowerCase(), local = q.length > 1 ? [...new Set([...v.invs, ...(v.builtin ? [{ name: 'Qatar OOH assets', rows: v.builtin.rows }] : [])])].flatMap(i => i.rows.filter(r => (r.name + ' ' + r.id).toLowerCase().includes(q)).slice(0, 4).map(r => ({ ...r, inv: i.name }))).slice(0, 6) : [], mem = v.focus || q.length > 1 ? BR.suggest(v.brain, v.q, 4) : [];
