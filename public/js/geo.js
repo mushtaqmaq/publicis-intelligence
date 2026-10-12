@@ -3,14 +3,14 @@
 (function () {
 'use strict';
 const { $, $$, esc, I, S, num } = PI;
-const C = window.PIGeoCore, M = PI.geoMap;
+const C = window.PIGeoCore, M = PI.geoMap, BR = window.PIGeoBrain, BUILTIN = 'builtin-qa-2026-09-24';
 const TABS = [['map', 'Map & Analysis'], ['official', 'Official Data'], ['audience', 'Audience Insights'], ['comp', 'Competitors & POIs'], ['compare', 'Site Comparison'], ['opp', 'Opportunity Analysis'], ['saved', 'Saved Analyses']];
 const sel = (id, opts, cur, label) => `<label class="gx-f"><span>${label}</span><select id="${id}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
 const pinRe = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/;
 const STATE = { NOT_CONFIGURED: ['Not configured', 'mut'], CONFIGURED_UNVERIFIED: ['Configured, not verified', 'warn'], VERIFIED: ['Verified', 'ok'], DEGRADED: ['Degraded', 'bad'], DISABLED: ['Disabled', 'mut'], AVAILABLE: ['Available', 'ok'] };
 
 PI.tools.geo = async (box, p, a) => {
-  const v = S.drafts.geo || (S.drafts.geo = { tab: 'map', q: '', site: null, cands: [], radius: 500, recipe: 'families', competitor: '', objective: 'general', brief: '', zone: '', inv: '', run: 0, sel: 0, sp: 'overview', view: 'site', weights: null, places: {}, routes: {}, cmp: [], layers: { sites: true, rings: true, places: true, off: {} }, mapType: 'roadmap' });
+  const v = S.drafts.geo || (S.drafts.geo = { tab: 'map', q: '', site: null, cands: [], radius: 500, recipe: 'families', competitor: '', objective: 'general', brief: '', zone: '', inv: '', run: 0, sel: 0, sp: 'overview', view: 'site', weights: null, places: {}, routes: {}, cmp: [], layers: { sites: true, rings: true, places: true, clients: true, inv: false, muni: false, off: {} }, mapType: 'roadmap', invFilter: { vendor: '', format: '', q: '' }, clientLoc: '' });
   v.placesFor = r => (v.places[r.site.id + ':' + v.result.radius] || { list: [] }).list;
   if (!v.meta) {
     box.innerHTML = '<div class="empty"><span class="spin"></span></div>';
@@ -19,6 +19,12 @@ PI.tools.geo = async (box, p, a) => {
   }
   const { meta } = v; PI.geoCats = meta.categories;
   try { v.invs = (await PI.api('GET', 'db/geoooh')).map(r => ({ id: r.id, ...r.data })).filter(i => !S.clientId || !i.client || i.client === S.clientId); } catch (_) { v.invs = v.invs || []; }
+  const brainId = S.clientId || '_team';
+  if (v.brainFor !== brainId) { v.brainFor = brainId; try { v.brain = Object.assign(BR.emptyBrain(), await PI.api('GET', 'db/geobrain/' + brainId)); } catch (_) { v.brain = BR.emptyBrain(); } }
+  const clientInvs = v.invs.filter(i => i.kind === 'client'), oohInvs = v.invs.filter(i => i.kind !== 'client');
+  const invRows = id => id === BUILTIN ? (v.builtin ? v.builtin.rows : []) : ((v.invs.find(i => i.id === id) || {}).rows || []);
+  const filtered = () => { const f = v.invFilter, q = f.q.trim().toLowerCase(); return invRows(v.inv).filter(r => (!f.vendor || r.vendor === f.vendor) && (!f.format || r.format === f.format) && (!q || (r.name + ' ' + r.id + ' ' + (r.site_description || '')).toLowerCase().includes(q))); };
+  const clients = () => v.clientLoc ? invRows(v.clientLoc) : [];
   const ranked = () => v.result ? v.result.results.slice().sort((x, y) => (y.score.value ?? -1) - (x.score.value ?? -1)) : [];
   const current = () => { const rs = ranked(); return rs[Math.min(v.sel, rs.length - 1)]; };
   const pr = () => v.st.providers.google, [gl, gc] = STATE[pr().state], ai = S.me && S.me.caps && S.me.caps.ai;
@@ -28,21 +34,26 @@ PI.tools.geo = async (box, p, a) => {
       <div class="gx-status"><span class="gx-pill ok" title="State of Qatar Open Data">Qatar Open Data · Available</span><span class="gx-pill ${gc}" title="Google Maps Platform">Google Maps · ${gl}</span><span class="gx-pill ${ai ? 'ok' : 'mut'}" title="AI engine (used only when you ask)">AI · ${ai ? 'Configured' : 'Not configured'}</span>${quota}${S.me && S.me.role === 'admin' && pr().serverKey ? `<button class="btn xs" id="gverify" title="Runs one request per Google API (5 of the monthly allowance)">${I('check')}Run Google check</button>` : ''}</div></div>
     ${pr().state === 'NOT_CONFIGURED' ? `<div class="notice info">${I('info')}<div>Google Maps data is not configured. Official Qatar data and first-party analysis remain available.</div></div>` : ''}
     <div class="gx-bar"><div class="gx-search"><input id="gq" dir="auto" value="${esc(v.q)}" placeholder="Search location, OOH site, area or client…" aria-label="Search"><button class="btn sm" id="gfind">${I('search')}Find</button><div id="gcand" class="gx-cand"></div></div>
-      ${sel('ginv', [['', 'Single location'], ...v.invs.map(i => [i.id, `${i.name} · ${i.rows.length} sites`])], v.inv, 'OOH inventory')}
+      ${sel('ginv', [['', 'Single location'], [BUILTIN, 'Qatar OOH assets (24 Sep 2026) · 1,351 sites'], ...oohInvs.map(i => [i.id, `${i.name} · ${i.rows.length} sites${i.version > 1 ? ' · v' + i.version : ''}`])], v.inv, 'OOH inventory')}
       <div class="gx-f"><span>Catchment</span><div class="gx-seg" id="grad">${meta.radii.map(m => `<button data-r="${m}" class="${m === v.radius ? 'on' : ''}">${m >= 1000 ? m / 1000 + ' km' : m + ' m'}</button>`).join('')}</div></div>
       ${sel('gc', [['', 'None'], ...Object.entries(meta.categories)], v.competitor, 'Competitor category')}
+      ${sel('gcl', [['', 'None'], ...clientInvs.map(i => [i.id, `${i.name} · ${i.rows.length}`])], v.clientLoc, 'Client locations')}
       <button class="btn pri" id="ggo">${I('target')}Analyse</button></div>
+    ${(() => { const u = BR.usual(v.brain); return u && (u.recipe !== v.recipe || u.radius !== v.radius || u.competitor !== v.competitor) ? `<div class="gx-usual"><button class="btn xs" id="gusual">${I('sparkles')}Your usual: ${esc((meta.recipes.find(r => r.id === u.recipe) || {}).label || u.recipe)} · ${u.radius >= 1000 ? u.radius / 1000 + ' km' : u.radius + ' m'}${u.competitor ? ' · ' + esc(meta.categories[u.competitor] || '') : ''}</button><small>learned from ${u.runs} team analyses</small></div>` : ''; })()}
+    <div id="ginvf" class="gx-invf"></div>
     <details class="gx-more"><summary>Zone, client brief and OOH upload</summary><div class="gx-morein">
       <label>Official zone<input id="gz" list="gzl" value="${esc(v.zone)}" placeholder="e.g. Al Dafna"><datalist id="gzl">${(v.zones || []).map(z => `<option value="${esc(z)}">`).join('')}</datalist></label>
       <label>Client brief<textarea id="gb" dir="auto" placeholder="Client, product and goal. Used only for the optional AI explanation.">${esc(v.brief)}</textarea></label>
-      <label>OOH inventory file (CSV or Excel; only latitude and longitude are required)<input type="file" id="gf" accept=".csv,.xlsx,.xls"></label><div id="gchk"></div></div></details>
+      <label>Inventory file: CSV, Excel, or KMZ/KML from Google Earth (only latitude and longitude are required)<input type="file" id="gf" accept=".csv,.xlsx,.xls,.kmz,.kml"></label><label class="gx-check"><input type="checkbox" id="gkind"> These are client locations (branches), not OOH assets</label><div id="gchk"></div></div></details>
     <div class="gx-tabs" role="tablist">${TABS.map(([k, l]) => `<button role="tab" aria-selected="${v.tab === k}" data-t="${k}">${l}</button>`).join('')}</div>
     <div id="gxb"></div></div>`;
 
   // ---- shared actions, handed to every tab ----
-  const G = { v, meta, ranked, current, C, M, sel, STATE };
+  const G = { v, meta, ranked, current, C, M, sel, STATE, BR, filtered, clients, invRows, BUILTIN };
+  G.logBrain = async ev => { try { let fresh; try { fresh = await PI.api('GET', 'db/geobrain/' + brainId); } catch (_) { fresh = v.brain; } v.brain = BR.record(fresh, ev); await PI.saveDoc('geobrain', brainId, v.brain); } catch (_) { } };
+  G.brainLabels = () => ({ ...Object.fromEntries(meta.recipes.map(r => [r.id, r.label])), ...meta.categories });
   G.show = () => { const el = $('#gxb'); if (!el) return; $$('[data-t]').forEach(b => b.setAttribute('aria-selected', b.dataset.t === v.tab)); const T = PI.geoTabs[v.tab]; if (T) T(el, G); };
-  G.select = id => { const i = ranked().findIndex(x => x.site.id === id); if (i >= 0) { v.sel = i; G.loadPlaces(); G.show(); } };
+  G.select = id => { const i = ranked().findIndex(x => x.site.id === id); if (i >= 0) { if (v.sel !== i) G.logBrain({ t: 'pick', site: ranked()[i].site }); v.sel = i; G.loadPlaces(); G.show(); } };
   G.loadPlaces = async () => {
     const r = current(); if (!r || !v.st.google) return; const key = r.site.id + ':' + v.result.radius; if (v.places[key]) return;
     v.places[key] = { list: [], loading: true };
@@ -60,10 +71,11 @@ PI.tools.geo = async (box, p, a) => {
     let res; try { res = await PI.api('POST', 'geo/analyze', { sites, radius: v.radius, recipe: v.recipe, competitor: v.competitor, weights: v.weights }); } catch (e) { if (id === v.run) $('#gxb').innerHTML = `<div class="gx-empty"><b>${esc(e.message)}</b></div>`; return; }
     if (id !== v.run) return;   // a newer analysis replaced this one
     v.result = res; v.sites = sites; v.ai = null; v.sel = 0; v.places = {}; v.routes = {}; v.cmp = ranked().slice(0, 5).map(x => x.site.id); v.savedId = opts.savedId || null; G.show(); G.loadPlaces();
+    if (!opts.savedId) { const top = ranked()[0]; G.logBrain({ t: 'analysis', q: sites.length === 1 ? v.q : '', sites: sites.map(s => ({ id: s.id, name: s.name, lat: s.lat, lon: s.lon, zone: s.zone, municipality: (res.results.find(r => r.site.id === s.id) || { site: {} }).site.municipality })), recipe: v.recipe, objective: v.objective, radius: v.radius, competitor: v.competitor, top: top && { id: top.site.id, score: top.score.value } }); }
   };
   G.explain = async () => {
     const res = v.result; if (!res) return; const id = v.run; v.ai = { busy: true }; G.show();
-    const pk = C.buildPacket(res, [v.brief, 'Objective: ' + C.OBJECTIVES[v.objective].label].filter(Boolean).join('\n'));
+    const pk = C.buildPacket(res, [v.brief, 'Objective: ' + C.OBJECTIVES[v.objective].label].filter(Boolean).join('\n')), tc = BR.digest(v.brain, G.brainLabels()); if (tc) pk.team_context = tc;
     try { const r = await PI.ai({ tier: 'complex', json: true, web: false, route: 'media/geo', system: C.SYSTEM + '\n\n' + PI.clientBlock(), prompt: JSON.stringify(pk) }); if (id !== v.run) return; v.ai = C.parseInterpretation(r.text, pk); }
     catch (e) { if (id !== v.run) return; v.ai = { ok: false, error: e.message + '.' }; }
     G.show();
@@ -73,7 +85,7 @@ PI.tools.geo = async (box, p, a) => {
     const name = await PI.ask('Save analysis', 'Name', (current().site.name || 'Analysis') + ' · ' + v.result.recipe.label); if (!name) return;
     const slim = { ...v.result, results: v.result.results.map(r => ({ ...r, places: [] })) };   // place coordinates are not kept beyond the cache window
     const id = v.savedId || PI.uid();
-    try { await PI.saveDoc('geosaved', id, { name, savedAt: Date.now(), client: S.clientId || '', state: { radius: v.radius, recipe: v.recipe, competitor: v.competitor, objective: v.objective, brief: v.brief, weights: v.weights, sites: v.sites, cmp: v.cmp }, result: slim, ai: v.ai && v.ai.ok ? v.ai : null }); v.savedId = id; PI.toast('Analysis saved'); } catch (e) { PI.toast(e.message); }
+    try { await PI.saveDoc('geosaved', id, { name, savedAt: Date.now(), client: S.clientId || '', state: { radius: v.radius, recipe: v.recipe, competitor: v.competitor, objective: v.objective, brief: v.brief, weights: v.weights, sites: v.sites, cmp: v.cmp }, result: slim, ai: v.ai && v.ai.ok ? v.ai : null }); v.savedId = id; PI.toast('Analysis saved'); G.logBrain({ t: 'save', sites: v.sites || [] }); } catch (e) { PI.toast(e.message); }
   };
   G.open = d => { const s = d.state; Object.assign(v, { radius: s.radius, recipe: s.recipe, competitor: s.competitor, objective: s.objective, brief: s.brief, weights: s.weights, sites: s.sites, cmp: s.cmp || [], result: d.result, ai: d.ai, sel: 0, places: {}, routes: {}, savedId: d.id, tab: 'map', inv: '' }); PI.tools.geo(box, p, a); };   // shows saved evidence; nothing is re-run
   G.refresh = () => { if (!v.sites) return; G.analyse(v.sites, { savedId: v.savedId }); };
@@ -83,18 +95,34 @@ PI.tools.geo = async (box, p, a) => {
 
   // ---- controls ----
   $$('[data-t]').forEach(b => b.onclick = () => { v.tab = b.dataset.t; G.show(); });
-  $('#ginv').onchange = e => v.inv = e.target.value; $('#gc').onchange = e => v.competitor = e.target.value; $('#gz').oninput = e => v.zone = e.target.value; $('#gb').oninput = e => v.brief = e.target.value;
+  const invUI = () => {
+    const box = $('#ginvf'); if (!box) return; const rows = invRows(v.inv);
+    if (!v.inv) { box.innerHTML = ''; return; }
+    if (v.inv === BUILTIN && !v.builtin) { box.innerHTML = '<span class="spin"></span>'; PI.api('GET', 'geo/ooh/builtin').then(d => { v.builtin = d; invUI(); if (!v.result) G.show(); }).catch(e => { box.innerHTML = `<span class="gx-iss">${esc(e.message)}</span>`; }); return; }
+    const vs = [...new Set(rows.map(r => r.vendor).filter(Boolean))].sort(), fs = [...new Set(rows.filter(r => !v.invFilter.vendor || r.vendor === v.invFilter.vendor).map(r => r.format).filter(Boolean))].sort(), n = filtered().length;
+    box.innerHTML = `<div class="gx-f"><span>Vendor</span><select id="gfv"><option value="">All</option>${vs.map(x => `<option ${x === v.invFilter.vendor ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div><div class="gx-f"><span>Format</span><select id="gff"><option value="">All</option>${fs.map(x => `<option ${x === v.invFilter.format ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div><div class="gx-f"><span>Find asset</span><input id="gfq" value="${esc(v.invFilter.q)}" placeholder="Asset code or area"></div><span class="gx-fine"><b>${n.toLocaleString('en-US')}</b> of ${rows.length.toLocaleString('en-US')} assets${n > 40 ? ' · Analyse takes up to 40 at a time, so narrow the list' : ''}${v.inv === BUILTIN && v.builtin ? ' · from ' + esc(v.builtin.source) : ''}</span>`;
+    $('#gfv').onchange = e => { v.invFilter.vendor = e.target.value; v.invFilter.format = ''; invUI(); if (!v.result) G.show(); };
+    $('#gff').onchange = e => { v.invFilter.format = e.target.value; invUI(); if (!v.result) G.show(); };
+    $('#gfq').oninput = e => { v.invFilter.q = e.target.value; const p = e.target.selectionStart; invUI(); const q = $('#gfq'); q.focus(); q.setSelectionRange(p, p); if (!v.result) G.show(); };
+  };
+  G.invUI = invUI; invUI();
+  $('#ginv').onchange = e => { v.inv = e.target.value; v.invFilter = { vendor: '', format: '', q: '' }; v.site = null; v.browseSel = null; cands(); invUI(); if (!v.result) G.show(); };
+  $('#gcl').onchange = e => { v.clientLoc = e.target.value; if (v.result) G.show(); else G.show(); };
+  const us = $('#gusual'); if (us) us.onclick = () => { const u = BR.usual(v.brain); Object.assign(v, { recipe: u.recipe, radius: u.radius, competitor: u.competitor, objective: u.objective }); PI.tools.geo(box, p, a); }; $('#gc').onchange = e => v.competitor = e.target.value; $('#gz').oninput = e => v.zone = e.target.value; $('#gb').oninput = e => v.brief = e.target.value;
   $$('#grad [data-r]').forEach(b => b.onclick = () => { v.radius = +b.dataset.r; $$('#grad [data-r]').forEach(x => x.classList.toggle('on', x === b)); if (v.result && v.tab === 'map') $('#ggo').click(); });
   const vb = $('#gverify'); if (vb) vb.onclick = async () => { vb.disabled = true; try { await PI.api('POST', 'geo/verify'); v.st = await PI.api('GET', 'geo/status'); PI.tools.geo(box, p, a); } catch (e) { PI.toast(e.message); vb.disabled = false; } };
   const cands = () => {
-    const q = v.q.trim().toLowerCase(), local = q.length > 1 ? v.invs.flatMap(i => i.rows.filter(r => (r.name + ' ' + r.id).toLowerCase().includes(q)).slice(0, 4).map(r => ({ ...r, inv: i.name }))).slice(0, 6) : [];
+    const q = v.q.trim().toLowerCase(), local = q.length > 1 ? [...new Set([...v.invs, ...(v.builtin ? [{ name: 'Qatar OOH assets', rows: v.builtin.rows }] : [])])].flatMap(i => i.rows.filter(r => (r.name + ' ' + r.id).toLowerCase().includes(q)).slice(0, 4).map(r => ({ ...r, inv: i.name }))).slice(0, 6) : [], mem = v.focus || q.length > 1 ? BR.suggest(v.brain, v.q, 4) : [];
     $('#gcand').innerHTML = v.site ? `<div class="gx-ok">${I('check')} ${esc(v.site.name)} · ${v.site.lat.toFixed(4)}, ${v.site.lon.toFixed(4)}</div>`
-      : [...local.map((r, i) => `<button data-l="${i}"><b>${esc(r.name)}</b><small>OOH · ${esc(r.inv)}</small></button>`), ...v.cands.map((c, i) => `<button data-c="${i}"><b>${esc(c.label)}</b><small>${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}</small></button>`)].join('');
-    $$('[data-l]').forEach(b => b.onclick = () => { const r = local[+b.dataset.l]; v.site = { id: r.id, name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, road: r.road, format: r.format, vendor: r.vendor, municipality: r.municipality }; v.inv = ''; $('#ginv').value = ''; cands(); });
+      : [...mem.map((r, i) => `<button data-m="${i}"><b>${esc(r.name)}</b><small>Seen before${r.zone ? ' · ' + esc(r.zone) : ''} · ${r.n}x · no lookup needed</small></button>`), ...local.map((r, i) => `<button data-l="${i}"><b>${esc(r.name)}</b><small>OOH · ${esc(r.inv)}${r.format ? ' · ' + esc(r.format) : ''}</small></button>`), ...v.cands.map((c, i) => `<button data-c="${i}"><b>${esc(c.label)}</b><small>${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}</small></button>`)].join('');
+    $$('[data-m]').forEach(b => b.onclick = () => { const r = mem[+b.dataset.m]; v.site = { id: 'm' + r.lat.toFixed(3) + r.lon.toFixed(3), name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, municipality: r.municipality }; v.inv = ''; $('#ginv').value = ''; invUI(); cands(); });
+    $$('[data-l]').forEach(b => b.onclick = () => { const r = local[+b.dataset.l]; v.site = { id: r.id, name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, road: r.road, format: r.format, vendor: r.vendor, municipality: r.municipality, site_description: r.site_description, circuit: r.circuit, screen_type: r.screen_type }; v.inv = ''; $('#ginv').value = ''; invUI(); cands(); });
     $$('[data-c]').forEach(b => b.onclick = () => { const c = v.cands[+b.dataset.c]; v.site = { id: 'site', name: c.label.split(',')[0], lat: c.lat, lon: c.lon, areas: c.areas, zone: c.zone }; cands(); });
   };
   cands();
   $('#gq').oninput = e => { v.q = e.target.value; v.site = null; v.cands = []; cands(); };
+  $('#gq').onfocus = () => { v.focus = true; if (!v.site) cands(); };
+  $('#gq').onblur = () => setTimeout(() => { v.focus = false; if (!v.site) cands(); }, 200);
   $('#gq').onkeydown = e => { if (e.key === 'Enter') $('#gfind').click(); };
   $('#gfind').onclick = async () => { const m = pinRe.exec(v.q); if (m) { v.site = { id: 'site', name: 'Dropped pin', lat: +m[1], lon: +m[2] }; v.inv = ''; return cands(); }
     if (!v.st.google) return PI.toast('Google Maps is not connected. Use coordinates, or pick an OOH site.');
@@ -102,13 +130,26 @@ PI.tools.geo = async (box, p, a) => {
   $('#gf').onchange = async e => {
     const f = e.target.files[0]; if (!f) return; const c = $('#gchk'); c.innerHTML = '<span class="spin"></span>';
     try {
-      const x = await PI.extract(f), chk = await PI.api('POST', 'geo/ooh/check', { rows: x.rows || [] });
-      c.innerHTML = `<div class="gx-ok2">${chk.rows.length} usable sites${chk.issues.length ? `, ${chk.issues.length} rows need fixing` : ''}${chk.warnings.length ? `, ${chk.warnings.length} share coordinates` : ''}.</div>${chk.issues.slice(0, 10).map(i => `<div class="gx-iss">Row ${i.row}: ${esc(i.message)}</div>`).join('')}${chk.rows.length ? `<button class="btn sm" id="gsave">${I('save')}Save inventory</button>` : ''}`;
-      const s = $('#gsave'); if (s) s.onclick = async () => { const id = PI.uid(); await PI.saveDoc('geoooh', id, { name: f.name.replace(/\.[^.]+$/, ''), rows: chk.rows, updatedAt: Date.now(), client: S.clientId || '' }); v.inv = id; PI.toast('Inventory saved'); PI.tools.geo(box, p, a); };
+      let chk; const geoFile = /\.(kmz|kml)$/i.test(f.name);
+      if (geoFile) { const buf = new Uint8Array(await f.arrayBuffer()); let bin = ''; for (let k = 0; k < buf.length; k += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(k, k + 0x8000)); chk = await PI.api('POST', 'geo/ooh/kmz', { data: btoa(bin) }); }
+      else { const x = await PI.extract(f); chk = await PI.api('POST', 'geo/ooh/check', { rows: x.rows || [] }); }
+      c.innerHTML = `<div class="gx-ok2">${chk.rows.length} usable sites${chk.issues.length ? `, ${chk.issues.length} rows need fixing` : ''}${chk.warnings.length ? `, ${chk.warnings.length} share coordinates` : ''}${chk.repeats ? `, ${chk.repeats} repeats across folders merged` : ''}${chk.skippedShapes ? `, ${chk.skippedShapes} lines or areas skipped` : ''}.</div>${chk.issues.slice(0, 10).map(i => `<div class="gx-iss">Row ${i.row}: ${esc(i.message)}</div>`).join('')}${chk.rows.length ? `<button class="btn sm" id="gsave">${I('save')}Save inventory</button>` : ''}`;
+      const s = $('#gsave'); if (s) s.onclick = async () => {
+        const kind = $('#gkind').checked ? 'client' : 'ooh', name = f.name.replace(/\.[^.]+$/, ''), prev = v.invs.find(i => i.name === name && (i.kind || 'ooh') === kind);
+        const id = prev ? prev.id : PI.uid(), version = prev ? (prev.version || 1) + 1 : 1;
+        await PI.saveDoc('geoooh', id, { name, kind, rows: chk.rows, version, history: prev ? [...(prev.history || []), { version: prev.version || 1, sites: prev.rows.length, at: prev.updatedAt }].slice(-5) : [], updatedAt: Date.now(), client: S.clientId || '' });
+        if (kind === 'client') v.clientLoc = id; else v.inv = id; PI.toast(prev ? `Inventory updated to version ${version}` : 'Inventory saved'); PI.tools.geo(box, p, a);
+      };
     } catch (err) { c.innerHTML = `<div class="gx-iss">${esc(err.message)}</div>`; }
   };
+  const asSite = r => ({ id: r.id, name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, vendor: r.vendor, format: r.format, road: r.road, site_description: r.site_description, circuit: r.circuit, screen_type: r.screen_type, notes: r.notes, municipality: r.municipality });
   $('#ggo').onclick = () => {
-    if (v.inv) { const inv = v.invs.find(i => i.id === v.inv); if (!inv) return PI.toast('Inventory not found'); if (inv.rows.length > 40) PI.toast('Analysing the first 40 sites'); return G.analyse(inv.rows.slice(0, 40)); }
+    if (v.inv) {
+      if (v.inv === BUILTIN && !v.builtin) return PI.toast('Still loading the assets');
+      const pool = v.browseSel ? [v.browseSel] : filtered(); if (!pool.length) return PI.toast('No assets match those filters');
+      if (pool.length > 40) PI.toast(`Analysing the first 40 of ${pool.length.toLocaleString('en-US')}. Narrow the filters to choose which.`);
+      return G.analyse(pool.slice(0, 40).map(asSite));
+    }
     if (!v.site) return PI.toast('Find a place first, or choose an inventory'); G.analyse([{ ...v.site, zone: v.zone || v.site.zone }]);
   };
   G.show();

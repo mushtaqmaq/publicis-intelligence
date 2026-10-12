@@ -225,10 +225,61 @@ test('opportunity: objective changes the weights, missing components are exclude
   const C = require('../public/js/geo-core.js');
   const r = { site: { id: 's', name: 'Site' }, score: { value: 80, contributions: [{ label: 'Schools', count: 12, capped: false, points: 30 }, { label: 'Parks', count: 4, points: 10 }] }, official: { year: 2019, percentile: { population: 80, density: 60 } }, pressure: { count: 5 } };
   const g = C.opportunity(r, 'general'), mass = C.opportunity(r, 'mass');
-  assert.equal(g.parts.find(p => p.key === 'access').value, null); assert.ok(g.coverage < 1 && g.coverage > 0.8);
+  assert.equal(g.parts.find(p => p.key === 'access').value, null); assert.ok(g.coverage < 1 && g.coverage > 0.7);
   assert.notEqual(g.value, mass.value);
-  const near = C.opportunity(r, 'general', { seconds: 600 }), far = C.opportunity(r, 'general', { seconds: 3000 }); assert.equal(near.coverage, 1); assert.ok(near.value > far.value);
+  const near = C.opportunity(r, 'general', { seconds: 600 }), far = C.opportunity(r, 'general', { seconds: 3000 }); assert.ok(near.coverage > g.coverage); assert.ok(near.value > far.value);
+  const cg = C.opportunity(r, 'general', null, { clientNearestM: 3000 }); assert.equal(cg.parts.find(p => p.key === 'coverage').value, 1); assert.equal(C.opportunity(r, 'general', null, { clientNearestM: 0 }).parts.find(p => p.key === 'coverage').value, 0);
+  const mu = C.opportunity({ ...r, official: null, municipalityContext: { name: 'Doha', year: 2020, percentile: { population: 100, density: 100 } } }, 'general'); assert.equal(mu.parts.find(p => p.key === 'official').value, 1); assert.match(mu.parts.find(p => p.key === 'official').note, /Municipality-level/);
   assert.equal(C.opportunity({ ...r, score: { value: null }, official: null, pressure: null }, 'general').value, null);
   const s = C.story(r, g, 500); assert.match(s.signal, /12 schools and 4 parks within 500 m/); assert.match(s.pattern, /Strong audience context with room/); assert.ok(s.action);
   assert.match(C.story({ ...r, pressure: { count: 15 } }, g, 500).pattern, /contested/);
+});
+
+test('Geo brain: learns places, usual set-up and weight adjustments, suggests but never rewrites scores', () => {
+  const BR = require('../public/js/geo-brain-core.js'); let b = BR.emptyBrain(); const t0 = 1e12;
+  const site = { id: 'S1', name: 'West Bay Tower', lat: 25.3213, lon: 51.5284, zone: 'Al Dafna' };
+  for (let i = 0; i < 4; i++) b = BR.record(b, { t: 'analysis', q: 'west bay', sites: [site], recipe: 'families', objective: 'family', radius: 500, competitor: 'bank', top: { id: 'S1', score: 55 + i } }, t0 + i);
+  b = BR.record(b, { t: 'analysis', q: 'lusail', sites: [{ id: 'S2', name: 'Lusail Blvd', lat: 25.42, lon: 51.5 }, { id: 'bad', lat: 'x', lon: 1 }], recipe: 'tourists', radius: 1000 }, t0 + 9);
+  assert.equal(b.runs, 5); assert.equal(Object.keys(b.places).length, 2, 'invalid coordinates are ignored, repeats are one place'); assert.equal(b.places['25.321,51.528'].n, 4); assert.equal(b.places['25.321,51.528'].best, 58);
+  assert.deepEqual(BR.suggest(b, 'west', 5).map(p => p.name), ['West Bay Tower']); assert.equal(BR.suggest(b, '', 5)[0].name, 'West Bay Tower');
+  assert.deepEqual(BR.usual(b), { recipe: 'families', radius: 500, competitor: 'bank', objective: 'family', runs: 5 }); assert.equal(BR.usual(BR.emptyBrain()), null);
+  const def = { school: 3, park: 2, restaurant: 1 };
+  assert.equal(BR.tuned(b, 'families', def), null, 'fewer than 3 adjustments is not enough to suggest anything');
+  for (const s of [5, 6, 5]) b = BR.record(b, { t: 'weights', recipe: 'families', weights: { school: s, park: 2, restaurant: 1 } });
+  const tu = BR.tuned(b, 'families', def); assert.equal(tu.votes, 3); assert.equal(tu.weights.school, 4.2); assert.equal(tu.weights.park, 2); assert.equal(tu.weights.restaurant, 1);
+  b = BR.record(b, { t: 'weights', recipe: 'families', weights: { school: 99, park: -1 } }); assert.equal(b.weightVotes.families.cats.school.n, 3, 'out-of-range weights are not counted');
+  b = BR.record(b, { t: 'pick', site }); b = BR.record(b, { t: 'save', sites: [site] });
+  assert.match(BR.insights(b, { families: 'Families' }).join(' '), /5 analyses.*Families \(4\)/); assert.match(BR.insights(b).join(' '), /West Bay Tower/);
+  const d = BR.digest(b, { families: 'Families' }); assert.equal(d.usual_audiences[0].audience, 'Families'); assert.ok(!JSON.stringify(d).includes('25.32'), 'the AI summary carries no coordinates');
+  for (let i = 0; i < 400; i++) b = BR.record(b, { t: 'analysis', q: 'q' + i, sites: [{ id: 'x' + i, name: 'P' + i, lat: 25 + i / 1000, lon: 51.4 }], recipe: 'families', radius: 500 });
+  assert.ok(Object.keys(b.places).length <= 300 && Object.keys(b.searches).length <= 120, 'memory stays bounded');
+});
+
+test('KMZ import: reads a zipped KML, builds assets from the folder path, drops repeats and non-point shapes', () => {
+  const zlib = require('zlib'), K = require('../lib/geo/kml'), I = require('../lib/geo/inventory');
+  const kml = `<?xml version="1.0"?><kml><Document><name>x</name><Folder><name>My Places</name><Folder><name>Elan Assets</name><Folder><name>Senior</name><Folder><name>Doha</name><Folder><name>circuit 1</name>
+    <Placemark><name>SE-009</name><ExtendedData><SchemaData><SimpleData name="Face">A</SimpleData><SimpleData name="Circuit_No_">1</SimpleData></SchemaData></ExtendedData><Point><coordinates>51.4843,25.3580,0</coordinates></Point></Placemark>
+    <Placemark><name>SE-010</name><Point><coordinates>51.50,25.31,0</coordinates></Point></Placemark></Folder>
+    <Folder><name>circuit 6</name><Placemark><name>SE-009</name><ExtendedData><SchemaData><SimpleData name="Face">A</SimpleData><SimpleData name="Circuit_No_">6</SimpleData></SchemaData></ExtendedData><Point><coordinates>51.4843,25.3580,0</coordinates></Point></Placemark></Folder></Folder></Folder></Folder>
+    <Folder><name>Doha DOOH</name><Placemark><name>Roadside A</name><Point><coordinates>51.52,25.29,0</coordinates></Point></Placemark><Placemark><name>Area</name><Polygon><outerBoundaryIs><LinearRing><coordinates>1,1 2,2 3,3 1,1</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark></Folder></Folder></Document></kml>`;
+  const raw = Buffer.from(kml), def = zlib.deflateRawSync(raw), name = Buffer.from('doc.kml');
+  const lh = Buffer.alloc(30); lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(8, 8); lh.writeUInt32LE(def.length, 18); lh.writeUInt32LE(raw.length, 22); lh.writeUInt16LE(name.length, 26);
+  const cd = Buffer.alloc(46); cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(8, 10); cd.writeUInt32LE(def.length, 20); cd.writeUInt32LE(raw.length, 24); cd.writeUInt16LE(name.length, 28); cd.writeUInt32LE(0, 42);
+  const local = Buffer.concat([lh, name, def]), central = Buffer.concat([cd, name]), eocd = Buffer.alloc(22); eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(1, 8); eocd.writeUInt16LE(1, 10); eocd.writeUInt32LE(central.length, 12); eocd.writeUInt32LE(local.length, 16);
+  const out = K.toRows(Buffer.concat([local, central, eocd]));
+  assert.equal(out.rows.length, 3); assert.equal(out.skipped, 1); assert.equal(out.repeats, 1);
+  assert.deepEqual([out.rows[0].vendor, out.rows[0].format, out.rows[0].circuit, out.rows[0].notes], ['Elan Assets', 'Senior', '1, 6', 'Face A']);
+  assert.equal(out.rows.find(r => r.name === 'Roadside A').screen_type, 'Digital');
+  const n = I.normalize(out.rows); assert.equal(n.rows.length, 3); assert.equal(n.issues.length, 0); assert.equal(n.rows[0].lat, 25.358);
+  assert.throws(() => K.toRows(Buffer.from('PK\u0003\u0004 not a real zip')), /KMZ|KML/);
+  assert.equal(require('../lib/geo/assets/qa-assets-2026-09-24.json').rows.length, 1351, 'the built-in asset list ships with the app');
+});
+
+test('municipality boundaries: a coordinate is placed by polygon, holes are respected, names meet across datasets', () => {
+  const B = require('../lib/geo/boundaries');
+  const sq = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]];
+  const feats = [{ name: 'Al Wakrah', key: 'wakr', type: 'Polygon', coordinates: [], bbox: [51, 25, 52, 26], polys: [[sq(51, 25, 52, 26), sq(51.4, 25.4, 51.6, 25.6)]] }, { name: 'Doha', key: 'doha', type: 'Polygon', coordinates: [], bbox: [50, 25, 51, 26], polys: [[sq(50, 25, 51, 26)]] }];
+  assert.equal(B.municipalityAt(feats, 25.1, 51.1), 'Al Wakrah'); assert.equal(B.municipalityAt(feats, 25.5, 51.5), null, 'inside the hole'); assert.equal(B.municipalityAt(feats, 25.5, 50.5), 'Doha'); assert.equal(B.municipalityAt(feats, 30, 51.1), null); assert.equal(B.municipalityAt(null, 25, 51), null);
+  assert.equal(B.key('Al Wakrah'), B.key('Al Wakra')); assert.equal(B.key('Al Khor and Al Dakhira'), B.key('Al Khor & Althakira'));
+  assert.equal(B.geojson(feats, { wakr: { population: 5 } }).features[0].properties.population, 5);
 });
