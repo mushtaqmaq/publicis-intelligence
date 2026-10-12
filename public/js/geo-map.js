@@ -37,11 +37,32 @@ M.update = st => {
   const L = st.layers, sel = st.r, pos = x => ({ lat: x.site.lat, lng: x.site.lon });
   if (L.rings) { const c = new g.Circle({ map: M.map, center: pos(sel), radius: st.res.radius, strokeColor: '#2F6BFF', strokeWeight: 2, fillColor: '#2F6BFF', fillOpacity: 0.1, clickable: false }); M.objs.push(c); }
   if (L.places) for (const p of st.places || []) if (!L.off[p.c]) M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, clickable: false, icon: { path: g.SymbolPath.CIRCLE, scale: 4.5, fillColor: M.color(st.res, p.c), fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1 } }));
+  const sq = (p, fill, sc = 5.5) => M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: p.name, clickable: false, icon: { path: g.SymbolPath.CIRCLE, scale: sc, fillColor: fill, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 } }));
+  if (L.clients) (st.clients || []).forEach(p => sq(p, '#1FA971', 6));
+  if (L.inv) (st.inv || []).forEach(p => sq(p, '#98A2B3', 3.5));
   if (L.sites) st.sites.forEach(x => { const on = x === sel, mk = new g.Marker({ map: M.map, position: pos(x), title: x.site.name || x.site.id, zIndex: on ? 9 : 1, icon: { path: g.SymbolPath.CIRCLE, scale: on ? 9 : 6.5, fillColor: on ? '#E5392B' : '#12121A', fillOpacity: 1, strokeColor: '#fff', strokeWeight: on ? 3 : 2 } }); mk.addListener('click', () => st.onSelect && st.onSelect(x.site.id)); M.objs.push(mk); });
   if (st.fit) {
     const b = new g.LatLngBounds();
     if (st.fit === 'all') st.sites.forEach(x => b.extend(pos(x))); else { b.union(M.objs[0] && L.rings ? M.objs[0].getBounds() : new g.Circle({ center: pos(sel), radius: st.res.radius }).getBounds()); }
     if (!b.isEmpty()) M.map.fitBounds(b, 40);
+  }
+};
+
+// Browsing an inventory before any analysis: every filtered asset as a dot, the chosen one highlighted.
+M.browse = st => {
+  if (!M.map) return; const g = M.g; M.objs.forEach(o => o.setMap(null)); M.objs = [];
+  st.rows.forEach(p => { const on = st.sel && st.sel.id === p.id, mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: (p.name || p.id) + (p.format ? ' · ' + p.format : ''), zIndex: on ? 9 : 1, icon: { path: g.SymbolPath.CIRCLE, scale: on ? 9 : 4, fillColor: on ? '#E5392B' : '#2F6BFF', fillOpacity: on ? 1 : 0.75, strokeColor: '#fff', strokeWeight: on ? 3 : 1 } }); mk.addListener('click', () => st.onSelect && st.onSelect(p)); M.objs.push(mk); });
+  (st.clients || []).forEach(p => M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: p.name, clickable: false, icon: { path: g.SymbolPath.CIRCLE, scale: 6, fillColor: '#1FA971', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 } })));
+  if (st.fit && st.rows.length) { const b = new g.LatLngBounds(); st.rows.forEach(p => b.extend({ lat: p.lat, lng: p.lon })); M.map.fitBounds(b, 40); }
+};
+// Municipality choropleth from the Qatar Open Data boundaries, shaded by census 2020 population.
+M.muniObjs = [];
+M.setMuni = (gj, on) => {
+  M.muniObjs.forEach(o => o.setMap(null)); M.muniObjs = [];
+  if (!M.map || !on || !gj) return; const g = M.g, max = Math.max(...gj.features.map(f => f.properties.population || 0), 1);
+  for (const f of gj.features) {
+    const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates, op = 0.06 + 0.5 * ((f.properties.population || 0) / max);
+    for (const rings of polys) M.muniObjs.push(new g.Polygon({ map: M.map, paths: rings.map(r => r.map(([lng, lat]) => ({ lat, lng }))), fillColor: '#2F6BFF', fillOpacity: op, strokeColor: '#2F6BFF', strokeWeight: 1, clickable: false, zIndex: 0 }));
   }
 };
 
