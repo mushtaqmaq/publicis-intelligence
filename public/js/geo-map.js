@@ -24,14 +24,24 @@ M.mount = (box) => {
   if (!M.g || M.failed) return false;
   if (!M.el) { M.el = document.createElement('div'); M.el.className = 'gx-gmap'; }
   box.appendChild(M.el);
-  // Country lock: the view cannot leave Qatar, so zooming out stops at the whole country instead of the globe.
-  if (!M.map) M.map = new M.g.Map(M.el, { center: { lat: 25.2854, lng: 51.531 }, zoom: 11, minZoom: 8, restriction: { latLngBounds: M.BOUNDS, strictBounds: true }, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'greedy' });
+  // Country lock: zooming out stops where the whole of Qatar is in view (worked out from the box's size), so it never reaches the globe.
+  // A strict bounds restriction was not used: Qatar is taller than a wide map is, so it would crop the country at the lowest zoom.
+  if (!M.map) M.map = new M.g.Map(M.el, { center: { lat: 25.2854, lng: 51.531 }, zoom: 11, minZoom: 7, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'greedy' });
   else M.g.event.trigger(M.map, 'resize');
-  if (!M.locked) { M.locked = true;   // belt and braces: keep the view inside Qatar even if the library lets a gesture through
-    const clamp = () => { const b = M.BOUNDS, c = M.map.getCenter(), z = M.map.getZoom(); if (z < 8) M.map.setZoom(8); const lat = Math.min(b.north, Math.max(b.south, c.lat())), lng = Math.min(b.east, Math.max(b.west, c.lng())); if (lat !== c.lat() || lng !== c.lng()) M.map.panTo({ lat, lng }); };
-    M.map.addListener('zoom_changed', clamp); M.map.addListener('dragend', clamp); }
+  setTimeout(() => M.fitMinZoom(), 60);
+  if (!M.locked) { M.locked = true;
+    const clamp = () => { const b = M.BOUNDS, c = M.map.getCenter(), z = M.map.getZoom(); if (z < M.minZ) M.map.setZoom(M.minZ); const lat = Math.min(b.north, Math.max(b.south, c.lat())), lng = Math.min(b.east, Math.max(b.west, c.lng())); if (lat !== c.lat() || lng !== c.lng()) M.map.panTo({ lat, lng }); };
+    M.map.addListener('zoom_changed', clamp); M.map.addListener('dragend', clamp);
+    if (window.ResizeObserver) new ResizeObserver(() => { clearTimeout(M.rz); M.rz = setTimeout(() => M.fitMinZoom(), 120); }).observe(M.el); }   // the box has no size until it is on the page
   return true;
 };
+// Lowest zoom at which the whole Qatar box still fits in the map's current size.
+M.fitMinZoom = () => {
+  if (!M.map || !M.el) return; const W = M.el.clientWidth || 800, H = M.el.clientHeight || 460, b = M.BOUNDS, y = la => Math.log(Math.tan(Math.PI / 4 + la * Math.PI / 360));
+  const zx = Math.log2(W * 360 / (256 * (b.east - b.west))), zy = Math.log2(H * 2 * Math.PI / (256 * (y(b.north) - y(b.south))));
+  M.minZ = Math.max(6, Math.floor(Math.min(zx, zy))); M.map.setOptions({ minZoom: M.minZ }); if (M.map.getZoom() < M.minZ) M.map.setZoom(M.minZ);
+};
+M.fitQatar = () => { if (M.map) M.map.fitBounds(M.BOUNDS, 0); };
 M.setType = t => { M.mapType = t; if (M.map) M.map.setMapTypeId(t); };
 
 // st = { res, r (selected result), sites: [results to show], places, layers, fit, onSelect }. Redraws overlays only; the map itself is kept.
@@ -66,7 +76,8 @@ const area = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.length; j
 M.setMask = (gj, on) => {
   if (M.mask) { M.mask.setMap(null); M.mask = null; }
   if (!M.map || !on || !gj) return; const g = M.g, ll = r => r.map(([lng, lat]) => ({ lat, lng }));
-  const world = [[-179.9, -85], [179.9, -85], [179.9, 85], [-179.9, 85]];                         // anticlockwise
+  // Google draws an edge the short way round, so a world-wide edge needs a vertex every 90 degrees or the ring collapses to a sliver.
+  const lngs = [-179.9, -90, 0, 90, 179.9], world = [...lngs.map(x => [x, -85]), ...lngs.slice().reverse().map(x => [x, 85])];   // anticlockwise
   const holes = []; for (const f of gj.features) for (const poly of (f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates)) { const r = poly[0].slice(); if (area(r) < 0) r.reverse(); holes.push(r); }   // clockwise, opposite to the world ring, so Qatar is cut out
   M.mask = new g.Polygon({ map: M.map, paths: [ll(world), ...holes.map(ll)], fillColor: '#344054', fillOpacity: 0.32, strokeColor: '#2F6BFF', strokeOpacity: 0.7, strokeWeight: 1.2, clickable: false, zIndex: 0 });
 };
