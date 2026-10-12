@@ -673,3 +673,11 @@ pre.code{background:#111114;color:#E8E8ED;font:12.5px/1.55 ui-monospace,SFMono-R
 .mb-brief{margin-bottom:0}.mb-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}.mb-sum small{color:var(--muted);font-size:12px}.mb-sum p{margin:2px 0 0;font-size:14px}
 .mb-segs{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.mb-in{border-color:var(--ink)}
 .why{font-size:11.5px;color:var(--muted);margin-top:3px;max-width:230px;line-height:1.35}
+
+.mb-say{font-family:var(--display);font-size:20px;letter-spacing:-.02em;line-height:1.35;margin:0 0 14px;color:var(--ink)}
+.mb-q{margin-bottom:10px}.mb-q.done{opacity:.72}.mb-qt{font-weight:600;margin-bottom:8px}
+.mb-opts{display:flex;flex-wrap:wrap;gap:8px}.mb-opt{border:1px solid var(--hair-2);background:var(--bg);color:var(--ink);border-radius:99px;padding:8px 14px;font:inherit;font-size:13.5px;cursor:pointer;transition:background .15s,border-color .15s}
+.mb-opt:hover{background:var(--paper)}.mb-opt.on{background:var(--ink);color:#fff;border-color:var(--ink)}.mb-opt.est{border-style:dashed}
+.hello.slogan{font-size:clamp(32px,4.8vw,60px);line-height:1.08;max-width:20ch;margin:0 auto;letter-spacing:-.04em}
+.slogan-ctl{display:flex;gap:14px;justify-content:center;margin-top:12px;opacity:0;transition:opacity .2s}.hero:hover .slogan-ctl,.slogan-ctl:focus-within{opacity:.7}.slogan-ctl button{background:none;border:0;color:var(--muted);font:inherit;font-size:12.5px;cursor:pointer;text-decoration:underline}
+.chips-wrap{display:flex;flex-wrap:wrap;gap:6px}

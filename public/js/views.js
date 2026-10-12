@@ -20,16 +20,13 @@ PI.render = () => {
 /* ================= Home ================= */
 function viewHome(v) {
   PI.crumb('house', 'Home');
-  const h = new Date().getHours(), greet = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
-  const name = S.me ? (S.me.name || S.me.email.split('@')[0]).split(' ')[0] : '';
   const recent = S.outputs.filter(o => !S.clientId || (o.clientId || '') === S.clientId).slice(0, 6);
   const caps = (S.me && S.me.caps) || {};
   const cards = PI.PILLARS.filter(p => PI.can(p.id)).map(p => `<div class="lcard reveal" style="--c:${p.color}"><button class="lhead" data-go="p/${p.id}"><span class="tile">${I(p.icon, 'lg')}</span><span><h3>${esc(p.name)}</h3><p>${esc(p.desc)}</p></span></button><div class="chips">${p.agents.filter(a => PI.can(p.id, a.id)).map(a => `<button data-go="p/${p.id}/${a.id}">${I(a.icon)}${esc(a.name)}</button>`).join('')}</div></div>`).join('');
   v.innerHTML = `${PI.creditNotice()}
     <section class="hero small"><span class="orb o1" data-par="0.12"></span><span class="orb o2" data-par="0.2"></span>
       <div class="hero-in">
-        <h1 class="hello">${greet}${name ? ',<br><span class="g">' + esc(name) + '.</span>' : '.'}</h1>
-        <p class="hello-sub">Where to${PI.client() ? ' for ' + esc(PI.client().name) : ''}? Pick a tool, or ask anything with the chat button.</p>
+        <h1 class="hello slogan" id="slg">${esc(PI.slogan())}</h1><div class="slogan-ctl"><button data-slg="another">Another line</button><button data-slg="retire">Retire this line</button></div>
       </div>
     </section>
     <section class="band">
@@ -48,6 +45,7 @@ function viewHome(v) {
         </div>
       </div>
     </section>`;
+  $$('[data-slg]').forEach(b => b.onclick = () => { const cur = PI.slogan(); if (b.dataset.slg === 'retire') { PI.retireSlogan(cur); PI.toast('Retired. It will not come back.'); } $('#slg').textContent = PI.slogan(true); });
   PI.reveal(v);
 }
 function libRow(o) {
@@ -197,7 +195,7 @@ function paintThread() {
   const ms = A.cur ? A.cur.messages : [];
   box.innerHTML = ms.length ? ms.map((m, i) => m.role === 'user' ? `<div class="msg user"><div class="bub" dir="auto">${esc(m.content)}</div>${m.files && m.files.length ? `<div class="att">${I('paperclip')} ${esc(m.files.join(', '))}</div>` : ''}</div>`
     : `<div class="msg ai">${AV}<div class="body"><div class="md ${m.busy ? 'caret' : ''}" dir="auto" ${i === ms.length - 1 ? 'id="lastAi"' : ''}>${m.content ? PI.md(m.content) : `<p class="muted"><span class="spin" style="vertical-align:-2px;margin-right:8px"></span>${esc(m.status || 'Thinking')}</p>`}</div>${m.error ? `<div class="notice err" style="margin-top:8px">${I('circle-alert')}<div>${esc(m.error)}</div></div>` : ''}${m.content && !m.busy ? `<div class="meta"><span>${esc(PI.metaLine(m.meta))}</span><button class="btn xs ghost" data-cpm="${i}">${I('copy')}Copy</button><button class="btn xs ghost" data-exm="${i}">${I('download')}Export</button></div>` : ''}</div></div>`).join('')
-    : `<div class="empty" style="padding-top:14vh">${I('message-circle')}<b>How can I help?</b>Ask a question, drop a brief, or have me draft something.${PI.client() ? '<br>Working in the ' + esc(PI.client().name) + ' workspace.' : ''}</div>`;
+    : `<div class="empty" style="padding-top:14vh">${I('message-circle')}<b>Got a brief, a hunch or a half-baked idea?</b>Drop it here. Bad puns optional.${PI.client() ? '<br>Working in the ' + esc(PI.client().name) + ' workspace.' : ''}</div>`;
   box.scrollTop = box.scrollHeight;
   box.querySelectorAll('[data-cpm]').forEach(b => b.onclick = () => PI.copy(ms[+b.dataset.cpm].content));
   box.querySelectorAll('[data-exm]').forEach(b => b.onclick = e => PI.exportMenu(e.currentTarget, { title: A.cur.title, md: ms[+b.dataset.exm].content }));
@@ -208,7 +206,7 @@ async function sendChat(cmp) {
   if (PI.stillReading(A)) return PI.toast('Still reading your files');
   const files = PI.readyFiles(A), docs = PI.docsBlock(files, 60000), images = PI.imagesOf(A);
   const user = { role: 'user', content: text || 'Please review the attached files.', sent: [text || 'Please review the attached files.', docs].filter(Boolean).join('\n\n'), files: files.map(f => f.name), ts: Date.now() };
-  A.cur.messages.push(user); if (A.cur.messages.length === 1) A.cur.title = (text || files[0]?.name || 'Conversation').slice(0, 60);
+  PI.learnAgency(text, 'chat'); A.cur.messages.push(user); if (A.cur.messages.length === 1) A.cur.title = (text || files[0]?.name || 'Conversation').slice(0, 60);
   const reply = { role: 'assistant', content: '', status: A.web ? 'Searching the web' : 'Thinking', busy: true }; A.cur.messages.push(reply);
   cmp.set(''); A.files = []; cmp.paint();
   const ctl = new AbortController(); S.running = { ctl, chat: true, keep: true }; cmp.busy(true); paintThread();
@@ -216,7 +214,7 @@ async function sendChat(cmp) {
   let raf = 0;
   try {
     const r = await PI.ai({ messages: history, images, tier: A.mode, route: A.web ? 'assistant-web' : 'assistant', signal: ctl.signal,
-      system: `You are the Publicis Intelligence assistant for the team at Publicis Media Qatar in Doha. Be direct, accurate and useful. Use Markdown when it helps. Never use em dashes. If you are unsure of a fact, say so.\n\n${PI.clientBlock()}`,
+      system: `You are the Publicis Intelligence assistant: a sharp, witty advertising colleague at Publicis Media Qatar in Doha, not a corporate chatbot. A little cheeky and quick with a clever line in casual chat, but plain and professional on briefs, budgets, finance and anything client-sensitive. Never say things like 'please provide more information' or 'I will now process your request'. Never make anyone feel silly for an incomplete idea. Do not invent campaign details from loose words: ask one short, pointed question instead. Stop talking when the answer is done. Be direct, accurate and useful. Use Markdown when it helps. Never use em dashes. If you are unsure of a fact, say so.${PI.agencyBlock()}\n\n${PI.clientBlock()}`,
       onStatus: s => { reply.status = s; if (!reply.content) paintThread(); }, onText: t => { reply.content = t; if (!raf) raf = requestAnimationFrame(() => { raf = 0; const el = $('#lastAi'); if (el) { el.innerHTML = PI.md(reply.content); const b = $('#msgs'); b.scrollTop = b.scrollHeight; } }); } });
     reply.content = r.text; reply.meta = r.meta;
   } catch (e) { if (e.text) reply.content = e.text; if (e.code !== 'cancelled') reply.error = e.message; else if (!reply.content) reply.content = '_Stopped._'; }
@@ -335,10 +333,10 @@ async function viewAdmin(v) {
   PI.crumb('shield', 'Admin');
   const tab = S.adminTab || 'users';
   v.innerHTML = `${PI.pageHead('shield', '#111114', 'Admin', 'People, credits and the engines behind every pillar.')}
-    <div class="tabs" role="tablist">${[['users', 'users', 'People and credits'], ['engine', 'brain', 'Engines'], ['credits', 'coins', 'Credit rules'], ['team', 'chart-column', 'Team usage']].map(([k, ic, l]) => `<button role="tab" aria-selected="${tab === k}" data-tab="${k}">${I(ic)}${l}</button>`).join('')}</div><div id="adm"><div class="empty"><span class="spin"></span></div></div>`;
+    <div class="tabs" role="tablist">${[['users', 'users', 'People and credits'], ['engine', 'brain', 'Engines'], ['credits', 'coins', 'Credit rules'], ['team', 'chart-column', 'Team usage'], ['brain', 'sparkles', 'Agency brain']].map(([k, ic, l]) => `<button role="tab" aria-selected="${tab === k}" data-tab="${k}">${I(ic)}${l}</button>`).join('')}</div><div id="adm"><div class="empty"><span class="spin"></span></div></div>`;
   $$('[data-tab]').forEach(b => b.onclick = () => { S.adminTab = b.dataset.tab; viewAdmin(v); });
   const box = $('#adm');
-  try { await ({ users: admUsers, engine: admEngine, credits: admCredits, team: admTeam })[tab](box); } catch (e) { box.innerHTML = `<div class="notice err">${I('circle-alert')}<div>${esc(e.message)}</div></div>`; }
+  try { await ({ users: admUsers, engine: admEngine, credits: admCredits, team: admTeam, brain: admBrain })[tab](box); } catch (e) { box.innerHTML = `<div class="notice err">${I('circle-alert')}<div>${esc(e.message)}</div></div>`; }
 }
 async function admUsers(box) {
   const users = await PI.api('GET', 'admin/users');
@@ -374,6 +372,22 @@ async function accessDialog(id) {
   E.querySelectorAll('[data-t]').forEach(x => x.onchange = sync); sync();
   E.querySelector('#acNo').onclick = m.close;
   E.querySelector('#acOk').onclick = async () => { try { await PI.api('PUT', 'admin/users/' + id + '/access', { tools: E.querySelector('#acAll').checked ? null : tools().filter(x => x.checked).map(x => x.dataset.t) }); m.close(); PI.toast('Access saved'); } catch (e) { PI.toast(e.message); } };
+}
+async function admBrain(box) {
+  await PI.loadAgency(); const b = PI.agency, K = PIAgency.known(b, 60), L = PI.sloganLib, T = PIAgency.top;
+  const chips = (a, k) => a.length ? a.map(x => `<span class="pill mut">${esc(x.name)} · ${x.seen}</span>`).join(' ') : '<span class="hint" style="margin:0">Nothing yet</span>';
+  box.innerHTML = `<div class="card pad"><div class="sec-h"><h3>What Publicis Intelligence has learned</h3><span class="hint" style="margin:0">${b.docs} briefs and chats read</span></div>
+      <p class="hint" style="margin:0 0 10px">It keeps short terms and counts, never numbers, emails or whole documents, and shows a term only after it has been seen ${PIAgency.MIN_SEEN} times. It shapes wording and slogans, nothing else.</p>
+      <h4 style="margin:10px 0 6px">The agency's own words</h4><div class="chips-wrap">${K.length ? K.map(x => `<span class="pill mut">${esc(x.term)} · ${x.seen}</span>`).join(' ') : '<span class="hint" style="margin:0">Still listening. Terms appear after a few briefs and chats.</span>'}</div>
+      <div class="grid2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:12px"><div><h4 style="margin:0 0 6px">Moments</h4>${chips(T(b.seasons, 6))}</div><div><h4 style="margin:0 0 6px">Sectors</h4>${chips(T(b.sectors, 6))}</div><div><h4 style="margin:0 0 6px">Objectives</h4>${chips(T(b.objectives, 6))}</div><div><h4 style="margin:0 0 6px">Platforms chosen</h4>${chips(T(b.platforms, 8))}</div></div></div>
+    <div class="card pad" style="margin-top:14px"><div class="sec-h"><h3>Home-screen lines</h3><div class="actions" style="margin:0"><button class="btn sm" id="slNew">${I('sparkles')}Write new lines now</button></div></div>
+      <p class="hint" style="margin:0 0 8px">${PI.SLOGANS.GENERAL.length + Object.values(PI.SLOGANS.DEPT).flat().length} starter lines and ${L.lines.length} written since. New lines are written about once a week from the agency's own words. Retire any you do not like.</p>
+      ${L.lines.length ? `<div class="card list">${L.lines.slice().reverse().map(l => `<div class="li"><span class="grow"><div class="t" dir="auto">${esc(l.text)}</div><div class="m">${l.dept ? esc(l.dept) + ' · ' : ''}${PI.when(l.at)}</div></span><button class="btn xs ghost" data-ret="${esc(l.text)}">Retire</button></div>`).join('')}</div>` : ''}
+      ${L.hidden.length ? `<h4 style="margin:14px 0 6px">Retired</h4>${L.hidden.map(t => `<div class="li" style="display:flex;justify-content:space-between;gap:10px"><span dir="auto">${esc(t)}</span><button class="btn xs ghost" data-res="${esc(t)}">Bring back</button></div>`).join('')}` : ''}</div>
+    <div class="actions" style="margin-top:14px"><button class="btn xs ghost" id="abReset">Reset what it has learned</button></div>`;
+  $('#slNew').onclick = async e => { const x = e.currentTarget; x.disabled = true; x.innerHTML = '<span class="spin"></span>'; try { const n = await PI.refreshSlogans(true); PI.toast(n + ' new lines added'); } catch (er) { PI.toast(er.message); } admBrain(box); };
+  $$('[data-ret]').forEach(x => x.onclick = () => { PI.retireSlogan(x.dataset.ret); admBrain(box); }); $$('[data-res]').forEach(x => x.onclick = () => { PI.restoreSlogan(x.dataset.res); admBrain(box); });
+  $('#abReset').onclick = async () => { if (!confirm('Forget the words, moments and sectors it has learned? Slogans stay.')) return; try { await PI.api('DELETE', 'db/agencybrain/main'); PI.agency = PIAgency.emptyAgency(); admBrain(box); } catch (er) { PI.toast(er.message); } };
 }
 async function admEngine(box) {
   const m = await PI.api('GET', 'admin/engine');
@@ -443,6 +457,7 @@ window.addEventListener('hashchange', () => { if (S.running && S.running.ctl && 
   try { const u = await PI.api('GET', 'usage/me?days=30'); S.spent30 = u.total.credits; PI.paintMe(); } catch (_) { }
   await PI.refreshData();
   PI.render();
+  PI.loadAgency().then(() => { if (S.me && S.me.caps && S.me.caps.ai) setTimeout(() => PI.refreshSlogans(false).catch(() => { }), 5000); });
   setInterval(() => { if (!document.hidden && !S.running) PI.refreshData(); }, 60000);
 })();
 })();
