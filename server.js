@@ -3,6 +3,7 @@ const http = require('http'), fs = require('fs'), path = require('path'), crypto
 const { db, init: initDb } = require('./lib/db');
 const A = require('./lib/auth');
 const GEO = require('./lib/geo');
+const DIG = require('./lib/digital');
 const P = require('./lib/providers');
 const SEO = require('./lib/dataforseo');
 const PAGE = require('./lib/webpage');
@@ -320,6 +321,7 @@ async function route(req, res) {
       res.writeHead(204); return res.end(); }
   }
 
+  if (p.startsWith('/api/digital/')) return DIG.handle(req, res, user, p, { send, fail, json, accessOf });
   if (p.startsWith('/api/geo/')) return GEO.handle(req, res, user, p, { send, fail, json, accessOf });
 
   if (p.startsWith('/api/admin/')) {
