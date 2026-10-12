@@ -1,23 +1,42 @@
-/* Geo Intelligence tool (Media). Evidence and scores come from /api/geo; the AI explains them (geo-core.js). */
+/* Geo Intelligence (Media): a dashboard over /api/geo. Evidence and scores come from the server; the AI explains them (geo-core.js).
+   The map is a schematic plot (exact positions, no basemap): Google's terms do not allow Places data on other basemaps. */
 (function () {
 'use strict';
 const { $, $$, esc, I, S, num } = PI;
 const GC = window.PIGeoCore;
 const sel = (id, opts, cur) => `<select id="${id}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
 const pinRe = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/;
+const COL = ['#4F8BFF', '#FF5C8A', '#34C98B', '#F5B53F', '#9B7BFF', '#2FC4D9', '#FF8A4C', '#C0C7D4', '#7BD34F'];
+const colorOf = (res, cat) => cat === res.competitor ? '#B26BFF' : COL[Math.max(0, res.recipe.factors.findIndex(f => f.cat === cat)) % COL.length];
+const band = s => s == null ? ['n/a', 'mut'] : s >= 70 ? ['Strong context', 'ok'] : s >= 40 ? ['Moderate context', 'warn'] : ['Limited context', 'bad'];
+const km = m => m == null ? '–' : m >= 1000 ? (m / 1000).toFixed(1) + ' km' : m + ' m';
 
+// Plot sites and the selected site's places on a plane around the centre (equirectangular, fine at city scale).
+function mapSVG(res, r, v) {
+  const W = 760, H = 440, many = res.results.length > 1, all = many && v.view === 'all', ref = all ? res.results : [r], lat0 = ref.reduce((a, x) => a + x.site.lat, 0) / ref.length, lon0 = ref.reduce((a, x) => a + x.site.lon, 0) / ref.length;
+  const P = (lat, lon) => [(lon - lon0) * 111320 * Math.cos(lat0 * Math.PI / 180), -(lat - lat0) * 110574];
+  const pts = res.results.map(x => P(x.site.lat, x.site.lon)), c = P(r.site.lat, r.site.lon);
+  const ext = Math.max(res.radius * 1.35, all ? Math.max(...pts.flatMap(([x, y]) => [Math.abs(x), Math.abs(y)])) * 1.25 + res.radius * 0.5 : 0);
+  const sc = (H / 2 - 24) / ext, X = x => W / 2 + x * sc, Y = y => H / 2 + y * sc;
+  const L = v.layers, rings = [res.radius / 2, res.radius];
+  let s = `<svg viewBox="0 0 ${W} ${H}" class="gx-svg" role="img" aria-label="Catchment plot"><defs><radialGradient id="gxg" cx="50%" cy="50%" r="60%"><stop offset="0" stop-color="#16233f"/><stop offset="1" stop-color="#0a0f1c"/></radialGradient></defs><rect width="${W}" height="${H}" fill="url(#gxg)"/>`;
+  for (let i = -10; i <= 10; i++) { const g = i * ext / 5; s += `<line x1="${X(g)}" x2="${X(g)}" y1="0" y2="${H}" class="gx-grid"/><line y1="${Y(g)}" y2="${Y(g)}" x1="0" x2="${W}" class="gx-grid"/>`; }
+  if (L.rings) rings.forEach((m, i) => { s += `<circle cx="${X(c[0])}" cy="${Y(c[1])}" r="${m * sc}" class="gx-ring ${i ? 'o' : ''}"/>`; if (i) s += `<text x="${X(c[0]) + m * sc * 0.72}" y="${Y(c[1]) - m * sc * 0.72 - 4}" class="gx-lbl">${res.radius >= 1000 ? res.radius / 1000 + ' km' : res.radius + ' m'}</text>`; });
+  if (L.places) for (const p of r.places) if (!L.off[p.c]) { const [x, y] = P(p.lat, p.lon); s += `<circle cx="${X(x)}" cy="${Y(y)}" r="${p.c === res.competitor ? 5 : 3.6}" fill="${colorOf(res, p.c)}" class="gx-dot"><title>${esc(PI.geoCats[p.c] || p.c)}</title></circle>`; }
+  if (L.sites) res.results.forEach((x, i) => { const [px, py] = pts[i], on = x === r; if (Math.abs(px) > ext || Math.abs(py) > ext) return; const b = band(x.score.value)[1]; s += `<g data-site="${esc(x.site.id)}" class="gx-site-pt ${on ? 'on' : ''}"><circle cx="${X(px)}" cy="${Y(py)}" r="${on ? 9 : 6}" fill="${on ? '#FF4D4F' : { ok: '#34C98B', warn: '#F5B53F', bad: '#7C8699', mut: '#7C8699' }[b]}" stroke="#fff" stroke-width="${on ? 2.5 : 1.2}"/>${on || !many ? `<text x="${X(px) + 14}" y="${Y(py) + 4}" class="gx-name">${esc(x.site.name || x.site.id)}</text>` : ''}</g>`; });
+  const bar = [100, 200, 250, 500, 1000, 2000, 5000].find(m => m * sc >= 70) || 5000;
+  s += `<line x1="${W - 24 - bar * sc}" x2="${W - 24}" y1="${H - 20}" y2="${H - 20}" stroke="#cfd6e4" stroke-width="2"/><text x="${W - 24 - bar * sc / 2}" y="${H - 28}" class="gx-lbl" text-anchor="middle">${bar >= 1000 ? bar / 1000 + ' km' : bar + ' m'}</text><text x="${W - 20}" y="22" class="gx-lbl" text-anchor="end">N ↑</text></svg>`;
+  return s;
+}
 
 // Official figures from Qatar Open Data, shown by the area each one actually covers.
-async function qatarData(box, p, a, v, st, quota) {
-  const tabs = `<div class="tabs" role="tablist"><button role="tab" aria-selected="false" data-t="loc">Location</button><button role="tab" aria-selected="false" data-t="ooh">OOH sites</button><button role="tab" aria-selected="true" data-t="qd">Qatar data</button>${quota}</div>`;
-  box.innerHTML = tabs + '<div class="empty" style="padding:60px 0"><span class="spin"></span></div>';
-  const rebind = () => $$('[data-t]').forEach(b => b.onclick = () => { v.tab = b.dataset.t; PI.tools.geo(box, p, a); });
-  rebind();
-  let o; try { o = v.qd || (v.qd = await PI.api('GET', 'geo/qatar/overview')); } catch (e) { box.innerHTML = tabs + `<div class="notice err">${I('circle-alert')}<div>${esc(e.message)}</div></div>`; return rebind(); }
+async function qatarData(el, v) {
+  el.innerHTML = '<div class="empty" style="padding:60px 0"><span class="spin"></span></div>';
+  let o; try { o = v.qd || (v.qd = await PI.api('GET', 'geo/qatar/overview')); } catch (e) { el.innerHTML = `<div class="notice err">${I('circle-alert')}<div>${esc(e.message)}</div></div>`; return; }
   const src = d => d.error ? `<p class="hint">${esc(d.error)}</p>` : `<p class="hint qd-src">${esc(d.title)} · ${d.year ? 'year ' + esc(d.year) + ' · ' : ''}by ${esc(d.level)} · <a href="${esc(d.url)}" target="_blank" rel="noopener">Qatar Open Data</a>${d.modified ? ' · updated ' + esc(d.modified.slice(0, 10)) : ''}</p>`;
   const short = s => s.length > 28 ? s.slice(0, 26) + '…' : s;
   const card = (id, title, d, note) => `<div class="card pad qd"><div class="sec-h" style="margin-bottom:4px"><h3>${title}</h3></div><p class="hint" style="margin:0 0 6px">${note}</p><div id="${id}">${d.error ? '' : ''}</div>${src(d)}</div>`;
-  box.innerHTML = tabs + `<div class="notice info">${I('info')}<div>Official figures cover whole zones, municipalities or the country, never a radius around a site. They give context; the site score uses surrounding places.</div></div>
+  el.innerHTML = `<div class="notice info">${I('info')}<div>Official figures cover whole zones, municipalities or the country, never a radius around a site. They give context; the site score uses surrounding places.</div></div>
     <div class="qd-grid">
       ${card('qd1', 'Population by municipality', o.municipalities, 'Census 2010 and 2020.')}
       ${card('qd2', 'Largest zones by population', o.zones, 'Latest published year; some zones are published as groups of areas.')}
@@ -26,7 +45,6 @@ async function qatarData(box, p, a, v, st, quota) {
     </div>
     <div class="card pad" style="margin-top:16px"><div class="sec-h"><h3>Explore the portal</h3></div><p class="hint" style="margin:0 0 8px">Search any official dataset, then open it to see its fields and first rows.</p>
       <div class="inline"><input id="qs" placeholder="e.g. employment, tourism, schools, transport"><button class="btn" id="qgo">${I('search')}Search</button></div><div id="qres"></div><div id="qprev"></div></div>`;
-  rebind();
   const chart = (id, cfg, d) => { const el = $('#' + id); if (!el) return; if (d.error) return el.innerHTML = '<div class="empty">Not available right now.</div>'; PI.chart(el, cfg); };
   if (!o.municipalities.error) { const r = o.municipalities.rows; chart('qd1', { type: 'bar', x: r.map(x => x.name), series: [{ name: '2010', values: r.map(x => x['2010'] ? x['2010'].population : 0) }, { name: '2020', values: r.map(x => x['2020'].population) }] }, o.municipalities); } else chart('qd1', {}, o.municipalities);
   if (!o.zones.error) chart('qd2', { type: 'hbar', x: o.zones.rows.map(x => short(x.name)), series: [{ name: 'Population', values: o.zones.rows.map(x => x.population) }] }, o.zones); else chart('qd2', {}, o.zones);
@@ -38,112 +56,127 @@ async function qatarData(box, p, a, v, st, quota) {
 }
 
 PI.tools.geo = async (box, p, a) => {
-  const v = S.drafts.geo || (S.drafts.geo = { tab: 'loc', q: '', site: null, cands: [], radius: 500, recipe: 'premium_families', competitor: '', brief: '', zone: '', ooh: null, invs: [], inv: '', run: 0 });
-  box.innerHTML = '<div class="empty"><span class="spin"></span></div>';
-  let st, meta;
-  try { [st, meta] = await Promise.all([PI.api('GET', 'geo/status'), PI.api('GET', 'geo/recipes')]); } catch (e) { box.innerHTML = `<div class="notice err">${I('circle-alert')}<div>${esc(e.message)}</div></div>`; return; }
-  if (!v.zones) try { v.zones = (await PI.api('GET', 'geo/zones')).zones; } catch (_) { v.zones = []; }
-  try { v.invs = (await PI.api('GET', 'db/geoooh')).map(r => ({ id: r.id, ...r.data })); } catch (_) { v.invs = []; }
-  const q = st.quota && st.quota.used != null ? `<span class="pill ${st.quota.state === 'normal' ? 'mut' : 'bad'}" title="Google requests this month">${num(st.quota.used)} / ${num(st.quota.cap)} · ${esc(st.quota.state)}</span>` : '';
-  const opts = () => `<div class="row3"><div class="field"><label for="gr">Catchment</label>${sel('gr', meta.radii.map(r => [r, r >= 1000 ? r / 1000 + ' km' : r + ' m']), v.radius)}</div>
-      <div class="field"><label for="gp">Audience</label>${sel('gp', meta.recipes.map(r => [r.id, r.label]), v.recipe)}</div>
-      <div class="field"><label for="gc">Competitor category</label>${sel('gc', [['', 'None'], ...Object.entries(meta.categories)], v.competitor)}</div></div>
-    <details class="adv"><summary>Audience recipe weights</summary><div id="gw"></div></details>
-    <div class="field"><label for="gb">Client brief</label><textarea id="gb" dir="auto" placeholder="e.g. Premium banking, targeting affluent families, goal is account openings">${esc(v.brief)}</textarea></div>`;
-  if (v.tab === 'qd') return qatarData(box, p, a, v, st, q);
-  box.innerHTML = `<div class="work"><div class="card pad form"><h3>${esc(a.name)}</h3>
-    <p class="desc">Where is the opportunity, who is around it, and what to do next. Surrounding places come from Google Maps and area population from Qatar Open Data.</p>
-    ${st.google ? '' : `<div class="notice info">${I('info')}<div>Google Maps is not connected yet, so surrounding places are unavailable. Official context and scoring still work; an admin adds <code>GOOGLE_MAPS_API_KEY</code> to switch it on.</div></div>`}
-    <div class="tabs" role="tablist"><button role="tab" aria-selected="${v.tab === 'loc'}" data-t="loc">Location</button><button role="tab" aria-selected="${v.tab === 'ooh'}" data-t="ooh">OOH sites</button><button role="tab" aria-selected="false" data-t="qd">Qatar data</button>${q}</div>
-    <div id="gform"></div></div><div class="card out" id="gout"></div></div>`;
-  $$('[data-t]').forEach(b => b.onclick = () => { v.tab = b.dataset.t; PI.tools.geo(box, p, a); });
-  const form = $('#gform');
-
-  const bindOpts = () => {
-    $('#gr').onchange = e => v.radius = +e.target.value; $('#gc').onchange = e => v.competitor = e.target.value; $('#gb').oninput = e => v.brief = e.target.value;
-    const weights = () => { const r = meta.recipes.find(x => x.id === v.recipe); $('#gw').innerHTML = `<p class="hint">Planning assumptions, shown so they can be challenged. Larger weight means more influence on the score.</p>` + r.factors.map(f => `<div class="gwrow"><span>${esc(f.label)}</span><b>${f.w}</b></div>`).join(''); };
-    $('#gp').onchange = e => { v.recipe = e.target.value; weights(); }; weights();
-  };
-  const run = async sites => {
-    const id = ++v.run, o = $('#gout');
-    o.innerHTML = `<div class="out-bar"><span class="status"><span class="spin"></span>Analysing</span></div><div class="out-body"></div>`;
-    let res; try { res = await PI.api('POST', 'geo/analyze', { sites, radius: v.radius, recipe: v.recipe, competitor: v.competitor }); } catch (e) { if (id === v.run) o.innerHTML = `<div class="notice err" style="margin:16px">${I('circle-alert')}<div>${esc(e.message)}</div></div>`; return; }
-    if (id !== v.run) return;   // a newer analysis replaced this one
-    v.result = res; paint(res, id);
-  };
-
-  if (v.tab === 'loc') {
-    form.innerHTML = `<div class="field"><label for="gq">Place, address or coordinates</label><div class="inline"><input id="gq" dir="auto" value="${esc(v.q)}" placeholder="e.g. The Pearl, or 25.2854, 51.5310"><button class="btn" id="gfind">${I('search')}Find</button></div></div>
-      <div id="gcand"></div>
-      <div class="field"><label for="gz">Official zone (for area population, optional)</label><input id="gz" list="gzl" value="${esc(v.zone)}" placeholder="Start typing, e.g. Al Dafna"><datalist id="gzl">${(v.zones || []).map(z => `<option value="${esc(z)}">`).join('')}</datalist></div>${opts()}
-      <div class="actions"><button class="btn pri" id="ggo">${I('map-pin')}Analyse</button></div>`;
-    bindOpts();
-    const cands = () => { $('#gcand').innerHTML = v.site ? `<div class="notice ok">${I('check')}<div>${esc(v.site.name)} · ${v.site.lat.toFixed(4)}, ${v.site.lon.toFixed(4)}</div></div>` : v.cands.length ? `<div class="card list">${v.cands.map((c, i) => `<button class="li" data-c="${i}"><span class="grow"><div class="t">${esc(c.label)}</div><div class="m">${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}</div></span></button>`).join('')}</div>` : '';
-      $$('[data-c]').forEach(b => b.onclick = () => { const c = v.cands[+b.dataset.c]; v.site = { id: 'site', name: c.label.split(',')[0], lat: c.lat, lon: c.lon, areas: c.areas }; cands(); }); };
-    cands();
-    $('#gz').oninput = e => v.zone = e.target.value;
-    $('#gq').oninput = e => { v.q = e.target.value; v.site = null; v.cands = []; $('#gcand').innerHTML = ''; };
-    $('#gfind').onclick = async () => {
-      const m = pinRe.exec(v.q); if (m) { v.site = { id: 'site', name: 'Dropped pin', lat: +m[1], lon: +m[2] }; return cands(); }
-      try { v.cands = (await PI.api('POST', 'geo/resolve', { query: v.q })).candidates; if (!v.cands.length) PI.toast('No match in Qatar. Try an address or coordinates.'); cands(); } catch (e) { PI.toast(e.message); }
-    };
-    $('#ggo').onclick = () => { if (!v.site) return PI.toast('Find a place first'); run([{ ...v.site, zone: v.zone }]); };
-  } else {
-    form.innerHTML = `<div class="field"><label>Inventory file (CSV or Excel)</label><input type="file" id="gf" accept=".csv,.xlsx,.xls"><p class="hint">Only latitude and longitude are required. Optional: ooh_id, name, vendor, format, zone, municipality, road, direction, availability, cost.</p></div><div id="gchk"></div>
-      <div class="field"><label for="ginv">Saved inventory</label>${sel('ginv', [['', v.invs.length ? 'Choose…' : 'None saved yet'], ...v.invs.map(i => [i.id, `${i.name} · ${i.rows.length} sites`])], v.inv)}</div>${opts()}
-      <div class="actions"><button class="btn pri" id="ggo">${I('layers')}Rank sites</button></div>`;
-    bindOpts();
-    $('#ginv').onchange = e => v.inv = e.target.value;
-    $('#gf').onchange = async e => {
-      const f = e.target.files[0]; if (!f) return; const c = $('#gchk'); c.innerHTML = '<span class="spin"></span>';
-      try {
-        const x = await PI.extract(f), chk = await PI.api('POST', 'geo/ooh/check', { rows: x.rows || [] });
-        v.ooh = { name: f.name.replace(/\.[^.]+$/, ''), rows: chk.rows };
-        c.innerHTML = `<div class="notice ${chk.rows.length ? 'ok' : 'err'}">${I(chk.rows.length ? 'check' : 'circle-alert')}<div><b>${chk.rows.length}</b> usable sites${chk.issues.length ? `, <b>${chk.issues.length}</b> rows need fixing` : ''}${chk.warnings.length ? `, ${chk.warnings.length} share coordinates` : ''}.</div></div>
-          ${chk.issues.length ? `<ul class="b-q">${chk.issues.slice(0, 12).map(i => `<li>Row ${i.row}: ${esc(i.message)}</li>`).join('')}</ul>` : ''}
-          ${chk.rows.length ? `<div class="actions"><button class="btn" id="gsave">${I('check')}Save inventory</button></div>` : ''}`;
-        const s = $('#gsave'); if (s) s.onclick = async () => { const id = PI.uid(); await PI.saveDoc('geoooh', id, { name: v.ooh.name, rows: v.ooh.rows, updatedAt: Date.now() }); v.inv = id; PI.toast('Inventory saved'); PI.tools.geo(box, p, a); };
-      } catch (err) { c.innerHTML = `<div class="notice err">${I('circle-alert')}<div>${esc(err.message)}</div></div>`; }
-    };
-    $('#ggo').onclick = () => { const inv = v.invs.find(i => i.id === v.inv); const rows = inv ? inv.rows : v.ooh && v.ooh.rows; if (!rows || !rows.length) return PI.toast('Upload or choose an inventory first'); if (rows.length > 40) PI.toast('Ranking the first 40 sites in this run'); run(rows.slice(0, 40)); };
+  const v = S.drafts.geo || (S.drafts.geo = { tab: 'map', q: '', site: null, cands: [], radius: 500, recipe: 'premium_families', competitor: '', brief: '', zone: '', inv: '', run: 0, sel: 0, layers: { sites: true, rings: true, places: true, off: {} } });
+  if (!v.meta) {
+    box.innerHTML = '<div class="empty"><span class="spin"></span></div>';
+    try { [v.st, v.meta] = await Promise.all([PI.api('GET', 'geo/status'), PI.api('GET', 'geo/recipes')]); } catch (e) { box.innerHTML = `<div class="notice err">${I('circle-alert')}<div>${esc(e.message)}</div></div>`; return; }
+    try { v.zones = (await PI.api('GET', 'geo/zones')).zones; } catch (_) { v.zones = []; }
   }
-  $('#gout').innerHTML = `<div class="out-bar"><span class="status">Result</span></div><div class="out-body"><div class="empty" style="padding-top:90px">${I('map-pin')}<b>Pick a place or an inventory</b>Scores, evidence and recommended actions appear here.</div></div>`;
-  if (v.result) paint(v.result, v.run, true);
+  const { st, meta } = v; PI.geoCats = meta.categories;
+  try { v.invs = (await PI.api('GET', 'db/geoooh')).map(r => ({ id: r.id, ...r.data })); } catch (_) { v.invs = v.invs || []; }
+  const quota = st.quota && st.quota.used != null ? `<span class="gx-pill ${st.quota.state === 'normal' ? '' : 'bad'}" title="Google requests this month">${num(st.quota.used)} / ${num(st.quota.cap)}</span>` : '';
+  box.innerHTML = `<div class="gx">
+    <div class="gx-head"><div><h2>Geo Intelligence</h2><p>Location. People. Context. Opportunity.</p></div>${quota}</div>
+    ${st.google ? '' : `<div class="gx-note">${I('info')}<span>Google Maps is not connected, so surrounding places are unavailable. Official context still works; an admin adds <code>GOOGLE_MAPS_API_KEY</code> to switch places on.</span></div>`}
+    <div class="gx-bar">
+      <div class="gx-search"><input id="gq" dir="auto" value="${esc(v.q)}" placeholder="Search a place, address or coordinates (25.28, 51.53)"><button class="gx-btn" id="gfind">${I('search')}Find</button><div id="gcand" class="gx-cand"></div></div>
+      ${sel('ginv', [['', 'Single location'], ...v.invs.map(i => [i.id, `${i.name} · ${i.rows.length} sites`])], v.inv)}
+      ${sel('gr', meta.radii.map(r => [r, r >= 1000 ? r / 1000 + ' km' : r + ' m']), v.radius)}
+      ${sel('gp', meta.recipes.map(r => [r.id, r.label]), v.recipe)}
+      ${sel('gc', [['', 'No competitor'], ...Object.entries(meta.categories)], v.competitor)}
+      <button class="gx-btn pri" id="ggo">${I('target')}Analyse</button>
+    </div>
+    <details class="gx-more"><summary>Zone, client brief and OOH inventory</summary><div class="gx-morein">
+      <label>Official zone<input id="gz" list="gzl" value="${esc(v.zone)}" placeholder="e.g. Al Dafna"><datalist id="gzl">${(v.zones || []).map(z => `<option value="${esc(z)}">`).join('')}</datalist></label>
+      <label>Client brief (for the AI explanation)<textarea id="gb" dir="auto" placeholder="e.g. Premium banking, affluent families, goal is account openings">${esc(v.brief)}</textarea></label>
+      <label>Upload OOH inventory (CSV or Excel; only latitude and longitude are required)<input type="file" id="gf" accept=".csv,.xlsx,.xls"></label><div id="gchk"></div></div></details>
+    <div class="gx-tabs" role="tablist">${[['map', 'Map & analysis'], ['official', 'Official data'], ['compare', 'Site comparison'], ['saved', 'Saved analyses']].map(([k, l]) => `<button role="tab" aria-selected="${v.tab === k}" data-t="${k}">${l}</button>`).join('')}</div>
+    <div id="gxb"></div></div>`;
 
-  function paint(res, id, restored) {
-    const o = $('#gout'), rows = res.results.slice().sort((x, y) => (y.score.value ?? -1) - (x.score.value ?? -1));
-    const many = rows.length > 1, km = m => m == null ? '–' : m >= 1000 ? (m / 1000).toFixed(1) + ' km' : m + ' m';
-    const detail = r => `<div class="g-site"><div class="g-head"><div><h3 dir="auto">${esc(r.site.name || r.site.id)}</h3><span class="muted">${r.site.lat.toFixed(4)}, ${r.site.lon.toFixed(4)}</span></div>
-        <div class="g-score"><b>${r.score.value == null ? 'n/a' : r.score.value}</b><small>${esc(res.recipe.label)} · coverage ${Math.round(r.score.coverage * 100)}% · ${r.confidence} confidence</small></div></div>
-      <table class="t"><thead><tr><th>Context</th><th class="num">Weight</th><th class="num">Places within ${res.radius} m</th><th class="num">Nearest</th><th class="num">Points</th></tr></thead><tbody>${r.score.contributions.map(c => `<tr><td>${esc(c.label)}</td><td class="num">${c.weight}</td><td class="num">${c.count == null ? '<span class="muted">unavailable</span>' : (c.capped ? '≥ ' : '') + c.count}</td><td class="num">${km(r.features[c.cat] && r.features[c.cat].nearestM)}</td><td class="num">${c.points == null ? '–' : c.points}</td></tr>`).join('')}</tbody></table>
-      ${r.pressure ? `<p class="hint">Competitor pressure (${esc(r.pressure.label)}): ${r.pressure.capped ? '≥ ' : ''}${r.pressure.count} within ${res.radius} m, nearest ${km(r.pressure.nearestM)}. Shown separately, not part of the score.</p>` : ''}
-      ${r.official ? `<div class="card pad g-off"><b>${esc(r.official.zone)} zone</b> · ${esc(r.official.year)}<div class="muted">Population ${num(r.official.population)} · density ${num(r.official.densityPerKm2)} per km². Whole zone, not this catchment. Source: <a href="${esc(r.official.url)}" target="_blank" rel="noopener">Qatar Open Data</a></div></div>` : `<p class="hint">${esc(r.officialNote || '')}</p>`}</div>`;
-    o.innerHTML = `<div class="out-bar"><span class="status" id="gst">${I('check')}<span>${res.planning.sites} site${res.planning.sites > 1 ? 's' : ''} · ${res.planning.clusters} cluster${res.planning.clusters > 1 ? 's' : ''} · ${res.planning.requested} lookups, ${res.planning.cached} cached</span></span><button class="btn sm" id="gsv">${I('library')}Save</button></div>
-      <div class="out-body"><div class="g-ai"><h4>Recommended next steps</h4><ul class="g-f">${(res.recommendations || []).map(x => `<li><span class="pill ${x.priority === 'Do now' ? 'ok' : 'mut'}">${x.priority}</span> ${esc(x.action)} <small>${esc(x.rationale)}${x.evidence_refs.length ? ' · ' + esc(x.evidence_refs.join(', ')) : ''}</small></li>`).join('')}</ul></div><div id="gai" class="g-ai"></div>
-      ${many ? `<table class="t g-rank"><thead><tr><th>#</th><th>Site</th><th class="num">Score</th><th class="num">Coverage</th><th>Confidence</th><th></th></tr></thead><tbody>${rows.map((r, i) => `<tr data-s="${esc(r.site.id)}"><td>${i + 1}</td><td dir="auto">${esc(r.site.name || r.site.id)}</td><td class="num">${r.score.value ?? 'n/a'}</td><td class="num">${Math.round(r.score.coverage * 100)}%</td><td>${r.confidence}</td><td>${I('chevron-down')}</td></tr>`).join('')}</tbody></table><div id="gone"></div>` : detail(rows[0])}
-      <details class="g-src"><summary>Sources and evidence (${res.evidence.length})</summary><ul class="b-s">${res.evidence.map(e => `<li><span class="grow"><b>${esc(e.id)} · ${esc(e.kind)}</b>${esc(e.text)}<small>${esc([e.source, e.retrieved, e.cached ? 'cached' : ''].filter(Boolean).join(' · '))}</small></span></li>`).join('')}</ul></details>
-      <div class="g-lim"><h4>Limits</h4><ul class="b-q">${res.limits.map(l => `<li>${esc(l)}</li>`).join('')}</ul></div></div>`;
-    $$('[data-s]').forEach(tr => tr.onclick = () => { const r = rows.find(x => x.site.id === tr.dataset.s); $('#gone').innerHTML = detail(r); });
+  const body = () => { if (v.tab === 'official') return qatarData($('#gxb'), v); if (v.tab === 'saved') return saved(); if (!v.result) return $('#gxb').innerHTML = `<div class="gx-empty">${I('map-pin')}<b>Pick a place, or choose an inventory, then Analyse</b><span>You get a score, the places around it, official area data and next steps.</span></div>`; return v.tab === 'compare' ? compare(v.result) : dash(v.result); };
+  $$('[data-t]').forEach(b => b.onclick = () => { v.tab = b.dataset.t; $$('[data-t]').forEach(x => x.setAttribute('aria-selected', x === b)); body(); });
+  $('#ginv').onchange = e => v.inv = e.target.value; $('#gr').onchange = e => v.radius = +e.target.value; $('#gp').onchange = e => v.recipe = e.target.value; $('#gc').onchange = e => v.competitor = e.target.value;
+  $('#gz').oninput = e => v.zone = e.target.value; $('#gb').oninput = e => v.brief = e.target.value;
+  const cands = () => { $('#gcand').innerHTML = v.site ? `<div class="gx-ok">${I('check')} ${esc(v.site.name)} · ${v.site.lat.toFixed(4)}, ${v.site.lon.toFixed(4)}</div>` : v.cands.length ? v.cands.map((c, i) => `<button data-c="${i}"><b>${esc(c.label)}</b><small>${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}</small></button>`).join('') : '';
+    $$('[data-c]').forEach(b => b.onclick = () => { const c = v.cands[+b.dataset.c]; v.site = { id: 'site', name: c.label.split(',')[0], lat: c.lat, lon: c.lon, areas: c.areas }; cands(); }); };
+  cands();
+  $('#gq').oninput = e => { v.q = e.target.value; v.site = null; v.cands = []; cands(); };
+  $('#gq').onkeydown = e => { if (e.key === 'Enter') $('#gfind').click(); };
+  $('#gfind').onclick = async () => { const m = pinRe.exec(v.q); if (m) { v.site = { id: 'site', name: 'Dropped pin', lat: +m[1], lon: +m[2] }; v.inv = ''; return cands(); }
+    try { v.cands = (await PI.api('POST', 'geo/resolve', { query: v.q })).candidates; if (!v.cands.length) PI.toast('No match in Qatar. Try an address or coordinates.'); cands(); } catch (e) { PI.toast(e.message); } };
+  $('#gf').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return; const c = $('#gchk'); c.innerHTML = '<span class="spin"></span>';
+    try {
+      const x = await PI.extract(f), chk = await PI.api('POST', 'geo/ooh/check', { rows: x.rows || [] });
+      c.innerHTML = `<div class="gx-ok">${chk.rows.length} usable sites${chk.issues.length ? `, ${chk.issues.length} rows need fixing` : ''}${chk.warnings.length ? `, ${chk.warnings.length} share coordinates` : ''}.</div>${chk.issues.slice(0, 10).map(i => `<div class="gx-iss">Row ${i.row}: ${esc(i.message)}</div>`).join('')}${chk.rows.length ? `<button class="gx-btn" id="gsave">${I('save')}Save inventory</button>` : ''}`;
+      const s = $('#gsave'); if (s) s.onclick = async () => { const id = PI.uid(); await PI.saveDoc('geoooh', id, { name: f.name.replace(/\.[^.]+$/, ''), rows: chk.rows, updatedAt: Date.now() }); v.inv = id; PI.toast('Inventory saved'); PI.tools.geo(box, p, a); };
+    } catch (err) { c.innerHTML = `<div class="gx-iss">${esc(err.message)}</div>`; }
+  };
+  $('#ggo').onclick = () => {
+    if (v.inv) { const inv = v.invs.find(i => i.id === v.inv); if (!inv) return PI.toast('Inventory not found'); if (inv.rows.length > 40) PI.toast('Analysing the first 40 sites'); return run(inv.rows.slice(0, 40)); }
+    if (!v.site) return PI.toast('Find a place first, or choose an inventory'); run([{ ...v.site, zone: v.zone }]);
+  };
+
+  async function run(sites) {
+    const id = ++v.run; v.tab = 'map'; $$('[data-t]').forEach(x => x.setAttribute('aria-selected', x.dataset.t === 'map'));
+    $('#gxb').innerHTML = `<div class="gx-empty"><span class="spin"></span><b>Analysing</b></div>`;
+    let res; try { res = await PI.api('POST', 'geo/analyze', { sites, radius: v.radius, recipe: v.recipe, competitor: v.competitor }); } catch (e) { if (id === v.run) $('#gxb').innerHTML = `<div class="gx-empty"><b>${esc(e.message)}</b></div>`; return; }
+    if (id !== v.run) return;   // a newer analysis replaced this one
+    v.result = res; v.ai = null; v.sel = 0; body(); interpret(res, id);
+  }
+  const ranked = res => res.results.slice().sort((x, y) => (y.score.value ?? -1) - (x.score.value ?? -1));
+
+  function dash(res) {
+    const rows = ranked(res), r = rows[Math.min(v.sel, rows.length - 1)], many = rows.length > 1, [bl, bc] = band(r.score.value), L = v.layers;
+    const cats = [...new Set(r.places.map(x => x.c))], counted = r.score.contributions.reduce((n, c) => n + (c.count || 0), 0) + (r.pressure ? r.pressure.count : 0), z = r.official;
+    const circ = 2 * Math.PI * 52, sv = r.score.value;
+    $('#gxb').innerHTML = `<div class="gx-top">
+      <div class="gx-map">${mapSVG(res, r, v)}
+        <div class="gx-layers"><b>Layers</b>
+          <label><input type="checkbox" data-l="sites" ${L.sites ? 'checked' : ''}> ${many ? 'OOH sites' : 'Site'}</label><label><input type="checkbox" data-l="rings" ${L.rings ? 'checked' : ''}> Catchment radius</label><label><input type="checkbox" data-l="places" ${L.places ? 'checked' : ''}> Places</label>
+          ${cats.map(c => `<label class="sub"><input type="checkbox" data-lc="${c}" ${L.off[c] ? '' : 'checked'}><i style="background:${colorOf(res, c)}"></i>${esc(meta.categories[c] || c)}</label>`).join('')}</div>
+        <div class="gx-pills">${many ? `<button data-view class="${v.view === 'all' ? 'on' : ''}">All sites</button>` : ''}${meta.radii.map(m => `<button data-rad="${m}" class="${m === res.radius ? 'on' : ''}">${m >= 1000 ? m / 1000 + ' km' : m + ' m'}</button>`).join('')}</div>
+        <div class="gx-schem">Schematic plot: positions are exact, no basemap.</div></div>
+      <div class="gx-card gx-sitec">
+        <div class="gx-sh"><div><h3 dir="auto">${esc(r.site.name || r.site.id)}</h3><span>${[r.site.vendor, r.site.format, r.site.road, r.site.municipality].filter(Boolean).map(esc).join(' · ') || 'Dropped location'}</span><span>${r.site.lat.toFixed(4)}, ${r.site.lon.toFixed(4)}</span></div><span class="gx-pill ${bc}">${bl}</span></div>
+        <div class="gx-tiles"><div><b>${z ? num(z.population) : 'n/a'}</b><small>Zone population${z ? ' ' + esc(z.year) : ''}</small></div><div><b>${counted ? (r.score.contributions.some(c => c.capped) ? '≥ ' : '') + counted : 'n/a'}</b><small>Places within ${res.radius} m</small></div><div><b>${r.pressure ? km(r.pressure.nearestM) : '–'}</b><small>Nearest competitor</small></div><div><b>${Math.round(r.score.coverage * 100)}%</b><small>Evidence coverage</small></div></div>
+        <div class="gx-rowl"><span>${I('target')}Audience</span><b>${esc(res.recipe.label)}</b></div><div class="gx-rowl"><span>${I('map-pin')}Catchment radius</span><b>${km(res.radius)}</b></div><div class="gx-rowl"><span>${I('building-2')}Official zone</span><b>${z ? esc(z.zone.split('/')[0]) : 'Not matched'}</b></div><div class="gx-rowl"><span>${I('gauge')}Confidence</span><b>${r.confidence}</b></div>
+        <div class="gx-comp"><small>Audience recipe weights (planning assumption)</small><div class="gx-stack">${res.recipe.factors.map(f => `<i style="flex:${f.w};background:${colorOf(res, f.cat)}" title="${esc(meta.categories[f.cat])} ${f.w}"></i>`).join('')}</div>
+          <div class="gx-leg">${res.recipe.factors.map(f => `<span><i style="background:${colorOf(res, f.cat)}"></i>${esc(meta.categories[f.cat])}</span>`).join('')}</div></div>
+        <div class="gx-acts"><button class="gx-btn" id="gsv">${I('save')}Save</button>${many ? `<small>${rows.indexOf(r) + 1} of ${rows.length}, click a site on the plot</small>` : ''}</div></div></div>
+    <div class="gx-row4">
+      <div class="gx-card"><h4>Official data ${z ? `<small>${esc(z.zone.split('/')[0])}</small>` : ''}</h4>${z ? `<div class="gx-mini"><div><small>Population ${esc(z.year)}</small><b>${num(z.population)}</b>${z.change ? `<em class="${z.change.pct >= 0 ? 'up' : 'dn'}">${z.change.pct >= 0 ? '+' : ''}${z.change.pct}% vs ${esc(z.change.sinceYear)}</em>` : ''}</div><div><small>Area</small><b>${num(z.areaKm2, 1)} km²</b></div><div><small>Density</small><b>${num(z.densityPerKm2)}/km²</b></div></div><p class="gx-fine">Whole zone, not this catchment. <a href="${esc(z.url)}" target="_blank" rel="noopener">Qatar Open Data</a></p>` : `<p class="gx-fine">${esc(r.officialNote || 'Add a zone to see official population.')}</p>`}<button class="gx-link" data-t2="official">View all official data ${I('chevron-right')}</button></div>
+      <div class="gx-card"><h4>Nearby places <small>${res.radius} m</small></h4>${r.score.contributions.map(c => `<div class="gx-li"><span><i style="background:${colorOf(res, c.cat)}"></i>${esc(c.label)}</span><b>${c.count == null ? 'n/a' : (c.capped ? '≥ ' : '') + c.count}</b><small>${km(r.features[c.cat] && r.features[c.cat].nearestM)}</small></div>`).join('')}</div>
+      <div class="gx-card"><h4>Competitor density</h4>${r.pressure ? `<div class="gx-big">${r.pressure.capped ? '≥ ' : ''}${r.pressure.count}<small>${esc(r.pressure.label.toLowerCase())} within ${km(res.radius)}</small></div><div class="gx-meter"><i style="width:${Math.min(100, r.pressure.count * 5)}%"></i></div><div class="gx-li"><span>Nearest</span><b>${km(r.pressure.nearestM)}</b></div><p class="gx-fine">Shown beside the score, not part of it. Search returns at most 20 per category.</p>` : `<p class="gx-fine">Choose a competitor category above to see how crowded the catchment is.</p>`}</div>
+      <div class="gx-card"><h4>Opportunity score <small>relative index</small></h4>${sv == null ? '<p class="gx-fine">No score yet: no surrounding-place data was available.</p>' : `<div class="gx-gauge"><svg viewBox="0 0 130 130"><circle cx="65" cy="65" r="52" class="bg"/><circle cx="65" cy="65" r="52" class="fg ${bc}" stroke-dasharray="${sv / 100 * circ} ${circ}" transform="rotate(-90 65 65)"/></svg><div><b>${sv}</b><small>/100</small></div></div><div class="gx-pill ${bc} c">${bl}</div>
+        ${r.score.contributions.filter(c => c.normalized != null).map(c => `<div class="gx-bar2"><span>${esc(c.label)}</span><div><i style="width:${Math.round(c.normalized * 100)}%;background:${colorOf(res, c.cat)}"></i></div><b>${Math.round(c.normalized * 100)}</b></div>`).join('')}`}</div></div>
+    <div class="gx-row2"><div class="gx-card"><h4>Recommended next steps</h4><ul class="gx-f">${(res.recommendations || []).map(x => `<li><span class="gx-pill ${x.priority === 'Do now' ? 'ok' : ''}">${x.priority}</span> ${esc(x.action)}<small>${esc(x.rationale)}${x.evidence_refs.length ? ' · ' + esc(x.evidence_refs.join(', ')) : ''}</small></li>`).join('')}</ul><div id="gai"></div></div>
+      <div class="gx-card"><h4>Sources and limits</h4><details><summary>Evidence (${res.evidence.length})</summary><ul class="gx-f">${res.evidence.map(e => `<li><b>${esc(e.id)} · ${esc(e.kind)}</b> ${esc(e.text)}<small>${esc([e.source, e.retrieved, e.cached ? 'cached' : ''].filter(Boolean).join(' · '))}</small></li>`).join('')}</ul></details><ul class="gx-lim">${res.limits.map(l => `<li>${esc(l)}</li>`).join('')}</ul></div></div>`;
+    $$('[data-l]').forEach(c => c.onchange = () => { L[c.dataset.l] = c.checked; dash(res); });
+    $$('[data-lc]').forEach(c => c.onchange = () => { L.off[c.dataset.lc] = !c.checked; dash(res); });
+    $$('[data-site]').forEach(g => g.onclick = () => { const i = rows.findIndex(x => x.site.id === g.dataset.site); if (i >= 0) { v.sel = i; dash(res); } });
+    $$('[data-view]').forEach(b => b.onclick = () => { v.view = v.view === 'all' ? 'site' : 'all'; dash(res); });
+    $$('[data-rad]').forEach(b => b.onclick = () => { v.radius = +b.dataset.rad; $('#gr').value = v.radius; $('#ggo').click(); });
+    $$('[data-t2]').forEach(b => b.onclick = () => $('[data-t="official"]').click());
     $('#gsv').onclick = async () => { const sid = await PI.saveOutput({ id: v.savedId, pillar: 'media', agent: 'geo', title: 'Geo Intelligence · ' + (rows[0].site.name || 'analysis') + (many ? ` +${rows.length - 1}` : ''), text: md(res, rows) }); if (sid) { v.savedId = sid; PI.toast('Saved to the library'); } };
-    if (!restored) interpret(res, id); else if (v.ai) showAi(v.ai);
+    if (v.ai) showAi(v.ai);
+  }
+  function compare(res) {
+    const rows = ranked(res);
+    $('#gxb').innerHTML = `<div class="gx-card"><h4>Site comparison <small>${esc(res.recipe.label)} · ${km(res.radius)}</small></h4><table class="gx-t"><thead><tr><th>#</th><th>Site</th><th>Score</th><th>Coverage</th><th>Confidence</th><th>Zone population</th><th>Competitors</th></tr></thead><tbody>${rows.map((r, i) => `<tr data-s="${esc(r.site.id)}"><td>${i + 1}</td><td dir="auto">${esc(r.site.name || r.site.id)}</td><td><b>${r.score.value ?? 'n/a'}</b></td><td>${Math.round(r.score.coverage * 100)}%</td><td>${r.confidence}</td><td>${r.official ? num(r.official.population) : '–'}</td><td>${r.pressure ? (r.pressure.capped ? '≥ ' : '') + r.pressure.count : '–'}</td></tr>`).join('')}</tbody></table><p class="gx-fine">Click a row to open that site on the map. Scores are relative planning indices, not footfall or reach.</p></div>`;
+    $$('[data-s]').forEach(tr => tr.onclick = () => { v.sel = rows.findIndex(x => x.site.id === tr.dataset.s); v.tab = 'map'; $$('[data-t]').forEach(x => x.setAttribute('aria-selected', x.dataset.t === 'map')); dash(res); });
+  }
+  function saved() {
+    const list = S.outputs.filter(o => o.agent === 'geo');
+    $('#gxb').innerHTML = `<div class="gx-card">${list.length ? list.map(o => `<button class="gx-li gx-sv" data-go="library/${o.id}"><span>${esc(o.title)}</span><small>${PI.when(o.createdAt)}</small></button>`).join('') : '<p class="gx-fine">Saved analyses appear here. Use Save on any result.</p>'}</div>`;
   }
   const md = (res, rows) => `# Geo Intelligence · ${res.recipe.label}, ${res.radius} m\n\n| # | Site | Score | Coverage | Confidence |\n|---|---|---|---|---|\n${rows.map((r, i) => `| ${i + 1} | ${r.site.name || r.site.id} | ${r.score.value ?? 'n/a'} | ${Math.round(r.score.coverage * 100)}% | ${r.confidence} |`).join('\n')}\n\n${(res.recommendations || []).map(x => `- **${x.priority}:** ${x.action} ${x.rationale}`).join('\n')}\n\n${v.ai && v.ai.ok ? v.ai.findings.map(f => `- ${f.statement} (${f.classification}, ${f.confidence})`).join('\n') + '\n\n' + v.ai.actions.map(x => `- **${x.priority}:** ${x.action}`).join('\n') : ''}\n\n## Limits\n${res.limits.map(l => '- ' + l).join('\n')}\n`;
   function showAi(ai) {
     const b = $('#gai'); if (!b) return;
-    b.innerHTML = !ai.ok ? `<div class="notice info">${I('info')}<div>AI interpretation unavailable: ${esc(ai.error)} The scores and evidence below are complete.</div></div>`
-      : `<h4>Findings</h4><ul class="g-f">${ai.findings.map(f => `<li><span class="pill mut">${f.classification}</span> ${esc(f.statement)} <small>${f.confidence} · ${esc(f.refs.join(', '))}</small></li>`).join('')}</ul>
-        ${ai.audience.length ? `<h4>Audience context</h4><ul class="g-f">${ai.audience.map(x => `<li><b>${esc(x.archetype)}</b> ${esc(x.rationale)} <small>${esc(x.refs.join(', '))}</small></li>`).join('')}</ul>` : ''}
-        ${ai.actions.length ? `<h4>Actions</h4><ul class="g-f">${ai.actions.map(x => `<li><span class="pill ${x.priority === 'Do now' ? 'ok' : 'mut'}">${x.priority}</span> ${esc(x.action)} <small>${esc(x.rationale)}${x.validation ? ' · to validate: ' + esc(x.validation) : ''}</small></li>`).join('')}</ul>` : ''}
-        ${ai.dropped ? `<p class="hint">${ai.dropped} AI statement${ai.dropped > 1 ? 's' : ''} left out because they could not be matched to the evidence.</p>` : ''}`;
+    b.innerHTML = !ai.ok ? `<p class="gx-fine">AI interpretation unavailable: ${esc(ai.error)} The scores and evidence are complete.</p>`
+      : `<h5>AI findings</h5><ul class="gx-f">${ai.findings.map(f => `<li><span class="gx-pill">${f.classification}</span> ${esc(f.statement)}<small>${f.confidence} · ${esc(f.refs.join(', '))}</small></li>`).join('')}</ul>
+        ${ai.audience.length ? `<h5>Audience context</h5><ul class="gx-f">${ai.audience.map(x => `<li><b>${esc(x.archetype)}</b> ${esc(x.rationale)}<small>${esc(x.refs.join(', '))}</small></li>`).join('')}</ul>` : ''}
+        ${ai.actions.length ? `<h5>AI actions</h5><ul class="gx-f">${ai.actions.map(x => `<li><span class="gx-pill ${x.priority === 'Do now' ? 'ok' : ''}">${x.priority}</span> ${esc(x.action)}<small>${esc(x.rationale)}${x.validation ? ' · to validate: ' + esc(x.validation) : ''}</small></li>`).join('')}</ul>` : ''}
+        ${ai.dropped ? `<p class="gx-fine">${ai.dropped} AI statement${ai.dropped > 1 ? 's' : ''} left out because they could not be matched to the evidence.</p>` : ''}`;
   }
   async function interpret(res, id) {
-    v.ai = null; const b = $('#gai');
     if (!res.results.some(r => r.score.value != null) && !res.results.some(r => r.official)) { v.ai = { ok: false, error: 'There is no evidence to interpret yet.' }; return showAi(v.ai); }
-    b.innerHTML = '<p class="muted"><span class="spin" style="vertical-align:-2px;margin-right:8px"></span>Reading the evidence</p>';
+    const b = $('#gai'); if (b) b.innerHTML = '<p class="gx-fine"><span class="spin" style="vertical-align:-2px;margin-right:8px"></span>Reading the evidence</p>';
     const pk = GC.buildPacket(res, v.brief);
     try { const r = await PI.ai({ tier: 'complex', json: true, web: false, route: 'media/geo', system: GC.SYSTEM + '\n\n' + PI.clientBlock(), prompt: JSON.stringify(pk) }); if (id !== v.run) return; v.ai = GC.parseInterpretation(r.text, pk); }
     catch (e) { if (id !== v.run) return; v.ai = { ok: false, error: e.message + '.' }; }
     showAi(v.ai);
   }
+  body();
 };
 })();
