@@ -95,7 +95,7 @@ const pct = v => num(v * 100, v * 100 % 1 ? 1 : 0) + '%';
 /* ---------- Tool ---------- */
 PI.tools.mediaplan = (box, p, a) => {
   if (S.openPlan) { S.mplan = JSON.parse(JSON.stringify(S.openPlan.data)); S.openPlan = null; }
-  if (!S.mplan) return chooseType(box);
+  if (!S.mplan) return PI.mediaBrief ? PI.mediaBrief.start(box) : chooseType(box);
   editor(box);
 };
 function chooseType(box) {
@@ -131,7 +131,7 @@ function editor(box) {
         <button class="icon-btn" data-delsec="${si}" title="Remove section" aria-label="Remove section">${I('trash-2')}</button></div>
       <div class="tw"><table class="grid-t"><thead><tr><th>Platform</th><th>Ad format</th><th>Ad placement</th><th>Ad specs</th><th>Objective</th><th>Pricing unit</th><th>Price / unit (USD)</th>${s.mode === 'allocation' ? '<th>Allocation %</th>' : '<th>Net cost QAR</th>'}<th class="num">${esc(s.kpi)}</th><th class="num">Net cost USD</th>${s.mode === 'allocation' ? '<th class="num">Net cost QAR</th>' : ''}<th class="num">Daily QAR</th><th class="num">Daily USD</th>${weekHeaderRow}<th></th></tr></thead>
         <tbody>${s.rows.map((r, ri) => { const pth = `online.sections.${si}.rows.${ri}`; return `<tr>
-          <td>${inp(pth + '.platform', r.platform, 'w', 'e.g. Instagram')}</td><td>${inp(pth + '.format', r.format, 'w', 'Static + video')}</td><td>${inp(pth + '.placement', r.placement, 'w', 'Feed, Reels')}</td><td>${inp(pth + '.specs', r.specs, '', '1080x1920')}</td><td>${inp(pth + '.objective', r.objective, 'w', 'Traffic')}</td>
+          <td title="${esc(r.why || '')}">${inp(pth + '.platform', r.platform, 'w', 'e.g. Instagram')}${r.why ? `<div class="why">${esc(r.why)}</div>` : ''}</td><td>${inp(pth + '.format', r.format, 'w', 'Static + video')}</td><td>${inp(pth + '.placement', r.placement, 'w', 'Feed, Reels')}</td><td>${inp(pth + '.specs', r.specs, '', '1080x1920')}</td><td>${inp(pth + '.objective', r.objective, 'w', 'Traffic')}</td>
           <td>${sel(pth + '.unit', r.unit, UNITS)}</td><td>${inp(pth + '.price', r.price, 'n')}</td>
           ${s.mode === 'allocation' ? `<td>${inp(pth + '.alloc', Math.round(n(r.alloc) * 10000) / 100, 'n', '%').replace('data-p', 'data-pct data-p')}</td>` : `<td>${inp(pth + '.qar', r.qar, 'n')}</td>`}
           <td class="calc" data-c="on.${si}.${ri}.kpi"></td><td class="calc" data-c="on.${si}.${ri}.usd"></td>${s.mode === 'allocation' ? `<td class="calc" data-c="on.${si}.${ri}.qar"></td>` : ''}<td class="calc" data-c="on.${si}.${ri}.dQar"></td><td class="calc" data-c="on.${si}.${ri}.dUsd"></td>
@@ -169,6 +169,7 @@ function editor(box) {
       <div class="mp-head">${[['client', 'Client'], ['reference', 'Reference number'], ['brand', 'Brand / product'], ['campaign', 'Campaign name'], ['market', 'Market']].map(([k, l]) => `<div class="field"><label>${l}</label><input data-p="header.${k}" value="${esc(H[k] || '')}" dir="auto"></div>`).join('')}
         <div class="field"><label>Plan date</label><input type="date" data-p="header.planDate" data-restruct value="${esc(H.planDate)}"></div><div class="field"><label>Start date</label><input type="date" data-p="header.start" data-restruct value="${esc(H.start)}"></div><div class="field"><label>End date</label><input type="date" data-p="header.end" data-restruct value="${esc(H.end)}"></div>
         <div class="field"><label>Duration</label><input value="${days(H)} days" disabled></div><div class="field"><label>Exchange rate (QAR per USD)</label><input data-p="header.fx" value="${esc(H.fx)}"></div></div></div>
+    <div id="mbpanel"></div>
     <div class="mp-sum" id="mpsum"></div>
     ${hasOn(P) ? (P.type === 'hybrid' ? '<div class="mp-divider"><span>Online</span></div>' : '') + onlineHTML() : ''}
     ${hasOff(P) ? (P.type === 'hybrid' ? '<div class="mp-divider"><span>Offline and OOH</span></div>' : '') + offlineHTML() : ''}
@@ -234,6 +235,7 @@ function editor(box) {
   $('#mpPdf').onclick = async () => { savePlan(true); try { PI.toast('Building the PDF'); await exportPDF(P); } catch (e) { PI.toast('PDF export failed: ' + e.message); } };
   $('#mpAI').onclick = () => draftAI(box);
   recalc();
+  if (PI.mediaBrief) PI.mediaBrief.mount(P, box);
   if (S.mplanSaved) { const st = $('#mpst'); if (st) st.innerHTML = I('check') + 'Saved'; }
 }
 const planTitle = P => (P.header.campaign || P.header.brand || 'Media plan') + (P.header.client ? ' · ' + P.header.client : '');
@@ -244,34 +246,36 @@ async function savePlan(quiet) {
 }
 
 /* ---------- AI draft ---------- */
+// Asks the AI for a plan from the brief and applies it to P. extra = the verified audience data and the chosen suppliers (mediabrief.js).
+async function runDraft(P, brief, on, off, extra) {
+  const schema = { ...(hasOn(P) ? { sections: [{ name: 'Awareness', kpi: 'Impressions', total: 50000, rows: [{ platform: 'Instagram', format: 'Static + video', placement: 'Feed, Stories, Reels', specs: '1080x1080, 1080x1920', unit: 'CPM', price: 3.5, objective: 'Reach', alloc: 0.4, why: 'One line: why this platform or supplier fits this brief' }] }], targeting: [{ platform: 'Instagram', demographics: 'Age 25-45, all genders', geographics: 'Qatar', interests: 'Travel, premium banking' }] } : {}), ...(hasOff(P) ? { groups: [{ name: 'MUPI', category: 'OOH', vendor: 'Elan', rows: [{ format: 'Doha MUPI', size: '1.2 x 1.76 m', placement: '', language: '', unit: 'Block (2 weeks)', qty: 2, faces: 40, rate: 120000, disc: 0.2, prodRate: 6600, prodQty: 2 }] }] } : {}) };
+  const r = await PI.ai({ tier: 'complex', route: 'media/plan', json: true,
+    system: `You are the head of media planning at Publicis Media Qatar. Draft a ${P.type} media plan for the brief. Use realistic 2026 Qatar market channels, vendors and rates: online prices in USD per pricing unit (CPM, CPV, CPC, CPLP and so on), offline gross rates in QAR per unit (OOH per 2-week block per circuit, print per insertion, radio per spot). Online allocations in each section must sum to 1. Keep section totals within the online budget and offline net within the offline budget. Use categories from: ${Object.keys(CATS).join(', ')}.${extra ? '\nFor online, cover every platform and supplier in the shortlist that fits the brief, one row each (add a row per distinct format where useful), and give every row a one-line "why" tied to the brief. Leave out a shortlisted supplier only if it clearly does not fit. Use only the audience figures supplied; never invent audience sizes.' : ''}\n${PI.clientBlock()}\nReturn only JSON shaped exactly like this example:\n${JSON.stringify(schema)}`,
+    prompt: `Brief: ${brief}\nCampaign dates: ${P.header.start} to ${P.header.end}\n${hasOn(P) ? 'Online budget QAR: ' + (on || 'decide sensibly') + '\n' : ''}${hasOff(P) ? 'Offline budget QAR: ' + (off || 'decide sensibly') : ''}${extra ? '\n\n' + extra : ''}` });
+  const d = PI.parseJSON(r.text);
+  if (hasOn(P) && Array.isArray(d.sections) && d.sections.length) {
+    P.online.sections = d.sections.map(s => ({ id: PI.uid(), name: String(s.name || 'Section'), kpi: KPIS.includes(s.kpi) ? s.kpi : 'Impressions', mode: 'allocation', total: n(s.total), rows: (s.rows || []).map(x => ({ ...newRowOn(), platform: String(x.platform || ''), format: String(x.format || ''), placement: String(x.placement || ''), specs: String(x.specs || ''), unit: UNITS.includes(x.unit) ? x.unit : 'CPM', price: n(x.price), objective: String(x.objective || ''), alloc: n(x.alloc), why: String(x.why || ''), weeks: [] })) }));
+    const W = weeks(P.header); P.online.sections.forEach(s => s.rows.forEach(r => r.weeks = W.map(() => true)));
+    if (Array.isArray(d.targeting) && d.targeting.length) P.online.targeting = d.targeting.map(t => ({ platform: String(t.platform || ''), demographics: String(t.demographics || ''), geographics: String(t.geographics || ''), interests: String(t.interests || '') }));
+  }
+  if (hasOff(P) && Array.isArray(d.groups) && d.groups.length) {
+    P.offline.groups = d.groups.map(g => { const cat = CATS[g.category] ? g.category : 'Other'; return { id: PI.uid(), name: String(g.name || cat), category: cat, vendor: String(g.vendor || ''), rows: (g.rows || []).map(x => ({ ...newRowOff(cat), format: String(x.format || ''), size: String(x.size || ''), placement: String(x.placement || ''), language: String(x.language || ''), unit: String(x.unit || CATS[cat].unit), qty: n(x.qty) || 1, faces: n(x.faces), rate: n(x.rate), disc: Math.min(1, n(x.disc)), prodRate: n(x.prodRate), prodQty: n(x.prodQty) })) }; });
+    const W = weeks(P.header); P.offline.groups.forEach(g => g.rows.forEach(r => r.weeks = W.map((_, i) => i < 2 * (r.qty || 1))));
+  }
+}
 function draftAI(box) {
-  const P = S.mplan;
-  const m = PI.modal(`<h2>Draft the plan with AI</h2><p class="muted" style="margin:0 0 16px;font-size:14px">The planner proposes channels, units and rates for Qatar. Every number stays editable. Rates are estimates to confirm against current rate cards.</p>
-    <div class="field"><label for="dBrief">Objective and brief</label><textarea id="dBrief" class="inp" style="min-height:110px" placeholder="e.g. Drive applications for the new travel card among affluent Qatari nationals and expats, 25 to 45."></textarea></div>
-    <div class="row2">${hasOn(P) ? `<div class="field"><label for="dOn">Online budget (QAR)</label><input id="dOn" class="inp" placeholder="e.g. 150000"></div>` : ''}${hasOff(P) ? `<div class="field"><label for="dOff">Offline budget (QAR)</label><input id="dOff" class="inp" placeholder="e.g. 400000"></div>` : ''}</div>
+  const P = S.mplan, b = P.brief || {}, brief0 = P.brief && PI.mediaBrief ? PI.mediaBrief.briefText(P) : '';
+  const m = PI.modal(`<h2>Draft the plan with AI</h2><p class="muted" style="margin:0 0 16px;font-size:14px">The planner proposes channels, suppliers, units and rates for Qatar${P.brief ? ' from the brief and the verified audience data' : ''}. Every number stays editable. Rates are estimates to confirm against current rate cards. This replaces the current lines.</p>
+    <div class="field"><label for="dBrief">Objective and brief</label><textarea id="dBrief" class="inp" style="min-height:110px" placeholder="e.g. Drive applications for the new travel card among affluent Qatari nationals and expats, 25 to 45.">${esc(brief0)}</textarea></div>
+    <div class="row2">${hasOn(P) ? `<div class="field"><label for="dOn">Online budget (QAR)</label><input id="dOn" class="inp" value="${esc(b.budget ? b.budget.online : '')}" placeholder="e.g. 150000"></div>` : ''}${hasOff(P) ? `<div class="field"><label for="dOff">Offline budget (QAR)</label><input id="dOff" class="inp" value="${esc(b.budget ? b.budget.offline : '')}" placeholder="e.g. 400000"></div>` : ''}</div>
     <div class="actions" style="justify-content:flex-end"><button class="btn" id="dNo">Cancel</button><button class="btn pri" id="dGo">${I('sparkles')}Draft plan</button></div><p class="hint" id="dSt"></p>`);
   m.el.querySelector('#dNo').onclick = m.close;
   m.el.querySelector('#dGo').onclick = async () => {
     const brief = m.el.querySelector('#dBrief').value.trim(); if (!brief) { PI.toast('Describe the objective first'); return; }
     const on = n((m.el.querySelector('#dOn') || {}).value), off = n((m.el.querySelector('#dOff') || {}).value);
     const go = m.el.querySelector('#dGo'); go.disabled = true; const st = m.el.querySelector('#dSt'); st.innerHTML = '<span class="spin"></span> Planning. This can take a minute.';
-    try {
-      const schema = { ...(hasOn(P) ? { sections: [{ name: 'Awareness', kpi: 'Impressions', total: 50000, rows: [{ platform: 'Instagram', format: 'Static + video', placement: 'Feed, Stories, Reels', specs: '1080x1080, 1080x1920', unit: 'CPM', price: 3.5, objective: 'Reach', alloc: 0.4 }] }], targeting: [{ platform: 'Instagram', demographics: 'Age 25-45, all genders', geographics: 'Qatar', interests: 'Travel, premium banking' }] } : {}), ...(hasOff(P) ? { groups: [{ name: 'MUPI', category: 'OOH', vendor: 'Elan', rows: [{ format: 'Doha MUPI', size: '1.2 x 1.76 m', placement: '', language: '', unit: 'Block (2 weeks)', qty: 2, faces: 40, rate: 120000, disc: 0.2, prodRate: 6600, prodQty: 2 }] }] } : {}) };
-      const r = await PI.ai({ tier: 'complex', route: 'media/plan', json: true,
-        system: `You are the head of media planning at Publicis Media Qatar. Draft a ${P.type} media plan for the brief. Use realistic 2026 Qatar market channels, vendors and rates: online prices in USD per pricing unit (CPM, CPV, CPC, CPLP and so on), offline gross rates in QAR per unit (OOH per 2-week block per circuit, print per insertion, radio per spot). Online allocations in each section must sum to 1. Keep section totals within the online budget and offline net within the offline budget. Use categories from: ${Object.keys(CATS).join(', ')}.\n${PI.clientBlock()}\nReturn only JSON shaped exactly like this example:\n${JSON.stringify(schema)}`,
-        prompt: `Brief: ${brief}\nCampaign dates: ${P.header.start} to ${P.header.end}\n${hasOn(P) ? 'Online budget QAR: ' + (on || 'decide sensibly') + '\n' : ''}${hasOff(P) ? 'Offline budget QAR: ' + (off || 'decide sensibly') : ''}` });
-      const d = PI.parseJSON(r.text);
-      if (hasOn(P) && Array.isArray(d.sections) && d.sections.length) {
-        P.online.sections = d.sections.map(s => ({ id: PI.uid(), name: String(s.name || 'Section'), kpi: KPIS.includes(s.kpi) ? s.kpi : 'Impressions', mode: 'allocation', total: n(s.total), rows: (s.rows || []).map(x => ({ ...newRowOn(), platform: String(x.platform || ''), format: String(x.format || ''), placement: String(x.placement || ''), specs: String(x.specs || ''), unit: UNITS.includes(x.unit) ? x.unit : 'CPM', price: n(x.price), objective: String(x.objective || ''), alloc: n(x.alloc), weeks: [] })) }));
-        const W = weeks(P.header); P.online.sections.forEach(s => s.rows.forEach(r => r.weeks = W.map(() => true)));
-        if (Array.isArray(d.targeting) && d.targeting.length) P.online.targeting = d.targeting.map(t => ({ platform: String(t.platform || ''), demographics: String(t.demographics || ''), geographics: String(t.geographics || ''), interests: String(t.interests || '') }));
-      }
-      if (hasOff(P) && Array.isArray(d.groups) && d.groups.length) {
-        P.offline.groups = d.groups.map(g => { const cat = CATS[g.category] ? g.category : 'Other'; return { id: PI.uid(), name: String(g.name || cat), category: cat, vendor: String(g.vendor || ''), rows: (g.rows || []).map(x => ({ ...newRowOff(cat), format: String(x.format || ''), size: String(x.size || ''), placement: String(x.placement || ''), language: String(x.language || ''), unit: String(x.unit || CATS[cat].unit), qty: n(x.qty) || 1, faces: n(x.faces), rate: n(x.rate), disc: Math.min(1, n(x.disc)), prodRate: n(x.prodRate), prodQty: n(x.prodQty) })) }; });
-        const W = weeks(P.header); P.offline.groups.forEach(g => g.rows.forEach(r => r.weeks = W.map((_, i) => i < 2 * (r.qty || 1))));
-      }
-      m.close(); editor(box); PI.toast('Draft ready. Review every rate before sending.');
-    } catch (e) { st.textContent = e.message; go.disabled = false; }
+    try { await runDraft(P, brief, on, off, PI.mediaBrief ? PI.mediaBrief.draftContext(P) : ''); m.close(); editor(box); PI.toast('Draft ready. Review every rate before sending.'); }
+    catch (e) { st.textContent = e.message; go.disabled = false; }
   };
 }
 
@@ -445,4 +449,5 @@ async function exportPDF(P) {
   pdfMake.createPdf({ pageSize: 'A3', pageOrientation: 'landscape', pageMargins: [30, 30, 30, 36], content, defaultStyle: { fontSize: 8 }, footer: (p, c) => ({ text: planTitle(P) + '   ' + p + ' / ' + c, alignment: 'right', fontSize: 7, color: '#AEAEB2', margin: [30, 12, 30, 0] }) }).download(PI.slug(planTitle(P)) + '.pdf');
 }
 PI.mediaplanTest = { newPlan, totals, weeks, exportExcel, exportPDF };
+PI.mp = { newPlan, editor, chooseType, runDraft, draft: draftAI, hasOn, hasOff, weeks, calcOnline, totals, newRowOn, n, KPIS, TEAL, recentPlans, days };
 })();

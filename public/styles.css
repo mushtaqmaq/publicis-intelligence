@@ -667,3 +667,9 @@ pre.code{background:#111114;color:#E8E8ED;font:12.5px/1.55 ui-monospace,SFMono-R
 .gx-usual{display:flex;align-items:center;gap:10px;margin:2px 0 8px}.gx-usual small{color:var(--muted);font-size:12px}
 .gx-invf{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:0 0 8px}.gx-invf:empty{display:none}
 .gx-check{display:flex!important;flex-direction:row;align-items:center;gap:8px}.gx-check input{accent-color:var(--ink)}
+
+/* ============ Media planner: brief first, audience and reach ============ */
+.mb-steps{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:4px 0 10px}.mb-steps span{font-size:12.5px;color:var(--muted);padding:5px 12px;border-radius:99px;background:var(--paper)}.mb-steps .on{background:var(--ink);color:#fff}.mb-steps .done{color:var(--ink-2)}
+.mb-brief{margin-bottom:0}.mb-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}.mb-sum small{color:var(--muted);font-size:12px}.mb-sum p{margin:2px 0 0;font-size:14px}
+.mb-segs{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}.mb-in{border-color:var(--ink)}
+.why{font-size:11.5px;color:var(--muted);margin-top:3px;max-width:230px;line-height:1.35}

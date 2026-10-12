@@ -102,13 +102,17 @@ PI.tools.geo = async (box, p, a) => {
     if (!v.inv) { box.innerHTML = ''; return; }
     if (v.inv === BUILTIN && !v.builtin) { box.innerHTML = '<span class="spin"></span>'; PI.api('GET', 'geo/ooh/builtin').then(d => { v.builtin = d; invUI(); if (!v.result) G.show(); }).catch(e => { box.innerHTML = `<span class="gx-iss">${esc(e.message)}</span>`; }); return; }
     const vs = [...new Set(rows.map(r => r.vendor).filter(Boolean))].sort(), fs = [...new Set(rows.filter(r => !v.invFilter.vendor || r.vendor === v.invFilter.vendor).map(r => r.format).filter(Boolean))].sort(), n = filtered().length;
-    box.innerHTML = `<div class="gx-f"><span>Vendor</span><select id="gfv"><option value="">All</option>${vs.map(x => `<option ${x === v.invFilter.vendor ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div><div class="gx-f"><span>Format</span><select id="gff"><option value="">All</option>${fs.map(x => `<option ${x === v.invFilter.format ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div><div class="gx-f"><span>Find asset</span><input id="gfq" value="${esc(v.invFilter.q)}" placeholder="Asset code or area"></div><span class="gx-fine"><b>${n.toLocaleString('en-US')}</b> of ${rows.length.toLocaleString('en-US')} assets${n > 40 ? ' · Analyse takes up to 40 at a time, so narrow the list' : ''}${v.inv === BUILTIN && v.builtin ? ' · from ' + esc(v.builtin.source) : ''}</span>`;
+    box.innerHTML = `<div class="gx-f"><span>Supplier</span><select id="gfv"><option value="">All</option>${vs.map(x => `<option ${x === v.invFilter.vendor ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div><div class="gx-f"><span>Medium</span><select id="gff"><option value="">All</option>${fs.map(x => `<option ${x === v.invFilter.format ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div><div class="gx-f"><span>Find an asset</span><input id="gfq" value="${esc(v.invFilter.q)}" placeholder="Asset code or area"></div><span class="gx-fine"><b>${n.toLocaleString('en-US')}</b> of ${rows.length.toLocaleString('en-US')} assets${n > 40 ? ' · Analyse takes up to 40 at a time, so narrow the list' : ''}${v.inv === BUILTIN && v.builtin ? ' · from ' + esc(v.builtin.source) : ''}</span>`;
     $('#gfv').onchange = e => { v.invFilter.vendor = e.target.value; v.invFilter.format = ''; invUI(); if (!v.result) G.show(); };
     $('#gff').onchange = e => { v.invFilter.format = e.target.value; invUI(); if (!v.result) G.show(); };
     $('#gfq').oninput = e => { v.invFilter.q = e.target.value; const p = e.target.selectionStart; invUI(); const q = $('#gfq'); q.focus(); q.setSelectionRange(p, p); if (!v.result) G.show(); };
   };
   G.invUI = invUI; invUI();
-  $('#ginv').onchange = e => { v.inv = e.target.value; v.invFilter = { vendor: '', format: '', q: '' }; v.site = null; v.browseSel = null; cands(); invUI(); if (!v.result) G.show(); };
+  $('#ginv').onchange = e => {
+    v.inv = e.target.value; v.invFilter = { vendor: '', format: '', q: '' }; v.site = null; v.cands = []; v.focus = false; v.openList = false; v.browseSel = null;
+    if (v.inv) { v.result = null; v.tab = 'map'; v.layers.inv = true; }   // choosing an inventory shows every asset on the map; filter by supplier or medium afterwards
+    const qi = $('#gq'); if (qi) qi.blur(); cands(); invUI(); G.show();
+  };
   $('#gcl').onchange = e => { v.clientLoc = e.target.value; if (v.result) G.show(); else G.show(); };
   const us = $('#gusual'); if (us) us.onclick = () => { const u = BR.usual(v.brain); Object.assign(v, { recipe: u.recipe, radius: u.radius, competitor: u.competitor, objective: u.objective }); PI.tools.geo(box, p, a); }; $('#gc').onchange = e => v.competitor = e.target.value; $('#gz').oninput = e => v.zone = e.target.value; $('#gb').oninput = e => v.brief = e.target.value;
   $$('#grad [data-r]').forEach(b => b.onclick = () => { v.radius = +b.dataset.r; $$('#grad [data-r]').forEach(x => x.classList.toggle('on', x === b)); if (v.result && v.tab === 'map') $('#ggo').click(); });
@@ -128,6 +132,7 @@ PI.tools.geo = async (box, p, a) => {
   const vb = $('#gverify'); if (vb) vb.onclick = async () => { vb.disabled = true; try { await PI.api('POST', 'geo/verify'); v.st = await PI.api('GET', 'geo/status'); PI.tools.geo(box, p, a); } catch (e) { PI.toast(e.message); vb.disabled = false; } };
   const cands = () => {
     const q = v.q.trim().toLowerCase(), local = q.length > 1 ? [...new Set([...v.invs, ...(v.builtin ? [{ name: 'Qatar OOH assets', rows: v.builtin.rows }] : [])])].flatMap(i => i.rows.filter(r => (r.name + ' ' + r.id).toLowerCase().includes(q)).slice(0, 4).map(r => ({ ...r, inv: i.name }))).slice(0, 6) : [], mem = v.focus || q.length > 1 ? BR.suggest(v.brain, v.q, 4) : [];
+    if (!v.focus && !v.openList && !v.site) { $('#gcand').innerHTML = ''; return; }
     $('#gcand').innerHTML = v.site ? `<div class="gx-ok">${I('check')} ${esc(v.site.name)} · ${v.site.lat.toFixed(4)}, ${v.site.lon.toFixed(4)}</div>`
       : [...(v.cands.length ? [`<button data-all><b>Show every match for “${esc(v.q.trim())}” in Qatar</b><small>Maps all of them, then you can analyse or save them</small></button>`] : []), ...v.cands.map((c, i) => `<button data-c="${i}"><b>${esc(c.label)}</b><small>${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}</small></button>`), ...mem.map((r, i) => `<button data-m="${i}"><b>${esc(r.name)}</b><small>Seen before${r.zone ? ' · ' + esc(r.zone) : ''} · ${r.n}x · no lookup needed</small></button>`), ...local.map((r, i) => `<button data-l="${i}"><b>${esc(r.name)}</b><small>OOH · ${esc(r.inv)}${r.format ? ' · ' + esc(r.format) : ''}</small></button>`)].join('');
     $$('[data-all]').forEach(b => b.onclick = showAll);
@@ -138,19 +143,19 @@ PI.tools.geo = async (box, p, a) => {
   cands();
   $('#gq').oninput = e => { v.q = e.target.value; v.site = null; v.cands = []; cands(); };
   $('#gq').onfocus = () => { v.focus = true; if (!v.site) cands(); };
-  $('#gq').onblur = () => setTimeout(() => { v.focus = false; if (!v.site) cands(); }, 200);
+  $('#gq').onblur = () => setTimeout(() => { v.focus = false; v.openList = false; if (!v.site) cands(); }, 200);
   $('#gq').onkeydown = e => { if (e.key === 'Enter') $('#gfind').click(); };
   const showAll = async () => {
     const q = v.q.trim(); if (q.length < 3) return PI.toast('Type what to look for');
     if (!v.st.google) return PI.toast('Google Maps is not connected.');
     const btn = $('#gfind'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
-    try { const d = await PI.api('POST', 'geo/search', { query: q }); v.found = { query: q, items: d.items, saturated: d.saturated, cached: d.cached }; v.inv = FOUND; v.invFilter = { vendor: '', format: '', q: '' }; v.site = null; v.browseSel = null; v.result = null; v.tab = 'map'; if (!d.items.length) PI.toast('Nothing matched in Qatar. Try different words.'); PI.tools.geo(box, p, a); }
+    try { const d = await PI.api('POST', 'geo/search', { query: q }); v.found = { query: q, items: d.items, saturated: d.saturated, cached: d.cached }; v.cands = []; v.openList = false; v.inv = FOUND; v.invFilter = { vendor: '', format: '', q: '' }; v.site = null; v.browseSel = null; v.result = null; v.tab = 'map'; if (!d.items.length) PI.toast('Nothing matched in Qatar. Try different words.'); PI.tools.geo(box, p, a); }
     catch (e) { PI.toast(e.message); btn.disabled = false; btn.innerHTML = I('search') + 'Find'; }
   };
   $('#gfind').onclick = async () => { const m = pinRe.exec(v.q); if (m) { v.site = { id: 'site', name: 'Dropped pin', lat: +m[1], lon: +m[2] }; v.inv = ''; return cands(); }
     if (!v.st.google) return PI.toast('Google Maps is not connected. Use coordinates, or pick an OOH site.');
     if (/(atms|branches|stores|outlets|locations|offices|showrooms|restaurants|cafes|banks|malls|hotels|schools|pharmacies|clinics|hospitals)\s*$/i.test(v.q.trim())) return showAll();   // a plural means "all of them"
-    try { v.cands = (await PI.api('POST', 'geo/resolve', { query: v.q })).candidates; if (!v.cands.length) PI.toast('No match in Qatar. Try an address or coordinates.'); cands(); } catch (e) { PI.toast(e.message); } };
+    try { v.cands = (await PI.api('POST', 'geo/resolve', { query: v.q })).candidates; v.openList = true; if (!v.cands.length) PI.toast('No match in Qatar. Try an address or coordinates.'); cands(); } catch (e) { PI.toast(e.message); } };
   $('#gf').onchange = async e => {
     const f = e.target.files[0]; if (!f) return; const c = $('#gchk'); c.innerHTML = '<span class="spin"></span>';
     try {
