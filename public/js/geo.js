@@ -22,7 +22,8 @@ PI.tools.geo = async (box, p, a) => {
   const brainId = S.clientId || '_team';
   if (v.brainFor !== brainId) { v.brainFor = brainId; try { v.brain = Object.assign(BR.emptyBrain(), await PI.api('GET', 'db/geobrain/' + brainId)); } catch (_) { v.brain = BR.emptyBrain(); } }
   const clientInvs = v.invs.filter(i => i.kind === 'client'), oohInvs = v.invs.filter(i => i.kind !== 'client');
-  const invRows = id => id === BUILTIN ? (v.builtin ? v.builtin.rows : []) : ((v.invs.find(i => i.id === id) || {}).rows || []);
+  const FOUND = '__found';
+  const invRows = id => id === FOUND ? (v.found ? v.found.items.map((x, i) => ({ id: x.id, name: x.name || `${v.found.query} ${i + 1}`, lat: x.lat, lon: x.lon, vendor: v.found.query, format: 'Search result', site_description: x.address || '' })) : []) : id === BUILTIN ? (v.builtin ? v.builtin.rows : []) : ((v.invs.find(i => i.id === id) || {}).rows || []);
   const filtered = () => { const f = v.invFilter, q = f.q.trim().toLowerCase(); return invRows(v.inv).filter(r => (!f.vendor || r.vendor === f.vendor) && (!f.format || r.format === f.format) && (!q || (r.name + ' ' + r.id + ' ' + (r.site_description || '')).toLowerCase().includes(q))); };
   const clients = () => v.clientLoc ? invRows(v.clientLoc) : [];
   const ranked = () => v.result ? v.result.results.slice().sort((x, y) => (y.score.value ?? -1) - (x.score.value ?? -1)) : [];
@@ -34,7 +35,7 @@ PI.tools.geo = async (box, p, a) => {
       <div class="gx-status"><span class="gx-pill ok" title="State of Qatar Open Data">Qatar Open Data · Available</span><span class="gx-pill ${gc}" title="Google Maps Platform">Google Maps · ${gl}</span><span class="gx-pill ${ai ? 'ok' : 'mut'}" title="AI engine (used only when you ask)">AI · ${ai ? 'Configured' : 'Not configured'}</span>${quota}${S.me && S.me.role === 'admin' && pr().serverKey ? `<button class="btn xs" id="gverify" title="Runs one request per Google API (5 of the monthly allowance)">${I('check')}Run Google check</button>` : ''}</div></div>
     ${pr().state === 'NOT_CONFIGURED' ? `<div class="notice info">${I('info')}<div>Google Maps data is not configured. Official Qatar data and first-party analysis remain available.</div></div>` : ''}
     <div class="gx-bar"><div class="gx-search"><input id="gq" dir="auto" value="${esc(v.q)}" placeholder="Search location, OOH site, area or client…" aria-label="Search"><button class="btn sm" id="gfind">${I('search')}Find</button><div id="gcand" class="gx-cand"></div></div>
-      ${sel('ginv', [['', 'Single location'], [BUILTIN, 'Qatar OOH assets (24 Sep 2026) · 1,351 sites'], ...oohInvs.map(i => [i.id, `${i.name} · ${i.rows.length} sites${i.version > 1 ? ' · v' + i.version : ''}`])], v.inv, 'OOH inventory')}
+      ${sel('ginv', [['', 'Single location'], [BUILTIN, 'Qatar OOH assets (24 Sep 2026) · 1,351 sites'], ...(v.found ? [[FOUND, `Search: ${v.found.query} · ${v.found.items.length} found`]] : []), ...oohInvs.map(i => [i.id, `${i.name} · ${i.rows.length} sites${i.version > 1 ? ' · v' + i.version : ''}`])], v.inv, 'OOH inventory')}
       <div class="gx-f"><span>Catchment</span><div class="gx-seg" id="grad">${meta.radii.map(m => `<button data-r="${m}" class="${m === v.radius ? 'on' : ''}">${m >= 1000 ? m / 1000 + ' km' : m + ' m'}</button>`).join('')}</div></div>
       ${sel('gc', [['', 'None'], ...Object.entries(meta.categories)], v.competitor, 'Competitor category')}
       ${sel('gcl', [['', 'None'], ...clientInvs.map(i => [i.id, `${i.name} · ${i.rows.length}`])], v.clientLoc, 'Client locations')}
@@ -49,7 +50,7 @@ PI.tools.geo = async (box, p, a) => {
     <div id="gxb"></div></div>`;
 
   // ---- shared actions, handed to every tab ----
-  const G = { v, meta, ranked, current, C, M, sel, STATE, BR, filtered, clients, invRows, BUILTIN };
+  const G = { v, meta, ranked, current, C, M, sel, STATE, BR, filtered, clients, invRows, BUILTIN, FOUND };
   G.logBrain = async ev => { try { let fresh; try { fresh = await PI.api('GET', 'db/geobrain/' + brainId); } catch (_) { fresh = v.brain; } v.brain = BR.record(fresh, ev); await PI.saveDoc('geobrain', brainId, v.brain); } catch (_) { } };
   G.brainLabels = () => ({ ...Object.fromEntries(meta.recipes.map(r => [r.id, r.label])), ...meta.categories });
   G.show = () => { const el = $('#gxb'); if (!el) return; $$('[data-t]').forEach(b => b.setAttribute('aria-selected', b.dataset.t === v.tab)); const T = PI.geoTabs[v.tab]; if (T) T(el, G); };
@@ -91,6 +92,7 @@ PI.tools.geo = async (box, p, a) => {
   G.refresh = () => { if (!v.sites) return; G.analyse(v.sites, { savedId: v.savedId }); };
   G.mapReady = async (el, cb) => { if (!v.st.browserKey || M.failed) return cb(false); const g = await M.load(v.st.browserKey); if (!g || M.failed) return cb(false); const ok = M.mount(el); if (ok) M.setType(v.mapType); cb(ok); };
   M.onFail = () => { if (['map', 'compare'].includes(v.tab)) G.show(); };
+  G.refreshAll = () => PI.tools.geo(box, p, a);
   PI.geoG = G;
 
   // ---- controls ----
@@ -114,7 +116,8 @@ PI.tools.geo = async (box, p, a) => {
   const cands = () => {
     const q = v.q.trim().toLowerCase(), local = q.length > 1 ? [...new Set([...v.invs, ...(v.builtin ? [{ name: 'Qatar OOH assets', rows: v.builtin.rows }] : [])])].flatMap(i => i.rows.filter(r => (r.name + ' ' + r.id).toLowerCase().includes(q)).slice(0, 4).map(r => ({ ...r, inv: i.name }))).slice(0, 6) : [], mem = v.focus || q.length > 1 ? BR.suggest(v.brain, v.q, 4) : [];
     $('#gcand').innerHTML = v.site ? `<div class="gx-ok">${I('check')} ${esc(v.site.name)} · ${v.site.lat.toFixed(4)}, ${v.site.lon.toFixed(4)}</div>`
-      : [...mem.map((r, i) => `<button data-m="${i}"><b>${esc(r.name)}</b><small>Seen before${r.zone ? ' · ' + esc(r.zone) : ''} · ${r.n}x · no lookup needed</small></button>`), ...local.map((r, i) => `<button data-l="${i}"><b>${esc(r.name)}</b><small>OOH · ${esc(r.inv)}${r.format ? ' · ' + esc(r.format) : ''}</small></button>`), ...v.cands.map((c, i) => `<button data-c="${i}"><b>${esc(c.label)}</b><small>${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}</small></button>`)].join('');
+      : [...(v.cands.length ? [`<button data-all><b>Show every match for “${esc(v.q.trim())}” in Qatar</b><small>Maps all of them, then you can analyse or save them</small></button>`] : []), ...v.cands.map((c, i) => `<button data-c="${i}"><b>${esc(c.label)}</b><small>${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}</small></button>`), ...mem.map((r, i) => `<button data-m="${i}"><b>${esc(r.name)}</b><small>Seen before${r.zone ? ' · ' + esc(r.zone) : ''} · ${r.n}x · no lookup needed</small></button>`), ...local.map((r, i) => `<button data-l="${i}"><b>${esc(r.name)}</b><small>OOH · ${esc(r.inv)}${r.format ? ' · ' + esc(r.format) : ''}</small></button>`)].join('');
+    $$('[data-all]').forEach(b => b.onclick = showAll);
     $$('[data-m]').forEach(b => b.onclick = () => { const r = mem[+b.dataset.m]; v.site = { id: 'm' + r.lat.toFixed(3) + r.lon.toFixed(3), name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, municipality: r.municipality }; v.inv = ''; $('#ginv').value = ''; invUI(); cands(); });
     $$('[data-l]').forEach(b => b.onclick = () => { const r = local[+b.dataset.l]; v.site = { id: r.id, name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, road: r.road, format: r.format, vendor: r.vendor, municipality: r.municipality, site_description: r.site_description, circuit: r.circuit, screen_type: r.screen_type }; v.inv = ''; $('#ginv').value = ''; invUI(); cands(); });
     $$('[data-c]').forEach(b => b.onclick = () => { const c = v.cands[+b.dataset.c]; v.site = { id: 'site', name: c.label.split(' · ')[0].split(',')[0], lat: c.lat, lon: c.lon, areas: c.areas, zone: c.zone }; cands(); });
@@ -124,8 +127,16 @@ PI.tools.geo = async (box, p, a) => {
   $('#gq').onfocus = () => { v.focus = true; if (!v.site) cands(); };
   $('#gq').onblur = () => setTimeout(() => { v.focus = false; if (!v.site) cands(); }, 200);
   $('#gq').onkeydown = e => { if (e.key === 'Enter') $('#gfind').click(); };
+  const showAll = async () => {
+    const q = v.q.trim(); if (q.length < 3) return PI.toast('Type what to look for');
+    if (!v.st.google) return PI.toast('Google Maps is not connected.');
+    const btn = $('#gfind'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
+    try { const d = await PI.api('POST', 'geo/search', { query: q }); v.found = { query: q, items: d.items, saturated: d.saturated, cached: d.cached }; v.inv = FOUND; v.invFilter = { vendor: '', format: '', q: '' }; v.site = null; v.browseSel = null; v.result = null; v.tab = 'map'; if (!d.items.length) PI.toast('Nothing matched in Qatar. Try different words.'); PI.tools.geo(box, p, a); }
+    catch (e) { PI.toast(e.message); btn.disabled = false; btn.innerHTML = I('search') + 'Find'; }
+  };
   $('#gfind').onclick = async () => { const m = pinRe.exec(v.q); if (m) { v.site = { id: 'site', name: 'Dropped pin', lat: +m[1], lon: +m[2] }; v.inv = ''; return cands(); }
     if (!v.st.google) return PI.toast('Google Maps is not connected. Use coordinates, or pick an OOH site.');
+    if (/(atms|branches|stores|outlets|locations|offices|showrooms|restaurants|cafes|banks|malls|hotels|schools|pharmacies|clinics|hospitals)\s*$/i.test(v.q.trim())) return showAll();   // a plural means "all of them"
     try { v.cands = (await PI.api('POST', 'geo/resolve', { query: v.q })).candidates; if (!v.cands.length) PI.toast('No match in Qatar. Try an address or coordinates.'); cands(); } catch (e) { PI.toast(e.message); } };
   $('#gf').onchange = async e => {
     const f = e.target.files[0]; if (!f) return; const c = $('#gchk'); c.innerHTML = '<span class="spin"></span>';
