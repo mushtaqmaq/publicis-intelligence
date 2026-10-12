@@ -112,7 +112,14 @@ MB.start = box => {
   const steps = ['Brief', 'Client', 'Platforms'], head = () => { const at = st.step <= 2 ? 1 : st.step - 1; return `<div class="mb-steps">${steps.map((s, i) => `<span class="${at === i + 1 ? 'on' : at > i + 1 ? 'done' : ''}">${i + 1}. ${s}</span>`).join('')}</div>`; };
   const draw = () => ({ 1: s1, 2: s2, 3: s3, 4: s4 })[st.step]();
   const go = k => { st.step = k; draw(); };
-  const lock = () => { st.qs = null; st.say = SAY.done; go(3); };   // the brief is final: straight on to the client
+  // The brief is final: no more questions. Fill what the brief allows and go straight to building the plan (Back still reaches the details).
+  const lock = async () => {
+    const d = st.details, b = st.brief; st.qs = null; st.say = SAY.done; d.type = d.type || b.suggestedType || 'online'; b.suggestedType = d.type; d.client = d.client || (PI.client() || {}).name || '';
+    box.innerHTML = `${head()}<div class="empty"><span class="spin"></span> Got it. Building your plan</div>`;
+    try { if (!hasBudget(b)) await fillEstimate(b); } catch (_) { }
+    if (d.client) { try { const r = await PI.brain.ensureClient(d.client); if (r && r.client) { d.client = r.client.name; if (r.client.id !== S.clientId) await PI.setClient(r.client.id, { keepView: true }); } } catch (_) { } }
+    st.auto = true; go(4);
+  };
 
   function drawQs() {
     const host = $('#mbQs'); if (!host || !st.qs) return;
@@ -203,6 +210,7 @@ MB.start = box => {
       S.mb = null; PI.mp.editor(box); PI.toast(ai ? 'Draft ready. Review every rate before sending.' : 'Plan started');
     };
     $('#mpEmpty').onclick = () => create(false); $('#mpBuild').onclick = () => create(true);
+    if (st.auto) { st.auto = false; create(true); }
   }
   draw();
 };
