@@ -39,6 +39,17 @@ Every AI call spends the user's credits (real provider cost times the admin's ra
 - Git pushes never deploy (`git.deploymentEnabled: false`). Production is deployed manually by the owner (CLI, or the manual "Deploy Production" workflow on `main`).
 - Contributors work through pull requests; CI runs a syntax check and an end-to-end test (the real server, Postgres and a fake AI provider). `.github/CODEOWNERS` assigns every file to the owner. Contributors need no Vercel access and no production secrets.
 
+## Geo Intelligence
+
+Media > Geo Intelligence scores places and OOH sites for an audience. Code is in `lib/geo/`, the page in `public/js/geo.js`.
+
+- **Evidence.** Surrounding places come from Google Places (New) Nearby Search (field mask `places.id,places.location`, at most 20 per category, so counts are lower bounds). Area population comes from Qatar Open Data (zone dataset, with its year and the label "whole zone, not the catchment"). Scores are computed in `lib/geo/score.js` from visible recipe weights; missing categories are left out and lower the coverage figure, never counted as zero.
+- **Google allowance.** Every Google request goes through `lib/geo/quota.js`: reserved atomically in Postgres before sending (cap 9,000 per Asia/Qatar calendar month, shared by everyone), never refunded, retries and failures counted, blocked if the quota store is unavailable. Tables `geo_quota`, `geo_usage`, `geo_cache` are created with the others.
+- **Cache.** Only place ids and coordinates are cached, for 30 days, then purged (not served stale). Names, ratings and reviews are not requested or stored. Qatar data is cached 7 days.
+- **AI.** The browser asks the normal `/api/ai` route (route `media/geo`) to explain the finished evidence; statements whose citations or figures do not match the evidence are dropped (`public/js/geo-core.js`). If the AI fails, the deterministic result still shows.
+- **Setup.** Set `GOOGLE_MAPS_API_KEY` on the server (Places API (New) and Geocoding API enabled). Without it, official context and the rest of the app work; surrounding places are reported as unavailable.
+- **Not built yet.** Google Places Aggregate counts, Routes/travel time, public reviews and ratings, popular-times, a map view. OOH inventories are saved per team in the `geoooh` docs collection.
+
 ## Limits
 
 - Vercel caps a request body at about 4.5 MB, so very large image or file uploads in one request are refused. The Hugging Face version had no such cap.
