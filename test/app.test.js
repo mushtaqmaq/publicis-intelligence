@@ -80,7 +80,7 @@ test('the original AI app end to end against Postgres', { skip: !process.env.DAT
   });
   await t.test('the database holds only the app tables, plus the Geo Intelligence allowance and cache', async () => {
     const r = await pool.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY 1");
-    assert.deepEqual(r.rows.map(x => x.table_name), ['conversations', 'docs', 'files', 'geo_cache', 'geo_quota', 'geo_usage', 'ledger', 'login_fails', 'sessions', 'settings', 'users']);
+    assert.deepEqual(r.rows.map(x => x.table_name), ['conversations', 'docs', 'files', 'geo_billing', 'geo_cache', 'geo_quota', 'geo_usage', 'ledger', 'login_fails', 'sessions', 'settings', 'users']);
   });
 });
 
