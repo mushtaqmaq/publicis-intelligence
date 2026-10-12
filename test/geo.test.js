@@ -150,3 +150,26 @@ test('AI interpretation: unsupported citations and invented figures are dropped,
   assert.equal(C.parseInterpretation('not json', pk).ok, false);
   assert.equal(C.parseInterpretation(JSON.stringify({ findings: [{ statement: 'x', classification: 'Observed', evidence_refs: ['E7'] }] }), pk).ok, false);
 });
+
+test('Qatar data tab: chart-ready overview, one failing dataset does not hide the rest, dataset ids are validated', { skip: !process.env.DATABASE_URL }, async (t) => {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
+  const { db, SCHEMA } = require('../lib/db'); await pool.query(SCHEMA); t.after(() => pool.end());
+  const QA = require('../lib/geo/qatar');
+  const J = o => ({ ok: true, status: 200, json: async () => o });
+  const fetchImpl = async url => {
+    if (/total-population-and-population-density-by-municipality/.test(url) && /records/.test(url)) return J({ results: [{ census_year: '2010', municipality: 'Doha', population: 800, population_density: 3 }, { census_year: '2020', municipality: 'Doha', population: 1200, population_density: 5 }] });
+    if (/population-estimates-by-gender/.test(url)) return { ok: false, status: 500, json: async () => ({}) };
+    if (/population-area-and-population-density/.test(url) && /group_by=year/.test(url)) return J({ results: [{ year: '2019' }] });
+    if (/population-area-and-population-density/.test(url) && /records/.test(url)) return J({ results: [{ zone: 'Al Sadd', population: 50, population_density_km2: 9 }] });
+    if (/housing-units/.test(url) && /records/.test(url)) return J({ results: [{ type_of_unit: 'Villas', census_year: 'Census 2010', total: 5 }, { type_of_unit: 'Villas', census_year: 'Census 2020', total: 9 }] });
+    if (/\?limit=12/.test(url)) return J({ results: [{ dataset_id: 'accident', 'default.title': 'Accident', 'default.modified': '2025-01-01' }] });
+    return J({ metas: { default: { title: 'T', modified: '2026-01-01' } }, fields: [{ name: 'a', label_en: 'A', type: 'text' }] });
+  };
+  const ctx = { db, fetchImpl };
+  const o = await QA.overview(ctx);
+  assert.deepEqual(o.municipalities.rows[0]['2010'], { population: 800, density: 3 }); assert.equal(o.zones.rows[0].name, 'Al Sadd'); assert.deepEqual(o.housing.y2020, [9]);
+  assert.equal(o.age.error, 'Unavailable right now.');
+  assert.equal((await QA.search(ctx, 'accid'))[0].id, 'accident'); assert.deepEqual(await QA.search(ctx, 'a'), []);
+  await assert.rejects(QA.preview(ctx, '../../x'), /Bad dataset id/);
+});

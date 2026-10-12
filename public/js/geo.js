@@ -6,6 +6,37 @@ const GC = window.PIGeoCore;
 const sel = (id, opts, cur) => `<select id="${id}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
 const pinRe = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/;
 
+
+// Official figures from Qatar Open Data, shown by the area each one actually covers.
+async function qatarData(box, p, a, v, st, quota) {
+  const tabs = `<div class="tabs" role="tablist"><button role="tab" aria-selected="false" data-t="loc">Location</button><button role="tab" aria-selected="false" data-t="ooh">OOH sites</button><button role="tab" aria-selected="true" data-t="qd">Qatar data</button>${quota}</div>`;
+  box.innerHTML = tabs + '<div class="empty" style="padding:60px 0"><span class="spin"></span></div>';
+  const rebind = () => $$('[data-t]').forEach(b => b.onclick = () => { v.tab = b.dataset.t; PI.tools.geo(box, p, a); });
+  rebind();
+  let o; try { o = v.qd || (v.qd = await PI.api('GET', 'geo/qatar/overview')); } catch (e) { box.innerHTML = tabs + `<div class="notice err">${I('circle-alert')}<div>${esc(e.message)}</div></div>`; return rebind(); }
+  const src = d => d.error ? `<p class="hint">${esc(d.error)}</p>` : `<p class="hint qd-src">${esc(d.title)} · ${d.year ? 'year ' + esc(d.year) + ' · ' : ''}by ${esc(d.level)} · <a href="${esc(d.url)}" target="_blank" rel="noopener">Qatar Open Data</a>${d.modified ? ' · updated ' + esc(d.modified.slice(0, 10)) : ''}</p>`;
+  const short = s => s.length > 28 ? s.slice(0, 26) + '…' : s;
+  const card = (id, title, d, note) => `<div class="card pad qd"><div class="sec-h" style="margin-bottom:4px"><h3>${title}</h3></div><p class="hint" style="margin:0 0 6px">${note}</p><div id="${id}">${d.error ? '' : ''}</div>${src(d)}</div>`;
+  box.innerHTML = tabs + `<div class="notice info">${I('info')}<div>Official figures cover whole zones, municipalities or the country, never a radius around a site. They give context; the site score uses surrounding places.</div></div>
+    <div class="qd-grid">
+      ${card('qd1', 'Population by municipality', o.municipalities, 'Census 2010 and 2020.')}
+      ${card('qd2', 'Largest zones by population', o.zones, 'Latest published year; some zones are published as groups of areas.')}
+      ${card('qd3', 'Age profile', o.age, 'Estimated population by age group and gender, all of Qatar.')}
+      ${card('qd4', 'Housing units by type', o.housing, 'Census 2010 and 2020, all of Qatar.')}
+    </div>
+    <div class="card pad" style="margin-top:16px"><div class="sec-h"><h3>Explore the portal</h3></div><p class="hint" style="margin:0 0 8px">Search any official dataset, then open it to see its fields and first rows.</p>
+      <div class="inline"><input id="qs" placeholder="e.g. employment, tourism, schools, transport"><button class="btn" id="qgo">${I('search')}Search</button></div><div id="qres"></div><div id="qprev"></div></div>`;
+  rebind();
+  const chart = (id, cfg, d) => { const el = $('#' + id); if (!el) return; if (d.error) return el.innerHTML = '<div class="empty">Not available right now.</div>'; PI.chart(el, cfg); };
+  if (!o.municipalities.error) { const r = o.municipalities.rows; chart('qd1', { type: 'bar', x: r.map(x => x.name), series: [{ name: '2010', values: r.map(x => x['2010'] ? x['2010'].population : 0) }, { name: '2020', values: r.map(x => x['2020'].population) }] }, o.municipalities); } else chart('qd1', {}, o.municipalities);
+  if (!o.zones.error) chart('qd2', { type: 'hbar', x: o.zones.rows.map(x => short(x.name)), series: [{ name: 'Population', values: o.zones.rows.map(x => x.population) }] }, o.zones); else chart('qd2', {}, o.zones);
+  if (!o.age.error) chart('qd3', { type: 'bar', x: o.age.groups, series: [{ name: 'Females', values: o.age.female }, { name: 'Males', values: o.age.male }] }, o.age); else chart('qd3', {}, o.age);
+  if (!o.housing.error) chart('qd4', { type: 'bar', x: o.housing.types.map(short), series: [{ name: '2010', values: o.housing.y2010 }, { name: '2020', values: o.housing.y2020 }] }, o.housing); else chart('qd4', {}, o.housing);
+  const find = async () => { const r = $('#qres'); r.innerHTML = '<span class="spin"></span>'; try { const x = (await PI.api('GET', 'geo/qatar/search?q=' + encodeURIComponent($('#qs').value))).results; r.innerHTML = x.length ? `<div class="card list" style="margin-top:10px">${x.map(d => `<button class="li" data-d="${esc(d.id)}"><span class="grow"><div class="t">${esc(d.title)}</div><div class="m">${esc((d.modified || '').slice(0, 10))}</div></span>${I('chevron-right')}</button>`).join('')}</div>` : '<p class="hint">No datasets found.</p>'; } catch (e) { r.innerHTML = `<p class="hint">${esc(e.message)}</p>`; }
+    $$('[data-d]').forEach(b => b.onclick = async () => { const pv = $('#qprev'); pv.innerHTML = '<span class="spin"></span>'; try { const d = await PI.api('GET', 'geo/qatar/dataset?id=' + encodeURIComponent(b.dataset.d)); pv.innerHTML = `<h4 style="margin:14px 0 4px">${esc(d.title)}</h4>${src({ ...d, level: 'the dataset' })}<div class="card tw">${PI.tableHTML(d.rows.map(r => Object.fromEntries(d.fields.slice(0, 8).map(f => [f.label, r[f.name] == null ? '' : String(r[f.name]).slice(0, 60)]))), 20)}</div>`; } catch (e) { pv.innerHTML = `<p class="hint">${esc(e.message)}</p>`; } }); };
+  $('#qgo').onclick = find; $('#qs').onkeydown = e => { if (e.key === 'Enter') find(); };
+}
+
 PI.tools.geo = async (box, p, a) => {
   const v = S.drafts.geo || (S.drafts.geo = { tab: 'loc', q: '', site: null, cands: [], radius: 500, recipe: 'premium_families', competitor: '', brief: '', zone: '', ooh: null, invs: [], inv: '', run: 0 });
   box.innerHTML = '<div class="empty"><span class="spin"></span></div>';
@@ -19,10 +50,11 @@ PI.tools.geo = async (box, p, a) => {
       <div class="field"><label for="gc">Competitor category</label>${sel('gc', [['', 'None'], ...Object.entries(meta.categories)], v.competitor)}</div></div>
     <details class="adv"><summary>Audience recipe weights</summary><div id="gw"></div></details>
     <div class="field"><label for="gb">Client brief</label><textarea id="gb" dir="auto" placeholder="e.g. Premium banking, targeting affluent families, goal is account openings">${esc(v.brief)}</textarea></div>`;
+  if (v.tab === 'qd') return qatarData(box, p, a, v, st, q);
   box.innerHTML = `<div class="work"><div class="card pad form"><h3>${esc(a.name)}</h3>
     <p class="desc">Where is the opportunity, who is around it, and what to do next. Surrounding places come from Google Maps and area population from Qatar Open Data.</p>
     ${st.google ? '' : `<div class="notice info">${I('info')}<div>Google Maps is not connected yet, so surrounding places are unavailable. Official context and scoring still work; an admin adds <code>GOOGLE_MAPS_API_KEY</code> to switch it on.</div></div>`}
-    <div class="tabs" role="tablist"><button role="tab" aria-selected="${v.tab === 'loc'}" data-t="loc">Location</button><button role="tab" aria-selected="${v.tab === 'ooh'}" data-t="ooh">OOH sites</button>${q}</div>
+    <div class="tabs" role="tablist"><button role="tab" aria-selected="${v.tab === 'loc'}" data-t="loc">Location</button><button role="tab" aria-selected="${v.tab === 'ooh'}" data-t="ooh">OOH sites</button><button role="tab" aria-selected="false" data-t="qd">Qatar data</button>${q}</div>
     <div id="gform"></div></div><div class="card out" id="gout"></div></div>`;
   $$('[data-t]').forEach(b => b.onclick = () => { v.tab = b.dataset.t; PI.tools.geo(box, p, a); });
   const form = $('#gform');
