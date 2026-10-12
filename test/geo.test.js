@@ -165,10 +165,14 @@ test('geo routes: respond truthfully without Google, validate uploads, honour to
   assert.equal((await admin.call('POST', '/api/geo/resolve', { query: 'West Bay' })).status, 503);
   const chk = await admin.call('POST', '/api/geo/ooh/check', { rows: [{ lat: 25.3, lon: 51.5 }, { lat: 1, lon: 1 }] });
   assert.equal(chk.json.rows.length, 1); assert.equal(chk.json.issues.length, 1);
+  const dg = await admin.call('GET', '/api/digital/qatar'); assert.equal(dg.status, 200); assert.ok(dg.json.facts.length >= 25 && dg.json.facts.every(f => f.source && f.quote)); assert.ok(dg.json.population); assert.ok(dg.json.notAvailable.length >= 3);
+  assert.equal((await client(app.base).call('GET', '/api/digital/qatar')).status, 401);
   const u = (await admin.call('POST', '/api/admin/users', { email: 'p@test.local', password: 'password123' })).json.id;
   const member = client(app.base); await member.login('p@test.local', 'password123');
   await admin.call('PUT', `/api/admin/users/${u}/access`, { tools: ['media/plan'] });
-  assert.equal((await member.call('GET', '/api/geo/status')).status, 403);
+  assert.equal((await member.call('GET', '/api/geo/status')).status, 403); assert.equal((await member.call('GET', '/api/digital/qatar')).status, 200, 'media planner users can read the verified data');
+  await admin.call('PUT', `/api/admin/users/${u}/access`, { tools: ['strategy/research'] }); assert.equal((await member.call('GET', '/api/digital/qatar')).status, 403);
+  await admin.call('PUT', `/api/admin/users/${u}/access`, { tools: ['media/plan'] });
   await admin.call('PUT', `/api/admin/users/${u}/access`, { tools: ['media/geo'] });
   const ms = await member.call('GET', '/api/geo/status'); assert.equal(ms.status, 200); assert.equal(ms.json.quota.used, undefined, 'members do not see request counts');
 });

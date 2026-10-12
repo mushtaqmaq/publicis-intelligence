@@ -1,0 +1,479 @@
+{
+ "retrieved": "2026-10-12",
+ "facts": [
+  {
+   "id": "pop.total",
+   "metric": "population",
+   "platform": null,
+   "value": 3130000,
+   "unit": "people",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…ed Nations indicates that the population of Qatar stood at 3.13 million in October 2025.",
+   "note": "United Nations dataset as cited by DataReportal",
+   "basis": null
+  },
+  {
+   "id": "pop.sex",
+   "metric": "population share female",
+   "platform": null,
+   "value": 29.0,
+   "unit": "%",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…s 0.6 percent lived in rural areas. At that time, 29.0 percent of Qatar’s population was female, while 71.0 percent of the population was male.",
+   "note": "male 71.0%",
+   "basis": null
+  },
+  {
+   "id": "net.users",
+   "metric": "internet users",
+   "platform": null,
+   "value": 3100000,
+   "unit": "people",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…lysis of the latest available data indicated that there were 3.10 million internet users in Qatar in October 2025.",
+   "note": "penetration 99.0% of total population",
+   "basis": null
+  },
+  {
+   "id": "mob.conn",
+   "metric": "mobile connections",
+   "platform": null,
+   "value": 4750000,
+   "unit": "connections",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…connected devices and services in Qatar in 2026: A total of 4.75 million cellular mobile connections were active in Qatar in late 2025, with this figure equivalent to 152 percent of the total population.",
+   "note": "GSMA Intelligence; one person can hold several connections",
+   "basis": null
+  },
+  {
+   "id": "social.ids",
+   "metric": "social media user identities",
+   "platform": null,
+   "value": 2950000,
+   "unit": "identities",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…behalf of DataReportal indicates that there were 2.95 million active social media user identities in Qatar in October 2025. For perspective, this figure was equivalent to 94.3 percent of Qatar’s to",
+   "note": "DataReportal warns identities are not de-duplicated across platforms",
+   "basis": null
+  },
+  {
+   "id": "social.sex",
+   "metric": "social identities share female",
+   "platform": null,
+   "value": 31.9,
+   "unit": "%",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…total population aged 18 and above. At that time, 31.9 percent of Qatar’s social media user identities were female, while 68.1 percent were male.",
+   "note": "male 68.1%",
+   "basis": null
+  },
+  {
+   "id": "reach.facebook",
+   "metric": "advertising reach",
+   "platform": "facebook",
+   "value": 2400000,
+   "unit": "people",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…hed in Meta’s advertising resources indicate that Facebook had 2.40 million users in Qatar in late 2025. However, Meta has made important changes to the way its advertising resources report",
+   "note": "Meta ad planning tools",
+   "basis": null
+  },
+  {
+   "id": "reach.instagram",
+   "metric": "advertising reach",
+   "platform": "instagram",
+   "value": 1700000,
+   "unit": "people",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…blished in Meta’s advertising tools indicate that Instagram had 1.70 million users in Qatar in late 2025. The company’s regularly revised figures suggest that Instagram’s ad reach in Qatar wa",
+   "note": "Meta ad planning tools",
+   "basis": null
+  },
+  {
+   "id": "reach.tiktok",
+   "metric": "advertising reach",
+   "platform": "tiktok",
+   "value": 2950000,
+   "unit": "people",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…d in TikTok’s advertising resources indicate that TikTok had 2.95 million users aged 18 and above in Qatar in late 2025. Note that TikTok allows marketers to target TikTok ads to users aged 13 and above via",
+   "note": "TikTok ad planning tools, users 18+",
+   "basis": "18+"
+  },
+  {
+   "id": "reach.youtube",
+   "metric": "advertising reach",
+   "platform": "youtube",
+   "value": 2310000,
+   "unit": "people",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…2026 Google’s advertising resources indicate that YouTube had 2.31 million users in Qatar in late 2025. It’s important to stress that these advertising reach figures do not necessarily repr",
+   "note": "Google ad planning tools",
+   "basis": null
+  },
+  {
+   "id": "reach.linkedin",
+   "metric": "advertising reach",
+   "platform": "linkedin",
+   "value": 1800000,
+   "unit": "people",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…in LinkedIn’s advertising resources indicate that LinkedIn had 1.80 million “members” in Qatar in late 2025. Note that LinkedIn’s advertising tools publish audience reach data based on total reg",
+   "note": "LinkedIn ad tools, registered members not monthly actives",
+   "basis": "18+"
+  },
+  {
+   "id": "reach.messenger",
+   "metric": "advertising reach",
+   "platform": "messenger",
+   "value": 1500000,
+   "unit": "people",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…hed in Meta’s advertising resources indicate that ads on Messenger reached 1.50 million users in Qatar in late 2025. The company’s frequently adjusted audience numbers suggest that Messenger’s ad reach",
+   "note": "Meta ad planning tools",
+   "basis": null
+  },
+  {
+   "id": "reach.snapchat",
+   "metric": "advertising reach",
+   "platform": "snapchat",
+   "value": 1240000,
+   "unit": "people",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…hed in Snap’s advertising resources indicate that Snapchat had 1.24 million users in Qatar in late 2025. This figure means that Snapchat’s ad reach in Qatar was equivalent to 39.5 percent of the total population at the end of the year.",
+   "note": "Snap ad planning tools",
+   "basis": null
+  },
+  {
+   "id": "reach.x",
+   "metric": "advertising reach",
+   "platform": "x",
+   "value": 650000,
+   "unit": "people",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…lished in X’s advertising resources indicate that X had 650 thousand users in Qatar in late 2025. This figure means that X’s ad reach in Qatar was equivalent to 20.8 percent of the total population at the time.",
+   "note": "X ad planning tools",
+   "basis": null
+  },
+  {
+   "id": "reach.reddit",
+   "metric": "advertising reach",
+   "platform": "reddit",
+   "value": 420000,
+   "unit": "people",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…d in Reddit’s advertising resources indicate that Reddit had 420 thousand users in Qatar in late 2025. This figure means that Reddit’s ad reach in Qatar was equivalent to 13.4 percent of the total population at the end of the year.",
+   "note": "Reddit ad planning tools",
+   "basis": null
+  },
+  {
+   "id": "sex.facebook",
+   "metric": "audience share female",
+   "platform": "facebook",
+   "value": 26.0,
+   "unit": "%",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…less of age) in October 2025. At the end of 2025, 26.0 percent of Facebook’s adult ad audience in Qatar was female, while 72.9 percent was male.",
+   "note": "male 72.9%; adults, as published in the platform ad tool",
+   "basis": null,
+   "male": 72.9
+  },
+  {
+   "id": "sex.instagram",
+   "metric": "audience share female",
+   "platform": "instagram",
+   "value": 34.0,
+   "unit": "%",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…rnet user base (regardless of age). In late 2025, 34.0 percent of Instagram’s adult ad audience in Qatar was female, while 66.0 percent was male.",
+   "note": "male 66.0%; adults, as published in the platform ad tool",
+   "basis": null,
+   "male": 66.0
+  },
+  {
+   "id": "sex.tiktok",
+   "metric": "audience share female",
+   "platform": "tiktok",
+   "value": 31.9,
+   "unit": "%",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…end of the year, regardless of age. In late 2025, 31.9 percent of TikTok’s adult ad audience in Qatar was female, whereas 68.1 percent was male.",
+   "note": "male 68.1%; adults, as published in the platform ad tool",
+   "basis": null,
+   "male": 68.1
+  },
+  {
+   "id": "sex.youtube",
+   "metric": "audience share female",
+   "platform": "youtube",
+   "value": 24.6,
+   "unit": "%",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…regardless of age) in October 2025. At that time, 24.6 percent of YouTube’s adult ad audience in Qatar was female, while 75.4 percent was male.",
+   "note": "male 75.4%; adults, as published in the platform ad tool",
+   "basis": null,
+   "male": 75.4
+  },
+  {
+   "id": "sex.linkedin",
+   "metric": "audience share female",
+   "platform": "linkedin",
+   "value": 26.2,
+   "unit": "%",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…ess of age) at the end of the year. In late 2025, 26.2 percent of LinkedIn’s ad audience in Qatar was female, while 73.8 percent was male.",
+   "note": "male 73.8%; adults, as published in the platform ad tool",
+   "basis": null,
+   "male": 73.8
+  },
+  {
+   "id": "sex.messenger",
+   "metric": "audience share female",
+   "platform": "messenger",
+   "value": 25.8,
+   "unit": "%",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…ser base (regardless of age). At the end of 2025, 25.8 percent of Messenger’s ad audience in Qatar was female, while 73.3 percent was male.",
+   "note": "male 73.3%; adults, as published in the platform ad tool",
+   "basis": null,
+   "male": 73.3
+  },
+  {
+   "id": "sex.snapchat",
+   "metric": "audience share female",
+   "platform": "snapchat",
+   "value": 41.2,
+   "unit": "%",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…ess of age) at the end of the year. In late 2025, 41.2 percent of Snapchat’s adult ad audience in Qatar was female, while 58.0 percent was male.",
+   "note": "male 58.0%; adults, as published in the platform ad tool",
+   "basis": null,
+   "male": 58.0
+  },
+  {
+   "id": "sex.x",
+   "metric": "audience share female",
+   "platform": "x",
+   "value": 31.1,
+   "unit": "%",
+   "source": {
+    "name": "DataReportal, Digital 2026: Qatar (Kepios)",
+    "url": "https://datareportal.com/reports/digital-2026-qatar",
+    "publishedAt": "2025-11-08",
+    "dataPeriod": "late 2025 (October 2025 where stated)"
+   },
+   "quote": "…late 2025, the company’s own data indicated that 31.1 percent of X’s adult ad audience in Qatar was female, while 68.9 percent was male.",
+   "note": "male 68.9%; adults, as published in the platform ad tool",
+   "basis": null,
+   "male": 68.9
+  },
+  {
+   "id": "dev.mobile",
+   "metric": "web traffic share mobile",
+   "platform": null,
+   "value": 62.01,
+   "unit": "%",
+   "source": {
+    "name": "StatCounter Global Stats, Qatar",
+    "url": "https://gs.statcounter.com/platform-market-share/desktop-mobile-tablet/qatar",
+    "publishedAt": "2026-09",
+    "dataPeriod": "September 2026"
+   },
+   "quote": "Mobile 62.01%, Desktop 37%, Tablet 0.99% of web page views in Qatar, September 2026 (StatCounter page table)",
+   "note": "Share of web page views across all sites, not time spent on a social platform",
+   "basis": null
+  },
+  {
+   "id": "dev.desktop",
+   "metric": "web traffic share desktop",
+   "platform": null,
+   "value": 37.0,
+   "unit": "%",
+   "source": {
+    "name": "StatCounter Global Stats, Qatar",
+    "url": "https://gs.statcounter.com/platform-market-share/desktop-mobile-tablet/qatar",
+    "publishedAt": "2026-09",
+    "dataPeriod": "September 2026"
+   },
+   "quote": "Mobile 62.01%, Desktop 37%, Tablet 0.99% of web page views in Qatar, September 2026 (StatCounter page table)",
+   "note": "",
+   "basis": null
+  },
+  {
+   "id": "dev.tablet",
+   "metric": "web traffic share tablet",
+   "platform": null,
+   "value": 0.99,
+   "unit": "%",
+   "source": {
+    "name": "StatCounter Global Stats, Qatar",
+    "url": "https://gs.statcounter.com/platform-market-share/desktop-mobile-tablet/qatar",
+    "publishedAt": "2026-09",
+    "dataPeriod": "September 2026"
+   },
+   "quote": "Mobile 62.01%, Desktop 37%, Tablet 0.99% of web page views in Qatar, September 2026 (StatCounter page table)",
+   "note": "",
+   "basis": null
+  },
+  {
+   "id": "os.android",
+   "metric": "mobile OS share Android",
+   "platform": null,
+   "value": 73.52,
+   "unit": "%",
+   "source": {
+    "name": "StatCounter Global Stats, Qatar mobile operating systems",
+    "url": "https://gs.statcounter.com/os-market-share/mobile/qatar",
+    "publishedAt": "2026-09",
+    "dataPeriod": "September 2026"
+   },
+   "quote": "Android 73.52, iOS 26.47, Other 0.01 (share of mobile web page views, Qatar, September 2026; StatCounter CSV export)",
+   "note": "",
+   "basis": null
+  },
+  {
+   "id": "os.ios",
+   "metric": "mobile OS share iOS",
+   "platform": null,
+   "value": 26.47,
+   "unit": "%",
+   "source": {
+    "name": "StatCounter Global Stats, Qatar mobile operating systems",
+    "url": "https://gs.statcounter.com/os-market-share/mobile/qatar",
+    "publishedAt": "2026-09",
+    "dataPeriod": "September 2026"
+   },
+   "quote": "Android 73.52, iOS 26.47, Other 0.01 (share of mobile web page views, Qatar, September 2026; StatCounter CSV export)",
+   "note": "",
+   "basis": null
+  }
+ ],
+ "notAvailable": [
+  {
+   "what": "Age split of each platform audience in Qatar",
+   "why": "DataReportal publishes gender, not age, per platform for Qatar. Age by platform is visible only inside each ad tool (Meta Ads Manager, TikTok Ads Manager, Snapchat Ads Manager, LinkedIn Campaign Manager, Google Ads) and can be entered here with its source and date."
+  },
+  {
+   "what": "Interest and psychographic segment sizes",
+   "why": "No public Qatar source publishes interest-level audience sizes. They come from ad tools or paid panels (GWI, Kantar, Statista Consumer Insights) and can be entered here with source and date."
+  },
+  {
+   "what": "Per-platform device split",
+   "why": "No public source splits each social platform by device for Qatar. Country device and operating-system shares are shown as context, labelled as share of web page views."
+  },
+  {
+   "what": "WhatsApp, Telegram, Pinterest",
+   "why": "The DataReportal Qatar report gives no figure for these."
+  }
+ ]
+}
