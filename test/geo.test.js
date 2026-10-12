@@ -55,6 +55,7 @@ test('Google gateway, cache and analysis against a fake Google and a real databa
   const fetchImpl = async (url, init) => {
     calls.push({ url, init });
     if (/maps\/api\/geocode/.test(url)) return { ok: true, status: 200, json: async () => ({ status: 'OK', results: [{ formatted_address: 'Corniche, Doha', geometry: { location: { lat: 25.29, lng: 51.53 } }, address_components: [] }] }) };
+    if (/places:searchText/.test(url)) return { ok: true, status: 200, json: async () => ({ places: [{ id: 'ChIJatm1', displayName: { text: 'QNB ATM' }, formattedAddress: 'Al Sadd, Doha, Qatar', location: { latitude: 25.2791, longitude: 51.5227 } }] }) };
     if (/areainsights/.test(url)) { if (mode === 'noagg') return { ok: false, status: 404, json: async () => ({}) }; const b = JSON.parse(init.body); return { ok: true, status: 200, json: async () => ({ count: String(b.filter.typeFilter.includedTypes[0] === 'school' ? 3 : 41) }) }; }
     if (/routes\.googleapis/.test(url)) return { ok: true, status: 200, json: async () => ({ routes: [{ duration: '600s', distanceMeters: 7000 }] }) };
     if (/places\.googleapis\.com\/v1\/places\/[A-Za-z0-9_-]{10,}$/.test(url)) return { ok: true, status: 200, json: async () => ({ id: 'abc', displayName: { text: 'Cafe X' }, formattedAddress: 'Doha' }) };
@@ -129,6 +130,7 @@ test('Google gateway, cache and analysis against a fake Google and a real databa
   assert.ok((await Q.usage(db)).reused > 0, 'reuse is counted separately from Google requests');
   // one place, minimum fields; bad ids rejected before any request
   assert.equal((await G.details(ctx, 'ChIJabcdefghijk')).name, 'Cafe X'); await assert.rejects(G.details(ctx, '../etc/passwd'), e => e.code === 'bad-input');
+  const ts = await G.textSearch(ctx, 'QNB ATM'); assert.equal(ts[0].label, 'QNB ATM · Al Sadd, Doha, Qatar'); assert.equal(ts[0].zone, 'Al Sadd', 'zone comes from an exact name in the address'); assert.equal(calls.filter(c => /searchText/.test(c.url))[0].init.headers['X-Goog-FieldMask'], 'places.id,places.displayName,places.formattedAddress,places.location');
   assert.deepEqual(await G.route(ctx, near, { lat: 25.32, lon: 51.52 }), { seconds: 600, meters: 7000 });
   // verification marks Google VERIFIED only when every API passes
   const PR = require('../lib/geo/providers'); assert.equal((await PR.status(db)).google.state, 'CONFIGURED_UNVERIFIED');
