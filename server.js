@@ -2,6 +2,7 @@
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
 const { db, init: initDb } = require('./lib/db');
 const A = require('./lib/auth');
+const GEO = require('./lib/geo');
 const P = require('./lib/providers');
 const SEO = require('./lib/dataforseo');
 const PAGE = require('./lib/webpage');
@@ -318,6 +319,8 @@ async function route(req, res) {
       (await db.prepare('INSERT INTO conversations(id,user_id,title,model,messages,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title, messages=excluded.messages, updated_at=excluded.updated_at').run(id, user.id, String(b.title || 'New conversation').slice(0, 120), '', JSON.stringify(Array.isArray(b.messages) ? b.messages : []), Date.now()));
       res.writeHead(204); return res.end(); }
   }
+
+  if (p.startsWith('/api/geo/')) return GEO.handle(req, res, user, p, { send, fail, json, accessOf });
 
   if (p.startsWith('/api/admin/')) {
     if (user.role !== 'admin') return fail(res, 403, 'Admins only');

@@ -45,12 +45,10 @@ PI.PILLARS = [
       fields: [sel('duration', 'Duration', ['6s', '15s', '30s', '60s']), text('platform', 'Platform', 'e.g. TikTok, YouTube, TV')],
       task: 'Write the video script as a table (timecode, visual, VO English, VO Arabic, super, sound). Then storyboard frame descriptions, a shot list, and one AI video prompt per shot covering subject, action, camera move, lens, lighting and style. Keep VO word counts realistic for the duration.' }
   ] },
-  { id: 'media', name: 'Media', icon: 'megaphone', color: '#0EA5A0', desc: 'Online, OOH and hybrid media plans, campaign builds, mix modelling, reporting and analysis.', agents: [
+  { id: 'media', name: 'Media', icon: 'megaphone', color: '#0EA5A0', desc: 'Online, OOH and hybrid media plans, reporting for clients, and geo intelligence for places and OOH sites.', agents: [
     { id: 'plan', name: 'Media planner', icon: 'calendar-clock', tool: 'mediaplan', blurb: 'Online, OOH or hybrid plans in the agency format, with live totals and Excel or PDF export.' },
-    { id: 'setup', name: 'Campaign setup', icon: 'settings-2', tool: 'setup', blurb: 'Full platform builds with copy, targeting and tracking, exported as bulk-upload files.' },
-    { id: 'optimize', name: 'Optimization', icon: 'sliders-horizontal', tool: 'optimize', blurb: 'Marketing mix modelling with saturation curves and a budget optimiser, plus live campaign diagnosis.' },
     { id: 'report', name: 'Reporting', icon: 'chart-column', tool: 'report', blurb: 'Drop platform exports and get a dashboard and a client-ready report.' },
-    { id: 'analyst', name: 'Data analyst', icon: 'chart-line', tool: 'analyst', blurb: 'Ask questions of any campaign data in plain English and get answers, tables and charts.' }
+    { id: 'geo', name: 'Geo Intelligence', icon: 'map-pin', tool: 'geo', blurb: 'Where the opportunity is: places, official population and audience context around any location or OOH site, scored and explained.' }
   ] },
   { id: 'finance', name: 'Finance', icon: 'wallet', color: '#C9971A', desc: 'Fee proposals, retainer models, budget reconciliation, invoicing and profitability.', agents: [
     { id: 'fee', name: 'Fee estimator', icon: 'calculator', tier: 'complex', brief: 'Scope of work', ph: 'Describe the scope, or drop the RFP',

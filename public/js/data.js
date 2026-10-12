@@ -555,6 +555,20 @@ function diagTool(box, v, a) {
 /* =====================================================================
    Reporting
    ===================================================================== */
+// Client view: tidy the tables before they are exported or saved. Edits change this report only; the uploaded data and the charts above are untouched.
+function editForClient(T, done) {
+  const names = ['Platforms', 'Campaigns'].filter(n => T[n] && T[n].length), draft = Object.fromEntries(names.map(n => [n, T[n].map(r => ({ ...r }))]));
+  const m = PI.modal(`<h2>Edit for client</h2><p class="hint" style="margin:4px 0 12px">Rename, correct or remove rows. This changes the exported and saved tables only; the charts and your uploaded data keep the original figures.</p>
+    <div style="max-height:56vh;overflow:auto">${names.map(n => { const cols = Object.keys(draft[n][0]); return `<h3 style="font-size:14px;margin:10px 0 6px">${n}</h3><table class="t"><thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join('')}<th></th></tr></thead><tbody>${draft[n].map((r, i) => `<tr data-n="${n}" data-i="${i}">${cols.map(c => `<td><input class="inp" data-c="${esc(c)}" value="${esc(r[c] ?? '')}"></td>`).join('')}<td><button class="icon-btn" data-x aria-label="Remove row">${I('trash-2')}</button></td></tr>`).join('')}</tbody></table>`; }).join('')}</div>
+    <div class="actions" style="justify-content:flex-end;margin-top:14px"><button class="btn" id="ecNo">Cancel</button><button class="btn pri" id="ecOk">Apply</button></div>`);
+  const E = m.el; E.style.maxWidth = '960px';
+  E.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { const tr = b.closest('tr'); tr.dataset.gone = '1'; tr.style.display = 'none'; });
+  E.querySelector('#ecNo').onclick = m.close;
+  E.querySelector('#ecOk').onclick = () => {
+    names.forEach(n => { const out = []; E.querySelectorAll(`tr[data-n="${n}"]`).forEach(tr => { if (tr.dataset.gone) return; const src = T[n][+tr.dataset.i], row = {}; tr.querySelectorAll('input').forEach(inp => { const c = inp.dataset.c, orig = src[c]; row[c] = typeof orig === 'number' && inp.value.trim() !== '' && isFinite(+inp.value.replace(/,/g, '')) ? +inp.value.replace(/,/g, '') : inp.value; }); out.push(row); }); T[n].splice(0, T[n].length, ...out); });
+    m.close(); done();
+  };
+}
 PI.tools.report = (box, p, a) => {
   const v = S.drafts.report || (S.drafts.report = { brief: '', files: [], maps: {}, pnames: {}, title: '', currency: 'QAR', lang: 'English', audience: 'Client', text: '' });
   box.innerHTML = `<div class="work">
@@ -581,13 +595,13 @@ PI.tools.report = (box, p, a) => {
     v.report = { title, T, text: '' };
     const outcome = has.conversions ? 'conversions' : has.clicks ? 'clicks' : 'impressions';
     const o = $('#rout');
-    o.innerHTML = `<div class="out-bar"><span class="status" id="rst">${withReport ? '<span class="spin"></span>Writing the report' : I('check') + '<span>' + esc(range) + '</span>'}</span><button class="btn sm" id="rxl">${I('file-spreadsheet')}Excel</button><button class="btn sm" id="rexp">${I('download')}Export ${I('chevron-down')}</button><button class="btn pri sm" id="rsave">${I('save')}Save</button></div>
+    o.innerHTML = `<div class="out-bar"><span class="status" id="rst">${withReport ? '<span class="spin"></span>Writing the report' : I('check') + '<span>' + esc(range) + '</span>'}</span><button class="btn sm" id="redit">${I('pencil')}Edit for client</button><button class="btn sm" id="rxl">${I('file-spreadsheet')}Excel</button><button class="btn sm" id="rexp">${I('download')}Export ${I('chevron-down')}</button><button class="btn pri sm" id="rsave">${I('save')}Save</button></div>
       <div class="out-body"><div class="dash-h"><h2 dir="auto">${esc(title)}</h2><span class="muted">${esc(range)}${range ? ' · ' : ''}${num(recs.length)} rows from ${ds.length} ${ds.length > 1 ? 'files' : 'file'}</span></div>
         <div class="stats">${stat('coins', 'Spend', cur + ' ' + PI.compact(tot.spend), has.impressions ? 'CPM ' + num(tot.cpm, 2) : '')}${has.impressions ? stat('eye', 'Impressions', PI.compact(tot.impressions), has.reach ? 'Reach ' + PI.compact(tot.reach) : '') : ''}${has.clicks ? stat('activity', 'Clicks', PI.compact(tot.clicks), (has.impressions ? 'CTR ' + pct(tot.ctr) + ' · ' : '') + 'CPC ' + num(tot.cpc, 2)) : ''}${has.conversions ? stat('target', 'Conversions', PI.compact(tot.conversions), 'CPA ' + num(tot.cpa, 2)) : ''}${has.revenue ? stat('trending-up', 'Revenue', cur + ' ' + PI.compact(tot.revenue), 'ROAS ' + num(tot.roas, 2) + 'x') : ''}</div>
         ${per ? `<div class="card pad" style="margin-bottom:16px" id="rc1"></div><div class="card pad" style="margin-bottom:16px" id="rc2"></div>` : ''}
         <div class="card pad" style="margin-bottom:16px" id="rc3"></div><div class="card pad" style="margin-bottom:16px" id="rc4"></div>
-        <div class="sec-h"><h3>Platforms</h3></div><div class="card tw" style="margin-bottom:16px">${PI.tableHTML(T.Platforms)}</div>
-        <div class="sec-h"><h3>Campaigns</h3><span class="hint">${camps.length > 25 ? 'Top 25 by spend. All in the Excel export.' : ''}</span></div><div class="card tw" style="margin-bottom:22px">${PI.tableHTML(T.Campaigns, 25)}</div>
+        <div class="sec-h"><h3>Platforms</h3></div><div class="card tw" id="tbP" style="margin-bottom:16px">${PI.tableHTML(T.Platforms)}</div>
+        <div class="sec-h"><h3>Campaigns</h3><span class="hint">${camps.length > 25 ? 'Top 25 by spend. All in the Excel export.' : ''}</span></div><div class="card tw" id="tbC" style="margin-bottom:22px">${PI.tableHTML(T.Campaigns, 25)}</div>
         <div class="md ${withReport ? 'caret' : ''}" id="rmd" dir="auto">${withReport ? '<p class="muted">Writing the report…</p>' : ''}</div></div>`;
     if (per) {
       PI.chart($('#rc1'), { type: 'line', title: 'Spend by ' + (per.weekly ? 'week' : 'day') + ' and platform', x: series.map(s => s.key.slice(5)), series: byPP, area: false });
@@ -597,6 +611,7 @@ PI.tools.report = (box, p, a) => {
     const eff = has.conversions ? ['CPA by campaign (lower is better)', camps.filter(c => c.cpa).sort((x, y) => x.cpa - y.cpa).slice(0, 10), 'cpa'] : has.clicks ? ['CTR by campaign', camps.filter(c => c.ctr).sort((x, y) => y.ctr - x.ctr).slice(0, 10), 'ctr'] : ['Impressions by campaign', camps.slice(0, 10), 'impressions'];
     $('#rc4').innerHTML = `<div class="sec-h" style="margin-bottom:6px"><h3>${eff[0]}</h3></div><div></div>`; PI.chart($('#rc4').lastElementChild, { type: 'hbar', x: eff[1].map(c => c.key.split(' · ').pop()), series: [{ name: eff[0], values: eff[1].map(c => eff[2] === 'ctr' ? c.ctr * 100 : r2(c[eff[2]])) }], format: eff[2] === 'ctr' ? x => num(x, 2) + '%' : undefined });
     const mdAll = () => `# ${title}\n\n${range}\n\n## Platforms\n\n${mdTable(T.Platforms)}\n## Campaigns\n\n${mdTable(T.Campaigns.slice(0, 40))}\n${v.report.text ? '\n' + v.report.text : ''}`;
+    $('#redit').onclick = () => editForClient(T, () => { $('#tbP').innerHTML = PI.tableHTML(T.Platforms); $('#tbC').innerHTML = PI.tableHTML(T.Campaigns, 25); });
     $('#rxl').onclick = () => wrap('Excel', () => PI.toExcel(title, [{ name: 'Summary', objects: dispRows([tot], has, cur, 'Total') }, ...Object.entries(T).map(([name, objects]) => ({ name, objects }))]));
     $('#rexp').onclick = e => PI.exportMenu(e.currentTarget, { title, md: mdAll(), tables: { Platforms: T.Platforms, Campaigns: T.Campaigns }, landscape: true });
     $('#rsave').onclick = async () => { const id = await PI.saveOutput({ id: v.savedId, pillar: 'media', agent: 'report', title, text: mdAll(), data: { tables: { Platforms: T.Platforms, Campaigns: T.Campaigns } } }); if (id) { v.savedId = id; PI.toast('Saved to the library'); } };
