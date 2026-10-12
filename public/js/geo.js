@@ -22,7 +22,7 @@ PI.tools.geo = async (box, p, a) => {
   const ranked = () => v.result ? v.result.results.slice().sort((x, y) => (y.score.value ?? -1) - (x.score.value ?? -1)) : [];
   const current = () => { const rs = ranked(); return rs[Math.min(v.sel, rs.length - 1)]; };
   const pr = () => v.st.providers.google, [gl, gc] = STATE[pr().state], ai = S.me && S.me.caps && S.me.caps.ai;
-  const quota = v.st.quota && v.st.quota.used != null ? `<span class="gx-pill" title="Google requests used this month">${num(v.st.quota.used)} / ${num(v.st.quota.cap)}</span>` : '';
+  const quota = v.st.quota && v.st.quota.used != null ? `<span class="gx-pill" title="Google requests sent this month, and how many times a stored result was reused instead">${num(v.st.quota.used)} / ${num(v.st.quota.cap)}${v.st.quota.reused ? ' · ' + num(v.st.quota.reused) + ' reused' : ''}</span>` : '';
 
   box.innerHTML = `<div class="gx"><div class="gx-head"><div><h2>Geo Intelligence</h2><p>Location. People. Context. Opportunity.</p></div>
       <div class="gx-status"><span class="gx-pill ok" title="State of Qatar Open Data">Qatar Open Data · Available</span><span class="gx-pill ${gc}" title="Google Maps Platform">Google Maps · ${gl}</span><span class="gx-pill ${ai ? 'ok' : 'mut'}" title="AI engine (used only when you ask)">AI · ${ai ? 'Configured' : 'Not configured'}</span>${quota}${S.me && S.me.role === 'admin' && pr().serverKey ? `<button class="btn xs" id="gverify" title="Runs one request per Google API (5 of the monthly allowance)">${I('check')}Run Google check</button>` : ''}</div></div>
