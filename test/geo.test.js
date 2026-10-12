@@ -122,6 +122,11 @@ test('Google gateway, cache and analysis against a fake Google and a real databa
   // establishments are live (name, rating, hours) and never written to the cache
   const bn = await pool.query("SELECT count(*)::int n FROM geo_cache"); const est = await G.establishments(ctx, { ...near, radius: 500, type: 'bank' }); assert.equal(est[0].name, 'Bank A'); assert.equal(est[0].rating, 4.2);
   assert.equal((await pool.query("SELECT count(*)::int n FROM geo_cache")).rows[0].n, bn.rows[0].n, 'rated, named places are not stored');
+  // opt-in: with GEO_CACHE_FULL_RESPONSES=1 named results are stored and reused too (the operator accepts Google's storage terms)
+  process.env.GEO_CACHE_FULL_RESPONSES = '1'; const ec = () => calls.filter(c => /displayName/.test((c.init.headers || {})['X-Goog-FieldMask'] || '') && /searchNearby/.test(c.url)).length, e0 = ec();
+  await G.establishments(ctx, { ...near, radius: 800, type: 'cafe' }); await G.establishments(ctx, { ...near, radius: 800, type: 'cafe' }); assert.equal(ec() - e0, 1, 'second identical request came from the database');
+  delete process.env.GEO_CACHE_FULL_RESPONSES; const e1 = ec(); await G.establishments(ctx, { ...near, radius: 800, type: 'cafe' }); assert.equal(ec() - e1, 1, 'off by default: nothing named is read back from storage');
+  assert.ok((await Q.usage(db)).reused > 0, 'reuse is counted separately from Google requests');
   // one place, minimum fields; bad ids rejected before any request
   assert.equal((await G.details(ctx, 'ChIJabcdefghijk')).name, 'Cafe X'); await assert.rejects(G.details(ctx, '../etc/passwd'), e => e.code === 'bad-input');
   assert.deepEqual(await G.route(ctx, near, { lat: 25.32, lon: 51.52 }), { seconds: 600, meters: 7000 });
