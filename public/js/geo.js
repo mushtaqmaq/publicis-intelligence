@@ -91,7 +91,7 @@ PI.tools.geo = async (box, p, a) => {
     $('#gcand').innerHTML = v.site ? `<div class="gx-ok">${I('check')} ${esc(v.site.name)} · ${v.site.lat.toFixed(4)}, ${v.site.lon.toFixed(4)}</div>`
       : [...local.map((r, i) => `<button data-l="${i}"><b>${esc(r.name)}</b><small>OOH · ${esc(r.inv)}</small></button>`), ...v.cands.map((c, i) => `<button data-c="${i}"><b>${esc(c.label)}</b><small>${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}</small></button>`)].join('');
     $$('[data-l]').forEach(b => b.onclick = () => { const r = local[+b.dataset.l]; v.site = { id: r.id, name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, road: r.road, format: r.format, vendor: r.vendor, municipality: r.municipality }; v.inv = ''; $('#ginv').value = ''; cands(); });
-    $$('[data-c]').forEach(b => b.onclick = () => { const c = v.cands[+b.dataset.c]; v.site = { id: 'site', name: c.label.split(',')[0], lat: c.lat, lon: c.lon, areas: c.areas }; cands(); });
+    $$('[data-c]').forEach(b => b.onclick = () => { const c = v.cands[+b.dataset.c]; v.site = { id: 'site', name: c.label.split(',')[0], lat: c.lat, lon: c.lon, areas: c.areas, zone: c.zone }; cands(); });
   };
   cands();
   $('#gq').oninput = e => { v.q = e.target.value; v.site = null; v.cands = []; cands(); };

@@ -105,6 +105,11 @@ test('Google gateway, cache and analysis against a fake Google and a real databa
   assert.equal(one.features.school.count, 3); assert.equal(one.features.supermarket.count, 41); assert.equal(one.features.supermarket.exact, true); assert.equal(one.features.supermarket.capped, false); assert.ok(one.score.value > 0 && one.score.coverage === 1);
   assert.equal(one.official.population, 41000); assert.match(out.evidence.find(e => e.id === one.evidenceIds.official).text, /not the 1000 m catchment/);
   assert.ok(one.pressure && one.pressure.cat === 'bank');
+  // asking for the same thing again reuses what was fetched: no new Google request at all
+  const again = await A.run(ctx, { sites: [{ id: 's1', name: 'Site 1', ...near, zone: 'West Bay' }], radius: 1000, recipe: 'families', competitor: 'bank' });
+  assert.equal(again.planning.requested - again.planning.cached, 0); assert.ok(again.planning.cached > 0); assert.deepEqual(again.results[0].features.school.count, one.features.school.count);
+  const gc = () => calls.filter(c => /maps\/api\/geocode/.test(c.url)).length, g0 = gc();
+  assert.equal((await G.geocode(ctx, 'Corniche, Doha'))[0].cached, undefined); assert.equal((await G.geocode(ctx, '  corniche,   DOHA '))[0].cached, true); assert.equal(gc() - g0, 1, 'the same search is not sent to Google twice');
   const ids = new Set(out.evidence.map(e => e.id)); assert.ok(out.recommendations.length >= 2 && ['Do now', 'Test'].includes(out.recommendations[0].priority));
   assert.ok(out.recommendations.every(r => r.evidence_refs.every(x => ids.has(x))), 'every recommendation cites real evidence');
   assert.equal(out.planning.fallback, undefined, 'counts came from Aggregate, not place searches'); assert.ok(!calls.slice(-30).some(c => /searchNearby/.test(c.url)) || true); assert.equal(out.planning.clusters, 1);
