@@ -100,6 +100,8 @@ test('Google gateway, cache and analysis against a fake Google and a real databa
   assert.equal(one.features.school.count, 3); assert.equal(one.features.supermarket.capped, true); assert.ok(one.score.value > 0 && one.score.coverage === 1);
   assert.equal(one.official.population, 41000); assert.match(out.evidence.find(e => e.id === one.evidenceIds.official).text, /not the 1000 m catchment/);
   assert.ok(one.pressure && one.pressure.cat === 'bank');
+  const ids = new Set(out.evidence.map(e => e.id)); assert.ok(out.recommendations.length >= 2 && ['Do now', 'Test'].includes(out.recommendations[0].priority));
+  assert.ok(out.recommendations.every(r => r.evidence_refs.every(x => ids.has(x))), 'every recommendation cites real evidence');
   assert.ok(out.limits.some(l => /lower bounds/.test(l))); assert.equal(out.planning.clusters, 1);
   // low allowance re-scopes the plan, it never overspends
   await pool.query('UPDATE geo_quota SET used=8998 WHERE month=$1', [m]);

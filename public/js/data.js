@@ -571,7 +571,16 @@ function editForClient(T, done) {
 }
 PI.tools.report = (box, p, a) => {
   const v = S.drafts.report || (S.drafts.report = { brief: '', files: [], maps: {}, pnames: {}, title: '', currency: 'QAR', lang: 'English', audience: 'Client', text: '' });
-  box.innerHTML = `<div class="work">
+  const bar = `<div class="tabs" role="tablist"><button role="tab" aria-selected="${v.mode === 'connect'}" data-m="connect">${I('link')}Connect platforms</button><button role="tab" aria-selected="${v.mode !== 'connect'}" data-m="manual">${I('upload')}Manual report</button></div>`;
+  const toggle = () => $$('[data-m]').forEach(b => b.onclick = () => { v.mode = b.dataset.m; PI.tools.report(box, p, a); });
+  if (v.mode === 'connect') {
+    box.innerHTML = bar + `<div class="card pad"><h3 style="margin:0 0 4px">Connect your platforms</h3><p class="hint" style="margin:0 0 14px">Pull results straight from each ad account instead of uploading exports.</p>
+      <div class="plats">${['Meta', 'Google Ads', 'TikTok', 'Snapchat', 'DV360', 'LinkedIn', 'X Ads'].map(n => `<div class="plat"><b>${n}</b><span class="pill mut">Not connected</span><button class="btn sm" data-conn="${n}">${I('link')}Connect</button></div>`).join('')}</div></div>`;
+    toggle();
+    $$('[data-conn]').forEach(b => b.onclick = () => { const m = PI.modal(`<h2>Connect ${esc(b.dataset.conn)}</h2><p class="hint" style="margin:8px 0 14px">Direct connections are not switched on yet. Each platform needs an approved API app and secure sign-in set up by an admin before accounts can be linked.</p><p style="margin:0 0 16px">Until then, use <b>Manual report</b>: export from ${esc(b.dataset.conn)} and drop the file in.</p><div class="actions" style="justify-content:flex-end"><button class="btn" id="cnX">Close</button><button class="btn pri" id="cnM">Manual report</button></div>`); m.el.querySelector('#cnX').onclick = m.close; m.el.querySelector('#cnM').onclick = () => { m.close(); v.mode = 'manual'; PI.tools.report(box, p, a); }; });
+    return;
+  }
+  box.innerHTML = bar + `<div class="work">
     <div class="card pad form"><h3>${esc(a.name)}</h3><p class="desc">Drop exports from Meta, Google, TikTok, Snapchat, DV360 or anything else. They are combined into one dashboard, then written up as a report.</p>
       <div class="field">${PI.composer({ id: 'rep', placeholder: 'Drop platform exports here. Add objectives, targets and anything the client should hear.', submit: false, hint: 'Drop CSV or Excel' })}</div>
       <div class="field"><label for="rt">Report title</label><input id="rt" value="${esc(v.title)}" placeholder="e.g. Ramadan campaign, weeks 1 to 4"></div>
@@ -579,6 +588,7 @@ PI.tools.report = (box, p, a) => {
       <div id="rmap"></div>
       <div class="actions"><button class="btn" id="rdash">${I('chart-column')}Dashboard</button><button class="btn pri" id="rgo">${I('sparkles')}Dashboard and report</button></div></div>
     <div class="card out" id="rout"></div></div>`;
+  toggle();
   const cmp = PI.bindComposer('rep', v, { onFiles: () => mp(), onSubmit: () => go(true) });
   [['rt', 'title'], ['rcur', 'currency'], ['rl', 'lang'], ['ra', 'audience']].forEach(([id, k]) => { const el = $('#' + id); el.oninput = el.onchange = () => v[k] = el.value; });
   const mp = () => { const ds = datasets(v); ensureMaps(v, ds); $('#rmap').innerHTML = ds.length ? mappingHTML(v, ds) : `<div class="notice info">${I('info')}<div>No exports to hand? <button class="btn xs" id="rsample" style="margin-left:6px">${I('table')}Load sample data</button></div></div>`; bindMapping($('#rmap'), v, ds, mp); const sb = $('#rsample'); if (sb) sb.onclick = () => { addSample(v, 'Sample platform export (illustrative).csv', samplePerf(), cmp); mp(); }; };
