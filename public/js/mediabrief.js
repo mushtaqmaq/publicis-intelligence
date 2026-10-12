@@ -109,7 +109,7 @@ async function fillEstimate(b) { const e = await estimateBudget(b, b.suggestedTy
 
 MB.start = box => {
   const st = S.mb || (S.mb = { step: 1, brief: emptyBrief(), draft: { brief: '', files: [] }, details: { client: '', brand: '', campaign: '', reference: '', type: '', fx: '3.65' }, picks: null, qs: null, say: '', answers: {} });
-  const steps = ['Brief', 'Client', 'Platforms'], head = () => { const at = st.step <= 2 ? 1 : st.step - 1; return `<div class="mb-steps">${steps.map((s, i) => `<span class="${at === i + 1 ? 'on' : at > i + 1 ? 'done' : ''}">${i + 1}. ${s}</span>`).join('')}</div>`; };
+  const steps = ['Brief', 'Plan'], head = () => { const at = st.step <= 2 ? 1 : 2; return `<div class="mb-steps">${steps.map((s, i) => `<span class="${at === i + 1 ? 'on' : at > i + 1 ? 'done' : ''}">${i + 1}. ${s}</span>`).join('')}</div>`; };
   const draw = () => ({ 1: s1, 2: s2, 3: s3, 4: s4 })[st.step]();
   const go = k => { st.step = k; draw(); };
   // The brief is final: no more questions. Fill what the brief allows and go straight to building the plan (Back still reaches the details).
