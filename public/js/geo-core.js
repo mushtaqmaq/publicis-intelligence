@@ -47,6 +47,45 @@ function parseInterpretation(text, packet) {
   if (!findings.length) return { ok: false, error: 'None of the AI statements could be matched to the evidence.' };
   return { ok: true, findings, audience, actions, dropped };
 }
-const api = { buildPacket, SYSTEM, parseInterpretation };
+
+const OBJECTIVES = {
+  general: { label: 'General awareness', w: { audience: 3, official: 2, competition: 2, access: 1 } },
+  b2b: { label: 'B2B / workplace', w: { audience: 4, official: 1, competition: 2, access: 2 } },
+  family: { label: 'Family', w: { audience: 4, official: 3, competition: 1, access: 1 } },
+  premium: { label: 'Premium', w: { audience: 4, official: 1, competition: 2, access: 1 } },
+  mass: { label: 'Mass retail', w: { audience: 2, official: 4, competition: 2, access: 2 } }
+};
+const clamp = x => Math.max(0, Math.min(1, x));
+// Objective-dependent opportunity score from evidence already in the result. Missing components are left out, never counted as zero.
+// route: optional { seconds } driving time from a chosen origin. Returns { value, coverage, parts }.
+function opportunity(r, objective, route) {
+  const w = (OBJECTIVES[objective] || OBJECTIVES.general).w, o = r.official, pc = o && o.percentile;
+  const parts = [
+    { key: 'audience', label: 'Audience fit', value: r.score.value == null ? null : r.score.value / 100, note: 'Recipe score from places around the site' },
+    { key: 'official', label: 'Official area context', value: pc ? (pc.population + pc.density) / 200 : null, note: o ? `Zone population and density rank among zones in ${o.year}` : 'No official zone matched' },
+    { key: 'competition', label: 'Competitor gap', value: r.pressure ? 1 - clamp(r.pressure.count / 20) : null, note: 'Fewer competitors nearby scores higher' },
+    { key: 'access', label: 'Accessibility', value: route && route.seconds != null ? clamp(1 - (route.seconds / 60 - 10) / 30) : null, note: 'Driving time from the chosen origin: 10 min or less is best, 40 or more is worst' }
+  ].map(p => ({ ...p, weight: w[p.key] }));
+  const avail = parts.filter(p => p.value != null), aw = avail.reduce((a, p) => a + p.weight, 0), tw = parts.reduce((a, p) => a + p.weight, 0);
+  return { value: aw ? Math.round(1000 * avail.reduce((a, p) => a + p.weight * p.value, 0) / aw) / 10 : null, coverage: Math.round(100 * aw / tw) / 100, parts };
+}
+
+// Signal -> Pattern -> Implication -> Action, from rules only (no AI).
+function story(r, opp, radius) {
+  const top = r.score.contributions.filter(c => c.points != null).sort((a, b) => b.points - a.points).slice(0, 2), name = r.site.name || r.site.id;
+  const signal = top.length ? `${top.map(c => `${(c.capped ? 'at least ' : '') + c.count} ${c.label.toLowerCase()}`).join(' and ')} within ${radius} m` : 'No surrounding-place evidence yet';
+  const aud = r.score.value, comp = r.pressure ? r.pressure.count : null;
+  let pattern, implication, action;
+  if (aud == null) { pattern = 'Not enough evidence to read a pattern'; implication = 'The site cannot be ranked yet.'; action = 'Connect Google Maps data or add the official zone, then re-run.'; }
+  else if (aud >= 60 && (comp == null || comp < 10)) { pattern = 'Strong audience context with room in the market'; implication = `${name} suits the audience and is not crowded by the chosen competitor category.`; action = 'Shortlist for the plan and confirm with traffic or audience measurement.'; }
+  else if (aud >= 60) { pattern = 'Strong audience context in a contested catchment'; implication = 'The audience is present, but competitors are dense around the site.'; action = 'Use it with a distinctive message, or test it against a quieter site.'; }
+  else if (aud >= 40) { pattern = 'Moderate audience context'; implication = 'Some supporting places exist, but the case is not strong.'; action = 'Pilot before committing budget.'; }
+  else { pattern = 'Limited audience context'; implication = 'Few places that match this audience are close to the site.'; action = 'Hold back unless the site has another reason to be included.'; }
+  return { signal, pattern, implication, action, confidence: opp.coverage >= 0.75 ? 'Higher' : opp.coverage >= 0.5 ? 'Medium' : 'Lower', limit: opp.coverage < 1 ? `${Math.round((1 - opp.coverage) * 100)}% of the weighting had no evidence` : null };
+}
+const band = s => s == null ? ['n/a', 'mut'] : s >= 70 ? ['Strong context', 'ok'] : s >= 40 ? ['Moderate context', 'warn'] : ['Limited context', 'bad'];
+const km = m => m == null ? '–' : m >= 1000 ? (m / 1000).toFixed(1).replace('.0', '') + ' km' : Math.round(m) + ' m';
+const mins = s => s == null ? '–' : Math.round(s / 60) + ' min';
+const api = { buildPacket, SYSTEM, parseInterpretation, OBJECTIVES, opportunity, story, band, km, mins };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PIGeoCore = api;
 })(typeof window !== 'undefined' ? window : globalThis);
