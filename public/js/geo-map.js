@@ -24,8 +24,12 @@ M.mount = (box) => {
   if (!M.g || M.failed) return false;
   if (!M.el) { M.el = document.createElement('div'); M.el.className = 'gx-gmap'; }
   box.appendChild(M.el);
-  if (!M.map) M.map = new M.g.Map(M.el, { center: { lat: 25.2854, lng: 51.531 }, zoom: 11, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'greedy' });
+  // Country lock: the view cannot leave Qatar, so zooming out stops at the whole country instead of the globe.
+  if (!M.map) M.map = new M.g.Map(M.el, { center: { lat: 25.2854, lng: 51.531 }, zoom: 11, minZoom: 8, restriction: { latLngBounds: M.BOUNDS, strictBounds: true }, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'greedy' });
   else M.g.event.trigger(M.map, 'resize');
+  if (!M.locked) { M.locked = true;   // belt and braces: keep the view inside Qatar even if the library lets a gesture through
+    const clamp = () => { const b = M.BOUNDS, c = M.map.getCenter(), z = M.map.getZoom(); if (z < 8) M.map.setZoom(8); const lat = Math.min(b.north, Math.max(b.south, c.lat())), lng = Math.min(b.east, Math.max(b.west, c.lng())); if (lat !== c.lat() || lng !== c.lng()) M.map.panTo({ lat, lng }); };
+    M.map.addListener('zoom_changed', clamp); M.map.addListener('dragend', clamp); }
   return true;
 };
 M.setType = t => { M.mapType = t; if (M.map) M.map.setMapTypeId(t); };
@@ -56,6 +60,17 @@ M.browse = st => {
   if (st.fit && st.rows.length) { const b = new g.LatLngBounds(); st.rows.forEach(p => b.extend({ lat: p.lat, lng: p.lon })); M.map.fitBounds(b, 40); }
 };
 // Municipality choropleth from the Qatar Open Data boundaries, shaded by census 2020 population.
+M.BOUNDS = { north: 26.3, south: 24.4, west: 50.6, east: 51.8 };   // Qatar and its waters
+// Everything outside Qatar is dimmed: a world-sized polygon with the municipality outlines cut out of it.
+const area = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) s += (r[j][0] + r[i][0]) * (r[j][1] - r[i][1]); return s / 2; };
+M.setMask = (gj, on) => {
+  if (M.mask) { M.mask.setMap(null); M.mask = null; }
+  if (!M.map || !on || !gj) return; const g = M.g, ll = r => r.map(([lng, lat]) => ({ lat, lng }));
+  const world = [[-179.9, -85], [179.9, -85], [179.9, 85], [-179.9, 85]];                         // anticlockwise
+  const holes = []; for (const f of gj.features) for (const poly of (f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates)) { const r = poly[0].slice(); if (area(r) < 0) r.reverse(); holes.push(r); }   // clockwise, opposite to the world ring, so Qatar is cut out
+  M.mask = new g.Polygon({ map: M.map, paths: [ll(world), ...holes.map(ll)], fillColor: '#344054', fillOpacity: 0.32, strokeColor: '#2F6BFF', strokeOpacity: 0.7, strokeWeight: 1.2, clickable: false, zIndex: 0 });
+};
+
 M.muniObjs = [];
 M.setMuni = (gj, on) => {
   M.muniObjs.forEach(o => o.setMap(null)); M.muniObjs = [];
