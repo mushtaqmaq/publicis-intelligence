@@ -285,7 +285,9 @@ test('KMZ import: reads a zipped KML, builds assets from the folder path, drops 
   assert.equal(out.rows.find(r => r.name === 'Roadside A').screen_type, 'Digital');
   const n = I.normalize(out.rows); assert.equal(n.rows.length, 3); assert.equal(n.issues.length, 0); assert.equal(n.rows[0].lat, 25.358);
   assert.throws(() => K.toRows(Buffer.from('PK\u0003\u0004 not a real zip')), /KMZ|KML/);
-  assert.equal(require('../lib/geo/assets/qa-assets-2026-09-24.json').rows.length, 1351, 'the built-in asset list ships with the app');
+  const built = require('../lib/geo/assets/qa-assets-2026-09-24.json'); assert.equal(built.rows.length, 1351, 'the built-in asset list ships with the app');
+  assert.ok(built.rows.every(r => geom.inQatar(r.lat, r.lon)), 'every asset lies inside the area the map is locked to');
+  assert.ok(/north: 26\.3, south: 24\.4, west: 50\.6, east: 51\.8/.test(require('fs').readFileSync(require('path').join(__dirname, '../public/js/geo-map.js'), 'utf8')) && geom.QATAR.maxLat === 26.3 && geom.QATAR.minLat === 24.4 && geom.QATAR.minLon === 50.6 && geom.QATAR.maxLon === 51.8, 'the map lock and the server share one Qatar box');
 });
 
 test('municipality boundaries: a coordinate is placed by polygon, holes are respected, names meet across datasets', () => {
