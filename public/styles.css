@@ -620,3 +620,7 @@ pre.code{background:#111114;color:#E8E8ED;font:12.5px/1.55 ui-monospace,SFMono-R
 
 .plats{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
 .plat{border:1px solid var(--hair);border-radius:var(--r-m);padding:14px;display:grid;gap:10px;justify-items:start}
+
+.qd-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:16px}
+.qd-src{margin:8px 0 0}.qd .ch,.qd svg{max-width:100%}
+@media (max-width:1000px){.qd-grid{grid-template-columns:1fr}}
