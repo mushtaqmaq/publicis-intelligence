@@ -117,7 +117,7 @@ PI.tools.geo = async (box, p, a) => {
       : [...mem.map((r, i) => `<button data-m="${i}"><b>${esc(r.name)}</b><small>Seen before${r.zone ? ' · ' + esc(r.zone) : ''} · ${r.n}x · no lookup needed</small></button>`), ...local.map((r, i) => `<button data-l="${i}"><b>${esc(r.name)}</b><small>OOH · ${esc(r.inv)}${r.format ? ' · ' + esc(r.format) : ''}</small></button>`), ...v.cands.map((c, i) => `<button data-c="${i}"><b>${esc(c.label)}</b><small>${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}</small></button>`)].join('');
     $$('[data-m]').forEach(b => b.onclick = () => { const r = mem[+b.dataset.m]; v.site = { id: 'm' + r.lat.toFixed(3) + r.lon.toFixed(3), name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, municipality: r.municipality }; v.inv = ''; $('#ginv').value = ''; invUI(); cands(); });
     $$('[data-l]').forEach(b => b.onclick = () => { const r = local[+b.dataset.l]; v.site = { id: r.id, name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, road: r.road, format: r.format, vendor: r.vendor, municipality: r.municipality, site_description: r.site_description, circuit: r.circuit, screen_type: r.screen_type }; v.inv = ''; $('#ginv').value = ''; invUI(); cands(); });
-    $$('[data-c]').forEach(b => b.onclick = () => { const c = v.cands[+b.dataset.c]; v.site = { id: 'site', name: c.label.split(',')[0], lat: c.lat, lon: c.lon, areas: c.areas, zone: c.zone }; cands(); });
+    $$('[data-c]').forEach(b => b.onclick = () => { const c = v.cands[+b.dataset.c]; v.site = { id: 'site', name: c.label.split(' · ')[0].split(',')[0], lat: c.lat, lon: c.lon, areas: c.areas, zone: c.zone }; cands(); });
   };
   cands();
   $('#gq').oninput = e => { v.q = e.target.value; v.site = null; v.cands = []; cands(); };
