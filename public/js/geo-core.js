@@ -68,10 +68,10 @@ const RULES = [
   { rx: /bank|atm|office|tower|b2b|corporate|business|enterprise|insurance|telecom/i, recipe: 'office_professionals', w: 3, why: 'workplace and finance words' },
   { rx: /luxury|premium|jewel|affluent|high.?end|private bank|spa\b/i, recipe: 'premium', w: 3, why: 'premium words' },
   { rx: /international|expat|embass/i, recipe: 'international', w: 3, why: 'international words' },
-  { rx: /cafe|coffee|gym|fitness|cinema|young|gen z|restaurant|qsr|burger|pizza/i, recipe: 'young_professionals', w: 2, why: 'dining and lifestyle words' }
+  { rx: /cafe|coffee|gym|fitness|cinema|young|gen z|restaurant|qsr|mcdonald|kfc|hardee|burger|pizza|subway|starbucks|dunkin|tim hortons|costa|popeyes|shake shack|baskin/i, recipe: 'young_professionals', w: 2, why: 'dining and lifestyle words' }
 ];
-const COMP = [[/atm|bank|branch/i, 'bank'], [/restaurant|qsr|burger|pizza|fast food|diner/i, 'restaurant'], [/cafe|coffee/i, 'cafe'], [/pharmac/i, 'pharmacy'], [/hospital/i, 'hospital'], [/clinic|dental/i, 'doctor'], [/showroom|dealer|car\b|cars\b/i, 'car_dealer'], [/hotel/i, 'hotel'], [/gym|fitness/i, 'gym'], [/mall/i, 'shopping_mall'], [/supermarket|grocery|hypermarket/i, 'supermarket'], [/jewel/i, 'jewelry_store'], [/school|nursery/i, 'school'], [/cinema/i, 'movie_theater']];
-const OBJ = [[/b2b|corporate|enterprise|business|insurance|telecom/i, 'b2b'], [/premium|luxury|affluent|private bank|jewel/i, 'premium'], [/famil|kids|school|baby|nursery/i, 'family'], [/mass|retail|fmcg|grocery|qsr|burger|pizza|fast food|supermarket/i, 'mass']];
+const COMP = [[/atm|bank|branch/i, 'bank'], [/restaurant|qsr|fast food|diner|mcdonald|kfc|hardee|burger|pizza|subway|popeyes|shake shack|baskin/i, 'restaurant'], [/cafe|coffee|starbucks|dunkin|tim hortons|costa/i, 'cafe'], [/pharmac/i, 'pharmacy'], [/hospital/i, 'hospital'], [/clinic|dental/i, 'doctor'], [/showroom|dealer|car\b|cars\b/i, 'car_dealer'], [/hotel/i, 'hotel'], [/gym|fitness/i, 'gym'], [/mall/i, 'shopping_mall'], [/supermarket|grocery|hypermarket/i, 'supermarket'], [/jewel/i, 'jewelry_store'], [/school|nursery/i, 'school'], [/cinema/i, 'movie_theater']];
+const OBJ = [[/b2b|corporate|enterprise|business|insurance|telecom/i, 'b2b'], [/premium|luxury|affluent|private bank|jewel/i, 'premium'], [/famil|kids|school|baby|nursery/i, 'family'], [/mass|retail|fmcg|grocery|qsr|burger|pizza|fast food|supermarket|mcdonald|kfc|hardee|burger|pizza|subway|starbucks|dunkin|tim hortons|costa|popeyes|shake shack|baskin/i, 'mass']];
 function infer(text) {
   const t = String(text || ''), score = {}, why = {};
   for (const r of RULES) if (r.rx.test(t)) { score[r.recipe] = (score[r.recipe] || 0) + r.w; why[r.recipe] = r.why; }
