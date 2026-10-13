@@ -4,7 +4,7 @@
 'use strict';
 const { $, $$, esc, I, S, num } = PI;
 const C = window.PIGeoCore, M = PI.geoMap, BR = window.PIGeoBrain, BUILTIN = 'builtin-qa-2026-09-24';
-const TABS = [['map', 'Map & Analysis'], ['official', 'Official Data'], ['audience', 'Audience Insights'], ['comp', 'Competitors & POIs'], ['compare', 'Site Comparison'], ['opp', 'Opportunity Analysis'], ['saved', 'Saved Analyses']];
+const TABS = [['plan', 'Plan'], ['map', 'Map & Analysis'], ['official', 'Official Data'], ['audience', 'Audience Insights'], ['comp', 'Competitors & POIs'], ['compare', 'Site Comparison'], ['opp', 'Opportunity Analysis'], ['saved', 'Saved Analyses']];
 const sel = (id, opts, cur, label) => `<label class="gx-f"><span>${label}</span><select id="${id}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
 const pinRe = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/;
 const STATE = { NOT_CONFIGURED: ['Not configured', 'mut'], CONFIGURED_UNVERIFIED: ['Configured, not verified', 'warn'], VERIFIED: ['Verified', 'ok'], DEGRADED: ['Degraded', 'bad'], DISABLED: ['Disabled', 'mut'], AVAILABLE: ['Available', 'ok'] };
@@ -35,10 +35,11 @@ PI.tools.geo = async (box, p, a) => {
   box.innerHTML = `<div class="gx"><div class="gx-head"><div><h2>Geo Intelligence</h2><p>Location. People. Context. Opportunity.</p></div>
       <div class="gx-status"><span class="gx-pill ok" title="State of Qatar Open Data">Qatar Open Data · Available</span><span class="gx-pill ${gc}" title="Google Maps Platform">Google Maps · ${gl}</span><span class="gx-pill ${ai ? 'ok' : 'mut'}" title="AI engine (used only when you ask)">AI · ${ai ? 'Configured' : 'Not configured'}</span>${quota}${S.me && S.me.role === 'admin' ? `<button class="btn xs" id="gusage">${I('gauge')}Usage</button>` : ''}${S.me && S.me.role === 'admin' && pr().serverKey ? `<button class="btn xs" id="gverify" title="Runs one request per Google API (5 of the monthly allowance)">${I('check')}Run Google check</button>` : ''}</div></div>
     ${pr().state === 'NOT_CONFIGURED' ? `<div class="notice info">${I('info')}<div>Google Maps data is not configured. Official Qatar data and first-party analysis remain available.</div></div>` : ''}
-    <div class="gx-bar"><div class="gx-search"><input id="gq" dir="auto" value="${esc(v.q)}" placeholder="Search location, OOH site, area or client…" aria-label="Search"><button class="btn sm" id="gfind">${I('search')}Find</button><div id="gcand" class="gx-cand"></div></div>
-      ${sel('ginv', [['', 'Single location'], [BUILTIN, 'Qatar OOH assets (24 Sep 2026) · 1,351 sites'], ...(v.found ? [[FOUND, `Search: ${v.found.query} · ${v.found.items.length} found`]] : []), ...oohInvs.map(i => [i.id, `${i.name} · ${i.rows.length} sites${i.version > 1 ? ' · v' + i.version : ''}`])], v.inv, 'OOH inventory')}
-      ${sel('gaud', meta.recipes.map(r => [r.id, r.label]), v.recipe, 'Who are you reaching?')}
-      <button class="btn pri" id="ggo">${I('target')}Analyse</button></div>
+    <div class="gx-steps">
+      <div class="gx-step"><span class="gx-n">1</span><div class="gx-sb"><b>Where</b><small>A brand or branch network (e.g. McDonald's), an area, or one place</small><div class="gx-search"><input id="gq" dir="auto" value="${esc(v.q)}" placeholder="Search location, OOH site, area or client…" aria-label="Search"><button class="btn sm" id="gfind">${I('search')}Find</button><div id="gcand" class="gx-cand"></div></div><div id="gwhere" class="gx-where"></div></div></div>
+      <div class="gx-step"><span class="gx-n">2</span><div class="gx-sb"><b>OOH inventory</b><small>The screens and sites you can buy</small>${sel('ginv', [['', 'Single location'], [BUILTIN, 'Qatar OOH assets (24 Sep 2026) · 1,351 sites'], ...(v.found ? [[FOUND, `Search: ${v.found.query} · ${v.found.items.length} found`]] : []), ...oohInvs.map(i => [i.id, `${i.name} · ${i.rows.length} sites${i.version > 1 ? ' · v' + i.version : ''}`])], v.inv, '')}</div></div>
+      <div class="gx-step"><span class="gx-n">3</span><div class="gx-sb"><b>Who</b><small>The audience to reach</small>${sel('gaud', meta.recipes.map(r => [r.id, r.label]), v.recipe, '')}</div></div>
+      <div class="gx-go"><button class="btn pri" id="gplan" title="Finds the audience areas around your locations and picks the best screens and branches">${I('sparkles')}Build plan</button><button class="btn" id="ggo" title="Scores the selected place or assets one by one">${I('target')}Analyse</button></div></div>
     ${(() => { const u = BR.usual(v.brain); return u && (u.recipe !== v.recipe || u.radius !== v.radius || u.competitor !== v.competitor) ? `<div class="gx-usual"><button class="btn xs" id="gusual">${I('sparkles')}Your usual: ${esc((meta.recipes.find(r => r.id === u.recipe) || {}).label || u.recipe)} · ${typeof u.radius !== 'number' ? 'Auto' : u.radius >= 1000 ? u.radius / 1000 + ' km' : u.radius + ' m'}${u.competitor ? ' · ' + esc(meta.categories[u.competitor] || '') : ''}</button><small>learned from ${u.runs} team analyses</small></div>` : ''; })()}
     <div id="gauto" class="gx-auto"></div>
     <div id="ginvf" class="gx-invf"></div>
@@ -111,6 +112,26 @@ PI.tools.geo = async (box, p, a) => {
     try { const d = await PI.api('POST', 'geo/places', { lat: r.site.lat, lon: r.site.lon, radius: r.radius || v.result.radius, categories: g.cats.slice(0, 3) }); v.ctxData[G.ctxKey(r, id)] = Object.values(d.byCat).flatMap(x => x.error ? [] : x.places || []); }
     catch (e) { v.ctxOn[id] = false; PI.toast(e.message); }
   };
+  // ---- network plan: locations + inventory + audience -> areas, competing plans and a validated winner ----
+  const whereUI = () => { const el = $('#gwhere'); if (!el) return; const t = v.targets, cl = v.clientLoc ? invRows(v.clientLoc).length : 0;
+    el.innerHTML = t && t.items.length ? `<span class="gx-pill ok">${t.items.length} “${esc(t.q)}” location${t.items.length === 1 ? '' : 's'}</span><button class="gx-link" id="gwclear">Clear</button>` : cl ? `<span class="gx-pill ok">${cl} client locations</span>` : '<span class="gx-fine">Type a brand and press Find to load all its locations.</span>';
+    const c = $('#gwclear'); if (c) c.onclick = () => { v.targets = null; v.plan = null; whereUI(); G.show(); }; };
+  G.whereUI = whereUI;
+  G.plan = async confirm => {
+    const q = v.q.trim(), btn = $('#gplan'), busy = on => { if (btn) { btn.disabled = on; btn.innerHTML = on ? '<span class="spin"></span>Building' : I('sparkles') + 'Build plan'; } };
+    if (!v.inv || v.inv === FOUND) return PI.toast('Choose an OOH inventory in step 2');
+    if (v.inv === BUILTIN && !v.builtin) return PI.toast('Still loading the assets');
+    busy(true);
+    try {
+      if (q.length >= 3 && !pinRe.test(q) && v.st.google && (!v.targets || v.targets.q !== q)) { await findTargets(q); whereUI(); }
+      const branches = clients(); if (branches.length < 2) { busy(false); return PI.toast(v.targets && v.targets.q === q && !v.targets.items.length ? `Google found no “${q}” locations in Qatar. Try the brand name on its own.` : 'A plan needs a group of locations. Type a brand in step 1 and press Find, or choose client locations.'); }
+      infer([v.q, v.brief, (PI.client() || {}).name].filter(Boolean).join(' '));
+      const d = await PI.api('POST', 'geo/plan', { branches, assets: filtered().map(r => ({ id: r.id, name: r.name, lat: r.lat, lon: r.lon, vendor: r.vendor, format: r.format })), recipe: v.recipe, objective: v.objective, competitor: v.competitor, confirm: !!confirm });
+      if (d.needsConfirm) { busy(false); const m = PI.modal(`<h2>Build this plan?</h2><p>${esc(d.message)}</p><div class="actions" style="justify-content:flex-end"><button class="btn" id="gpn">Cancel</button><button class="btn pri" id="gpy">Build plan</button></div>`); m.el.querySelector('#gpn').onclick = m.close; m.el.querySelector('#gpy').onclick = () => { m.close(); G.plan(true); }; return; }
+      v.plan = { ...d, q: v.targets ? v.targets.q : 'Client locations', inv: invLabel() }; v.tab = 'plan'; G.show(); G.logBrain({ t: 'analysis', q: v.q, sites: [], recipe: v.recipe, objective: v.objective, radius: 'auto', competitor: v.competitor });
+    } catch (e) { PI.toast(e.message); }
+    busy(false);
+  };
   G.refreshAll = () => PI.tools.geo(box, p, a);
   PI.geoG = G;
 
@@ -144,7 +165,7 @@ PI.tools.geo = async (box, p, a) => {
   const autoChip = () => `${I('sparkles')}<span>Set for you: <b>${v.auto.done.join(', ')}</b> · ${esc(v.auto.reasons.join('; '))}. Change any of it if it is wrong.</span>`;
   if (v.auto) $('#gauto').innerHTML = autoChip();
   $('#gaud').onchange = e => { v.recipe = e.target.value; v.recipeSet = true; v.weights = null; if (v.result && v.sites) G.analyse(v.sites, { stay: true }); };
-  $('#gcl').onchange = e => { v.clientLoc = e.target.value; if (v.result) G.show(); else G.show(); };
+  $('#gcl').onchange = e => { v.clientLoc = e.target.value; whereUI(); if (v.result) G.show(); else G.show(); };
   const us = $('#gusual'); if (us) us.onclick = () => { const u = BR.usual(v.brain); Object.assign(v, { recipe: u.recipe, radius: u.radius, competitor: u.competitor, objective: u.objective }); PI.tools.geo(box, p, a); }; $('#gc').onchange = e => { v.competitor = e.target.value; v.compSet = true; }; $('#gz').oninput = e => v.zone = e.target.value; $('#gb').oninput = e => v.brief = e.target.value;
   $$('#grad [data-r]').forEach(b => b.onclick = () => { v.radius = b.dataset.r === 'auto' ? 'auto' : +b.dataset.r; $$('#grad [data-r]').forEach(x => x.classList.toggle('on', x === b)); if (v.result && v.tab === 'map') $('#ggo').click(); });
   const ub = $('#gusage'); if (ub) ub.onclick = async () => {
@@ -178,7 +199,7 @@ PI.tools.geo = async (box, p, a) => {
   $('#gq').onkeydown = e => { if (e.key === 'Enter') $('#gfind').click(); };
   // The OOH inventory is fixed. What the planner types is the thing the assets should be near (a business, a branch network or a place), so it only marks targets.
   const invLabel = () => v.inv === BUILTIN ? 'Qatar OOH' : ((v.invs.find(i => i.id === v.inv) || {}).name || 'inventory');
-  const findTargets = async q => { const d = await PI.api('POST', 'geo/search', { query: q }); v.targets = { q, items: d.items.slice(0, 200) }; };
+  const findTargets = async q => { const d = await PI.api('POST', 'geo/search', { query: q }); v.targets = { q, items: d.items.slice(0, 200) }; v.plan = null; };
   const showAll = async () => {
     const q = v.q.trim(); if (q.length < 3) return PI.toast('Type what to look for');
     if (!v.st.google) return PI.toast('Google Maps is not connected.');
@@ -210,6 +231,7 @@ PI.tools.geo = async (box, p, a) => {
   const go = () => setTimeout(() => $('#ggo') && $('#ggo').click(), 0);   // choosing a place analyses it straight away
   const asSite = r => ({ id: r.id, name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, vendor: r.vendor, format: r.format, road: r.road, site_description: r.site_description, circuit: r.circuit, screen_type: r.screen_type, notes: r.notes, municipality: r.municipality });
   G.pickAsset = id => { const x = G.oohAll().find(y => y.id === id); if (!x) return; v.site = asSite(x); v.inv = ''; const gi = $('#ginv'); if (gi) gi.value = ''; v.browseSel = null; G.analyse([{ ...v.site }]); };
+  $('#gplan').onclick = () => G.plan(false); whereUI();
   $('#ggo').onclick = async () => {
     v.auto = null; infer([v.q, v.brief, (PI.client() || {}).name].filter(Boolean).join(' ')); { const el = $('#gauto'); if (el && !v.auto) el.innerHTML = ''; }
     if (v.inv) {
