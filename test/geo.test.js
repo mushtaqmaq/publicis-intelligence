@@ -28,11 +28,11 @@ test('OOH import: coordinates alone are enough, bad rows are reported, valid row
 
 test('scoring: weights adapt to the recipe, missing categories are left out (not zero) and lower the coverage', () => {
   const full = Object.fromEntries(S.RECIPES.families.factors.map(f => [f.cat, { count: 10 }]));
-  assert.equal(S.score(S.RECIPES.families, full).value, 50);
+  assert.equal(S.score(S.RECIPES.families, full).value, 71.3);   // 1 - exp(-10/8): saturating, not linear
   const part = S.score(S.RECIPES.families, { school: { count: 20 } });
-  assert.equal(part.value, 100); assert.ok(part.coverage < 0.3);
+  assert.equal(part.value, 91.8); assert.ok(part.coverage < 0.3);
   assert.equal(S.score(S.RECIPES.families, {}).value, null);
-  const s = S.score(S.RECIPES.families, full); assert.ok(Math.abs(s.contributions.reduce((a, c) => a + c.points, 0) - s.value) < 0.2);
+  const s = S.score(S.RECIPES.families, full); assert.ok(Math.abs(s.contributions.reduce((a, c) => a + c.points, 0) - s.value) < 0.5);   // each part is rounded to 0.1
   assert.equal(S.confidence(1, true), 'High'); assert.equal(S.confidence(0.5, true), 'Low');
 });
 
