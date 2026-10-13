@@ -56,6 +56,33 @@ const OBJECTIVES = {
   premium: { label: 'Premium', w: { audience: 4, official: 1, competition: 2, access: 1, coverage: 1 } },
   mass: { label: 'Mass retail', w: { audience: 2, official: 4, competition: 2, access: 2, coverage: 2 } }
 };
+
+// Reads the words the planner used (search, brief, client) and works out the audience, objective and competitor category. Rule-based, with reasons.
+const RULES = [
+  { rx: /hospital|clinic|medical|dental|pharmac|health|care centre/i, recipe: 'healthcare', w: 3, why: 'health places named' },
+  { rx: /showroom|dealer|car\b|cars\b|motor|vehicle|automotive|fuel|petrol/i, recipe: 'automotive', w: 3, why: 'vehicle words' },
+  { rx: /hotel|resort|tourist|visitor|attraction|museum|airport|travel/i, recipe: 'tourists', w: 3, why: 'visitor and hospitality words' },
+  { rx: /universit|college|student|campus|graduate/i, recipe: 'students', w: 3, why: 'education words' },
+  { rx: /school|nursery|famil|kids|children|supermarket|grocery|baby/i, recipe: 'families', w: 3, why: 'family words' },
+  { rx: /bank|atm|office|tower|b2b|corporate|business|enterprise|insurance|telecom/i, recipe: 'office_professionals', w: 3, why: 'workplace and finance words' },
+  { rx: /luxury|premium|jewel|affluent|high.?end|private bank|spa\b/i, recipe: 'premium', w: 3, why: 'premium words' },
+  { rx: /international|expat|embass/i, recipe: 'international', w: 3, why: 'international words' },
+  { rx: /cafe|coffee|gym|fitness|cinema|young|gen z|restaurant|qsr|burger|pizza/i, recipe: 'young_professionals', w: 2, why: 'dining and lifestyle words' }
+];
+const COMP = [[/atm|bank|branch/i, 'bank'], [/restaurant|qsr|burger|pizza|fast food|diner/i, 'restaurant'], [/cafe|coffee/i, 'cafe'], [/pharmac/i, 'pharmacy'], [/hospital/i, 'hospital'], [/clinic|dental/i, 'doctor'], [/showroom|dealer|car\b|cars\b/i, 'car_dealer'], [/hotel/i, 'hotel'], [/gym|fitness/i, 'gym'], [/mall/i, 'shopping_mall'], [/supermarket|grocery|hypermarket/i, 'supermarket'], [/jewel/i, 'jewelry_store'], [/school|nursery/i, 'school'], [/cinema/i, 'movie_theater']];
+const OBJ = [[/b2b|corporate|enterprise|business|insurance|telecom/i, 'b2b'], [/premium|luxury|affluent|private bank|jewel/i, 'premium'], [/famil|kids|school|baby|nursery/i, 'family'], [/mass|retail|fmcg|grocery|qsr|burger|pizza|fast food|supermarket/i, 'mass']];
+function infer(text) {
+  const t = String(text || ''), score = {}, why = {};
+  for (const r of RULES) if (r.rx.test(t)) { score[r.recipe] = (score[r.recipe] || 0) + r.w; why[r.recipe] = r.why; }
+  const ranked = Object.entries(score).sort((a, b) => b[1] - a[1]), best = ranked[0];
+  const comp = COMP.find(([rx]) => rx.test(t)), obj = OBJ.find(([rx]) => rx.test(t));
+  if (!best && !comp && !obj) return null;
+  const reasons = [];
+  if (best) reasons.push(`${why[best[0]]} point to ${best[0].replace(/_/g, ' ')}`);
+  if (comp) reasons.push(`"${comp[1].replace(/_/g, ' ')}" looks like the competing category`);
+  if (obj) reasons.push(`objective reads as ${OBJECTIVES[obj[1]].label.toLowerCase()}`);
+  return { recipe: best ? best[0] : null, objective: obj ? obj[1] : null, competitor: comp ? comp[1] : null, confidence: best && (!ranked[1] || best[1] > ranked[1][1]) ? 'Higher' : 'Lower', reasons };
+}
 const clamp = x => Math.max(0, Math.min(1, x));
 // Objective-dependent opportunity score from evidence already in the result. Missing components are left out, never counted as zero.
 // route: optional { seconds } driving time from a chosen origin. Returns { value, coverage, parts }.
@@ -69,7 +96,8 @@ function opportunity(r, objective, route, extra = {}) {
     { key: 'access', label: 'Accessibility', value: route && route.seconds != null ? clamp(1 - (route.seconds / 60 - 10) / 30) : null, note: 'Driving time from the chosen origin: 10 min or less is best, 40 or more is worst' }
   ].map(p => ({ ...p, weight: w[p.key] }));
   const avail = parts.filter(p => p.value != null), aw = avail.reduce((a, p) => a + p.weight, 0), tw = parts.reduce((a, p) => a + p.weight, 0);
-  return { value: aw ? Math.round(1000 * avail.reduce((a, p) => a + p.weight * p.value, 0) / aw) / 10 : null, coverage: Math.round(100 * aw / tw) / 100, parts };
+  const base = aw ? avail.reduce((a, p) => a + p.weight * p.value, 0) / aw : null, adj = extra.seasonAdj || 0;   // seasonal timing nudges the result by at most 20% and is reported on its own line
+  return { value: base == null ? null : Math.round(1000 * clamp(base * (1 + adj))) / 10, base: base == null ? null : Math.round(1000 * base) / 10, seasonAdj: adj, coverage: Math.round(100 * aw / tw) / 100, parts };
 }
 
 // Signal -> Pattern -> Implication -> Action, from rules only (no AI).
@@ -91,6 +119,6 @@ const mins = s => s == null ? '–' : Math.round(s / 60) + ' min';
 const rad = d => d * Math.PI / 180;
 function dist(a, b) { const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lon - a.lon) / 2) ** 2; return 2 * 6371008.8 * Math.asin(Math.sqrt(h)); }
 const nearestM = (site, rows) => rows && rows.length ? Math.round(Math.min(...rows.map(r => dist(site, r)))) : null;
-const api = { dist, nearestM, buildPacket, SYSTEM, parseInterpretation, OBJECTIVES, opportunity, story, band, km, mins };
+const api = { infer, dist, nearestM, buildPacket, SYSTEM, parseInterpretation, OBJECTIVES, opportunity, story, band, km, mins };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PIGeoCore = api;
 })(typeof window !== 'undefined' ? window : globalThis);
