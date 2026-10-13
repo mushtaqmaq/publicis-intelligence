@@ -36,13 +36,14 @@ PI.tools.geo = async (box, p, a) => {
     ${pr().state === 'NOT_CONFIGURED' ? `<div class="notice info">${I('info')}<div>Google Maps data is not configured. Official Qatar data and first-party analysis remain available.</div></div>` : ''}
     <div class="gx-bar"><div class="gx-search"><input id="gq" dir="auto" value="${esc(v.q)}" placeholder="Search location, OOH site, area or client…" aria-label="Search"><button class="btn sm" id="gfind">${I('search')}Find</button><div id="gcand" class="gx-cand"></div></div>
       ${sel('ginv', [['', 'Single location'], [BUILTIN, 'Qatar OOH assets (24 Sep 2026) · 1,351 sites'], ...(v.found ? [[FOUND, `Search: ${v.found.query} · ${v.found.items.length} found`]] : []), ...oohInvs.map(i => [i.id, `${i.name} · ${i.rows.length} sites${i.version > 1 ? ' · v' + i.version : ''}`])], v.inv, 'OOH inventory')}
-      <div class="gx-f"><span>Catchment</span><div class="gx-seg" id="grad">${meta.radii.map(m => `<button data-r="${m}" class="${m === v.radius ? 'on' : ''}">${m >= 1000 ? m / 1000 + ' km' : m + ' m'}</button>`).join('')}</div></div>
-      ${sel('gc', [['', 'None'], ...Object.entries(meta.categories)], v.competitor, 'Competitor category')}
-      ${sel('gcl', [['', 'None'], ...clientInvs.map(i => [i.id, `${i.name} · ${i.rows.length}`])], v.clientLoc, 'Client locations')}
+      ${sel('gaud', meta.recipes.map(r => [r.id, r.label]), v.recipe, 'Who are you reaching?')}
       <button class="btn pri" id="ggo">${I('target')}Analyse</button></div>
     ${(() => { const u = BR.usual(v.brain); return u && (u.recipe !== v.recipe || u.radius !== v.radius || u.competitor !== v.competitor) ? `<div class="gx-usual"><button class="btn xs" id="gusual">${I('sparkles')}Your usual: ${esc((meta.recipes.find(r => r.id === u.recipe) || {}).label || u.recipe)} · ${u.radius >= 1000 ? u.radius / 1000 + ' km' : u.radius + ' m'}${u.competitor ? ' · ' + esc(meta.categories[u.competitor] || '') : ''}</button><small>learned from ${u.runs} team analyses</small></div>` : ''; })()}
     <div id="ginvf" class="gx-invf"></div>
-    <details class="gx-more"><summary>Zone, client brief and OOH upload</summary><div class="gx-morein">
+    <details class="gx-more"><summary>Fine-tune: catchment, competitors, client locations, zone, brief, upload</summary><div class="gx-morein">
+      <div class="gx-f"><span>Catchment (straight-line radius)</span><div class="gx-seg" id="grad">${meta.radii.map(m => `<button data-r="${m}" class="${m === v.radius ? 'on' : ''}">${m >= 1000 ? m / 1000 + ' km' : m + ' m'}</button>`).join('')}</div></div>
+      ${sel('gc', [['', 'None'], ...Object.entries(meta.categories)], v.competitor, 'Competitor category')}
+      ${sel('gcl', [['', 'None'], ...clientInvs.map(i => [i.id, `${i.name} · ${i.rows.length}`])], v.clientLoc, 'Client locations')}
       <label>Official zone<input id="gz" list="gzl" value="${esc(v.zone)}" placeholder="e.g. Al Dafna"><datalist id="gzl">${(v.zones || []).map(z => `<option value="${esc(z)}">`).join('')}</datalist></label>
       <label>Client brief<textarea id="gb" dir="auto" placeholder="Client, product and goal. Used only for the optional AI explanation.">${esc(v.brief)}</textarea></label>
       <label>Inventory file: CSV, Excel, or KMZ/KML from Google Earth (only latitude and longitude are required)<input type="file" id="gf" accept=".csv,.xlsx,.xls,.kmz,.kml"></label><label class="gx-check"><input type="checkbox" id="gkind"> These are client locations (branches), not OOH assets</label><div id="gchk"></div></div></details>
@@ -113,6 +114,9 @@ PI.tools.geo = async (box, p, a) => {
     if (v.inv) { v.result = null; v.tab = 'map'; v.layers.inv = true; }   // choosing an inventory shows every asset on the map; filter by supplier or medium afterwards
     const qi = $('#gq'); if (qi) qi.blur(); cands(); invUI(); G.show();
   };
+  const AUD = [[/hospital|clinic|pharmac|medical|health/i, 'healthcare'], [/car |auto|showroom|dealer|motor|vehicle/i, 'automotive'], [/hotel|resort|tourist|attraction|museum|airport/i, 'tourists'], [/universit|college|student|campus/i, 'students'], [/school|nursery|famil|supermarket|kids/i, 'families'], [/bank|atm|office|tower|business|corporate|b2b/i, 'office_professionals'], [/luxury|premium|jewel|spa\b/i, 'premium'], [/cafe|gym|cinema|young/i, 'young_professionals']];
+  const infer = text => { if (v.recipeSet) return; const m = AUD.find(([rx]) => rx.test(text || '')); if (m && m[1] !== v.recipe) { v.recipe = m[1]; const g = $('#gaud'); if (g) g.value = m[1]; } };   // a sensible default from the words used; picking an audience by hand stops this
+  $('#gaud').onchange = e => { v.recipe = e.target.value; v.recipeSet = true; v.weights = null; if (v.result && v.sites) G.analyse(v.sites, { stay: true }); };
   $('#gcl').onchange = e => { v.clientLoc = e.target.value; if (v.result) G.show(); else G.show(); };
   const us = $('#gusual'); if (us) us.onclick = () => { const u = BR.usual(v.brain); Object.assign(v, { recipe: u.recipe, radius: u.radius, competitor: u.competitor, objective: u.objective }); PI.tools.geo(box, p, a); }; $('#gc').onchange = e => v.competitor = e.target.value; $('#gz').oninput = e => v.zone = e.target.value; $('#gb').oninput = e => v.brief = e.target.value;
   $$('#grad [data-r]').forEach(b => b.onclick = () => { v.radius = +b.dataset.r; $$('#grad [data-r]').forEach(x => x.classList.toggle('on', x === b)); if (v.result && v.tab === 'map') $('#ggo').click(); });
@@ -136,9 +140,9 @@ PI.tools.geo = async (box, p, a) => {
     $('#gcand').innerHTML = v.site ? `<div class="gx-ok">${I('check')} ${esc(v.site.name)} · ${v.site.lat.toFixed(4)}, ${v.site.lon.toFixed(4)}</div>`
       : [...(v.cands.length ? [`<button data-all><b>Show every match for “${esc(v.q.trim())}” in Qatar</b><small>Maps all of them, then you can analyse or save them</small></button>`] : []), ...v.cands.map((c, i) => `<button data-c="${i}"><b>${esc(c.label)}</b><small>${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}</small></button>`), ...mem.map((r, i) => `<button data-m="${i}"><b>${esc(r.name)}</b><small>Seen before${r.zone ? ' · ' + esc(r.zone) : ''} · ${r.n}x · no lookup needed</small></button>`), ...local.map((r, i) => `<button data-l="${i}"><b>${esc(r.name)}</b><small>OOH · ${esc(r.inv)}${r.format ? ' · ' + esc(r.format) : ''}</small></button>`)].join('');
     $$('[data-all]').forEach(b => b.onclick = showAll);
-    $$('[data-m]').forEach(b => b.onclick = () => { const r = mem[+b.dataset.m]; v.site = { id: 'm' + r.lat.toFixed(3) + r.lon.toFixed(3), name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, municipality: r.municipality }; v.inv = ''; $('#ginv').value = ''; invUI(); cands(); });
-    $$('[data-l]').forEach(b => b.onclick = () => { const r = local[+b.dataset.l]; v.site = { id: r.id, name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, road: r.road, format: r.format, vendor: r.vendor, municipality: r.municipality, site_description: r.site_description, circuit: r.circuit, screen_type: r.screen_type }; v.inv = ''; $('#ginv').value = ''; invUI(); cands(); });
-    $$('[data-c]').forEach(b => b.onclick = () => { const c = v.cands[+b.dataset.c]; v.site = { id: 'site', name: c.label.split(' · ')[0].split(',')[0], lat: c.lat, lon: c.lon, areas: c.areas, zone: c.zone }; cands(); });
+    $$('[data-m]').forEach(b => b.onclick = () => { const r = mem[+b.dataset.m]; v.site = { id: 'm' + r.lat.toFixed(3) + r.lon.toFixed(3), name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, municipality: r.municipality }; v.inv = ''; $('#ginv').value = ''; invUI(); cands(); infer(v.q + ' ' + r.name); go(); });
+    $$('[data-l]').forEach(b => b.onclick = () => { const r = local[+b.dataset.l]; v.site = { id: r.id, name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, road: r.road, format: r.format, vendor: r.vendor, municipality: r.municipality, site_description: r.site_description, circuit: r.circuit, screen_type: r.screen_type }; v.inv = ''; $('#ginv').value = ''; invUI(); cands(); infer(v.q + ' ' + (r.site_description || '')); go(); });
+    $$('[data-c]').forEach(b => b.onclick = () => { const c = v.cands[+b.dataset.c]; v.site = { id: 'site', name: c.label.split(' · ')[0].split(',')[0], lat: c.lat, lon: c.lon, areas: c.areas, zone: c.zone }; cands(); infer(v.q + ' ' + c.label); go(); });
   };
   cands();
   $('#gq').oninput = e => { v.q = e.target.value; v.site = null; v.cands = []; cands(); };
@@ -152,7 +156,7 @@ PI.tools.geo = async (box, p, a) => {
     try { const d = await PI.api('POST', 'geo/search', { query: q }); v.found = { query: q, items: d.items, saturated: d.saturated, cached: d.cached }; v.cands = []; v.openList = false; v.inv = FOUND; v.invFilter = { vendor: '', format: '', q: '' }; v.site = null; v.browseSel = null; v.result = null; v.tab = 'map'; if (!d.items.length) PI.toast('Nothing matched in Qatar. Try different words.'); PI.tools.geo(box, p, a); }
     catch (e) { PI.toast(e.message); btn.disabled = false; btn.innerHTML = I('search') + 'Find'; }
   };
-  $('#gfind').onclick = async () => { const m = pinRe.exec(v.q); if (m) { v.site = { id: 'site', name: 'Dropped pin', lat: +m[1], lon: +m[2] }; v.inv = ''; return cands(); }
+  $('#gfind').onclick = async () => { const m = pinRe.exec(v.q); if (m) { v.site = { id: 'site', name: 'Dropped pin', lat: +m[1], lon: +m[2] }; v.inv = ''; cands(); return go(); }
     if (!v.st.google) return PI.toast('Google Maps is not connected. Use coordinates, or pick an OOH site.');
     if (/(atms|branches|stores|outlets|locations|offices|showrooms|restaurants|cafes|banks|malls|hotels|schools|pharmacies|clinics|hospitals)\s*$/i.test(v.q.trim())) return showAll();   // a plural means "all of them"
     try { v.cands = (await PI.api('POST', 'geo/resolve', { query: v.q })).candidates; v.openList = true; if (!v.cands.length) PI.toast('No match in Qatar. Try an address or coordinates.'); cands(); } catch (e) { PI.toast(e.message); } };
@@ -171,6 +175,7 @@ PI.tools.geo = async (box, p, a) => {
       };
     } catch (err) { c.innerHTML = `<div class="gx-iss">${esc(err.message)}</div>`; }
   };
+  const go = () => setTimeout(() => $('#ggo') && $('#ggo').click(), 0);   // choosing a place analyses it straight away
   const asSite = r => ({ id: r.id, name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, vendor: r.vendor, format: r.format, road: r.road, site_description: r.site_description, circuit: r.circuit, screen_type: r.screen_type, notes: r.notes, municipality: r.municipality });
   $('#ggo').onclick = () => {
     if (v.inv) {

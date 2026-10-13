@@ -176,7 +176,7 @@ T.audience = (el, G) => {
       <details class="gx-card" style="margin-top:14px"><summary>Advanced controls · factor weights</summary><p class="gx-fine">Planning assumptions. Change a weight and re-score; nothing else changes.</p><div class="gx-weights">${res.recipe.factors.map(f => `<label>${esc(meta.categories[f.cat])}<input type="number" min="0.5" max="10" step="0.5" data-w="${f.cat}" value="${f.w}"></label>`).join('')}</div><button class="btn sm" id="gapw">Re-score with these weights</button>${tunedBlock(G)}</details>`;
   }
   el.innerHTML = `<div class="gx-auds">${cards}</div>${detail}`;
-  $$('[data-ra]').forEach(b => b.onclick = () => { v.recipe = b.dataset.ra; v.weights = null; if (v.result && v.sites) G.analyse(v.sites, { stay: true }); else T.audience(el, G); });
+  $$('[data-ra]').forEach(b => b.onclick = () => { v.recipe = b.dataset.ra; v.recipeSet = true; const ga = $('#gaud'); if (ga) ga.value = v.recipe; v.weights = null; if (v.result && v.sites) G.analyse(v.sites, { stay: true }); else T.audience(el, G); });
   $$('[data-pick]').forEach(tr => tr.onclick = () => { G.select(tr.dataset.pick); v.tab = 'map'; G.show(); });
   const ap = $('#gapw'); if (ap) ap.onclick = () => { v.weights = Object.fromEntries($$('[data-w]').map(i => [i.dataset.w, +i.value])); G.logBrain({ t: 'weights', recipe: v.recipe, weights: v.weights }); G.analyse(v.sites, { stay: true }); };
   const tb = $('#gtuned'); if (tb) tb.onclick = () => { v.weights = JSON.parse(tb.dataset.w); G.analyse(v.sites, { stay: true }); };
