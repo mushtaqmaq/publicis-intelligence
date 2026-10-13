@@ -10,8 +10,8 @@ const pinRe = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/;
 const STATE = { NOT_CONFIGURED: ['Not configured', 'mut'], CONFIGURED_UNVERIFIED: ['Configured, not verified', 'warn'], VERIFIED: ['Verified', 'ok'], DEGRADED: ['Degraded', 'bad'], DISABLED: ['Disabled', 'mut'], AVAILABLE: ['Available', 'ok'] };
 
 PI.tools.geo = async (box, p, a) => {
-  const v = S.drafts.geo || (S.drafts.geo = { tab: 'map', q: '', site: null, cands: [], radius: 500, recipe: 'families', competitor: '', objective: 'general', brief: '', zone: '', inv: '', run: 0, sel: 0, sp: 'overview', view: 'site', weights: null, places: {}, routes: {}, cmp: [], layers: { sites: true, rings: true, places: true, clients: true, inv: false, muni: false, off: {} }, mapType: 'roadmap', invFilter: { vendor: '', format: '', q: '' }, clientLoc: '' });
-  v.placesFor = r => (v.places[r.site.id + ':' + v.result.radius] || { list: [] }).list;
+  const v = S.drafts.geo || (S.drafts.geo = { tab: 'map', q: '', site: null, cands: [], radius: 'auto', recipe: 'families', competitor: '', objective: 'general', brief: '', zone: '', inv: '', run: 0, sel: 0, sp: 'overview', view: 'site', weights: null, places: {}, routes: {}, cmp: [], layers: { sites: true, rings: true, places: true, clients: true, inv: true, muni: false, off: {} }, mapType: 'roadmap', invFilter: { vendor: '', format: '', q: '' }, clientLoc: '' });
+  v.placesFor = r => (v.places[r.site.id + ':' + (r.radius || v.result.radius)] || { list: [] }).list;
   if (!v.meta) {
     box.innerHTML = '<div class="empty"><span class="spin"></span></div>';
     try { [v.st, v.meta] = await Promise.all([PI.api('GET', 'geo/status'), PI.api('GET', 'geo/recipes')]); } catch (e) { box.innerHTML = `<div class="notice err">${I('circle-alert')}<div>${esc(e.message)}</div></div>`; return; }
@@ -24,7 +24,8 @@ PI.tools.geo = async (box, p, a) => {
   const clientInvs = v.invs.filter(i => i.kind === 'client'), oohInvs = v.invs.filter(i => i.kind !== 'client');
   const FOUND = '__found';
   const invRows = id => id === FOUND ? (v.found ? v.found.items.map((x, i) => ({ id: x.id, name: x.name || `${v.found.query} ${i + 1}`, lat: x.lat, lon: x.lon, vendor: v.found.query, format: 'Search result', site_description: x.address || '' })) : []) : id === BUILTIN ? (v.builtin ? v.builtin.rows : []) : ((v.invs.find(i => i.id === id) || {}).rows || []);
-  const filtered = () => { const f = v.invFilter, q = f.q.trim().toLowerCase(); return invRows(v.inv).filter(r => (!f.vendor || r.vendor === f.vendor) && (!f.format || r.format === f.format) && (!q || (r.name + ' ' + r.id + ' ' + (r.site_description || '')).toLowerCase().includes(q))); };
+  const isDigital = r => r.screen_type === 'Digital' || /digital|led|screen|dome|unipole screen/i.test(r.format || '');
+  const filtered = () => { const f = v.invFilter, q = f.q.trim().toLowerCase(); return invRows(v.inv).filter(r => (!f.vendor || r.vendor === f.vendor) && (!f.format || r.format === f.format) && (!f.kind || (isDigital(r) ? 'digital' : 'static') === f.kind) && (!q || (r.name + ' ' + r.id + ' ' + (r.site_description || '')).toLowerCase().includes(q))); };
   const clients = () => v.clientLoc ? invRows(v.clientLoc) : [];
   const ranked = () => v.result ? v.result.results.slice().sort((x, y) => (y.score.value ?? -1) - (x.score.value ?? -1)) : [];
   const current = () => { const rs = ranked(); return rs[Math.min(v.sel, rs.length - 1)]; };
@@ -39,9 +40,10 @@ PI.tools.geo = async (box, p, a) => {
       ${sel('gaud', meta.recipes.map(r => [r.id, r.label]), v.recipe, 'Who are you reaching?')}
       <button class="btn pri" id="ggo">${I('target')}Analyse</button></div>
     ${(() => { const u = BR.usual(v.brain); return u && (u.recipe !== v.recipe || u.radius !== v.radius || u.competitor !== v.competitor) ? `<div class="gx-usual"><button class="btn xs" id="gusual">${I('sparkles')}Your usual: ${esc((meta.recipes.find(r => r.id === u.recipe) || {}).label || u.recipe)} · ${u.radius >= 1000 ? u.radius / 1000 + ' km' : u.radius + ' m'}${u.competitor ? ' · ' + esc(meta.categories[u.competitor] || '') : ''}</button><small>learned from ${u.runs} team analyses</small></div>` : ''; })()}
+    <div id="gauto" class="gx-auto"></div>
     <div id="ginvf" class="gx-invf"></div>
     <details class="gx-more"><summary>Fine-tune: catchment, competitors, client locations, zone, brief, upload</summary><div class="gx-morein">
-      <div class="gx-f"><span>Catchment (straight-line radius)</span><div class="gx-seg" id="grad">${meta.radii.map(m => `<button data-r="${m}" class="${m === v.radius ? 'on' : ''}">${m >= 1000 ? m / 1000 + ' km' : m + ' m'}</button>`).join('')}</div></div>
+      <div class="gx-f"><span>Catchment (straight-line radius)</span><div class="gx-seg" id="grad"><button data-r="auto" class="${v.radius === 'auto' ? 'on' : ''}" title="Chosen from the audience, the area's density and the spacing of your locations">Auto</button>${meta.radii.map(m => `<button data-r="${m}" class="${m === v.radius ? 'on' : ''}">${m >= 1000 ? m / 1000 + ' km' : m + ' m'}</button>`).join('')}</div></div>
       ${sel('gc', [['', 'None'], ...Object.entries(meta.categories)], v.competitor, 'Competitor category')}
       ${sel('gcl', [['', 'None'], ...clientInvs.map(i => [i.id, `${i.name} · ${i.rows.length}`])], v.clientLoc, 'Client locations')}
       <label>Official zone<input id="gz" list="gzl" value="${esc(v.zone)}" placeholder="e.g. Al Dafna"><datalist id="gzl">${(v.zones || []).map(z => `<option value="${esc(z)}">`).join('')}</datalist></label>
@@ -57,11 +59,11 @@ PI.tools.geo = async (box, p, a) => {
   G.show = () => { const el = $('#gxb'); if (!el) return; $$('[data-t]').forEach(b => b.setAttribute('aria-selected', b.dataset.t === v.tab)); const T = PI.geoTabs[v.tab]; if (T) T(el, G); };
   G.select = id => { const i = ranked().findIndex(x => x.site.id === id); if (i >= 0) { if (v.sel !== i) G.logBrain({ t: 'pick', site: ranked()[i].site }); v.sel = i; G.loadPlaces(); G.show(); } };
   G.loadPlaces = async () => {
-    const r = current(); if (!r || !v.st.google) return; const key = r.site.id + ':' + v.result.radius; if (v.places[key]) return;
+    const r = current(); if (!r || !v.st.google) return; const rr = r.radius || v.result.radius, key = r.site.id + ':' + rr; if (v.places[key]) return;
     v.places[key] = { list: [], loading: true };
     const cats = [...new Set([...v.result.recipe.factors.map(f => f.cat), ...(v.result.competitor ? [v.result.competitor] : [])])];
     try {
-      const d = await PI.api('POST', 'geo/places', { lat: r.site.lat, lon: r.site.lon, radius: v.result.radius, categories: cats });
+      const d = await PI.api('POST', 'geo/places', { lat: r.site.lat, lon: r.site.lon, radius: rr, categories: cats });
       const list = []; Object.entries(d.byCat).forEach(([c, x]) => { if (x.error) return; (x.places || []).forEach(q => list.push({ c, ...q })); if (r.features[c]) r.features[c].nearestM = x.nearestM; });
       if (r.pressure && d.byCat[v.result.competitor] && !d.byCat[v.result.competitor].error) r.pressure.nearestM = d.byCat[v.result.competitor].nearestM;
       v.places[key] = { list, loaded: true };
@@ -93,6 +95,22 @@ PI.tools.geo = async (box, p, a) => {
   G.refresh = () => { if (!v.sites) return; G.analyse(v.sites, { savedId: v.savedId }); };
   G.mapReady = async (el, cb) => { if (!v.st.browserKey || M.failed) return cb(false); if (!v.mapInitDone) { try { await PI.api('POST', 'geo/map-init'); v.mapInitDone = true; v.mapNote = ''; } catch (e) { v.mapNote = e.message; return cb(false); } } const g = await M.load(v.st.browserKey); if (!g || M.failed) return cb(false); const ok = M.mount(el); if (ok) M.setType(v.mapType); cb(ok); };
   M.onFail = () => { if (['map', 'compare'].includes(v.tab)) G.show(); };
+  // ---- one geographic workspace: the selected place and the OOH inventory are the same kind of thing ----
+  G.CTX = [{ id: 'office', label: 'Office areas', color: '#2F6BFF', cats: ['corporate_office', 'bank', 'subway_station'] }, { id: 'residential', label: 'Residential areas', color: '#1FA971', cats: ['supermarket', 'park', 'pharmacy'] }, { id: 'education', label: 'Schools and education', color: '#D99A12', cats: ['school', 'university'] }, { id: 'health', label: 'Healthcare areas', color: '#E5486F', cats: ['hospital', 'doctor', 'pharmacy'] }, { id: 'retail', label: 'Retail and commercial', color: '#7A5AF8', cats: ['shopping_mall', 'supermarket', 'bank'] }, { id: 'hospitality', label: 'Hospitality and tourism', color: '#17A2B8', cats: ['hotel', 'tourist_attraction', 'museum'] }, { id: 'auto', label: 'Automotive areas', color: '#F07C3C', cats: ['car_dealer', 'gas_station'] }, { id: 'premium', label: 'Premium and affluent context', color: '#B8860B', cats: ['hotel', 'jewelry_store', 'spa'] }];
+  G.oohAll = () => {
+    if (!v.builtin && !v.builtinLoading) { v.builtinLoading = true; PI.api('GET', 'geo/ooh/builtin').then(d => { v.builtin = d; if (v.tab === 'map' && v.result) G.show(); }).catch(() => { }); }
+    const seen = new Set(), out = [];
+    for (const r of [...(v.inv && v.inv !== FOUND ? filtered() : []), ...(v.builtin ? v.builtin.rows : []), ...oohInvs.flatMap(i => i.rows)]) if (!seen.has(r.id)) { seen.add(r.id); out.push(r); }
+    return out;
+  };
+  G.oohNear = r => { const rad = r.radius || v.result.radius; return G.oohAll().map(x => ({ ...x, d: C.dist(r.site, x) })).filter(x => x.d <= rad && x.id !== r.site.id).sort((x, y) => x.d - y.d); };
+  G.ctxKey = (r, id) => [r.site.id, r.radius || v.result.radius, id].join(':');
+  G.ctxPoints = r => G.CTX.filter(g => v.ctxOn && v.ctxOn[g.id]).flatMap(g => ((v.ctxData || {})[G.ctxKey(r, g.id)] || []).map(p => ({ ...p, color: g.color })));
+  G.toggleCtx = async (id, on) => {
+    v.ctxOn = v.ctxOn || {}; v.ctxData = v.ctxData || {}; v.ctxOn[id] = on; const r = current(), g = G.CTX.find(x => x.id === id); if (!on || !r || v.ctxData[G.ctxKey(r, id)]) return;
+    try { const d = await PI.api('POST', 'geo/places', { lat: r.site.lat, lon: r.site.lon, radius: r.radius || v.result.radius, categories: g.cats.slice(0, 3) }); v.ctxData[G.ctxKey(r, id)] = Object.values(d.byCat).flatMap(x => x.error ? [] : x.places || []); }
+    catch (e) { v.ctxOn[id] = false; PI.toast(e.message); }
+  };
   G.refreshAll = () => PI.tools.geo(box, p, a);
   PI.geoG = G;
 
@@ -103,8 +121,9 @@ PI.tools.geo = async (box, p, a) => {
     if (!v.inv) { box.innerHTML = ''; return; }
     if (v.inv === BUILTIN && !v.builtin) { box.innerHTML = '<span class="spin"></span>'; PI.api('GET', 'geo/ooh/builtin').then(d => { v.builtin = d; invUI(); if (!v.result) G.show(); }).catch(e => { box.innerHTML = `<span class="gx-iss">${esc(e.message)}</span>`; }); return; }
     const vs = [...new Set(rows.map(r => r.vendor).filter(Boolean))].sort(), fs = [...new Set(rows.filter(r => !v.invFilter.vendor || r.vendor === v.invFilter.vendor).map(r => r.format).filter(Boolean))].sort(), n = filtered().length;
-    box.innerHTML = `<div class="gx-f"><span>Supplier</span><select id="gfv"><option value="">All</option>${vs.map(x => `<option ${x === v.invFilter.vendor ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div><div class="gx-f"><span>Medium</span><select id="gff"><option value="">All</option>${fs.map(x => `<option ${x === v.invFilter.format ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div><div class="gx-f"><span>Find an asset</span><input id="gfq" value="${esc(v.invFilter.q)}" placeholder="Asset code or area"></div><span class="gx-fine"><b>${n.toLocaleString('en-US')}</b> of ${rows.length.toLocaleString('en-US')} assets${n > 40 ? ' · Analyse takes up to 40 at a time, so narrow the list' : ''}${v.inv === BUILTIN && v.builtin ? ' · from ' + esc(v.builtin.source) : ''}</span>`;
+    box.innerHTML = `<div class="gx-f"><span>Supplier</span><select id="gfv"><option value="">All</option>${vs.map(x => `<option ${x === v.invFilter.vendor ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div><div class="gx-f"><span>Medium</span><select id="gff"><option value="">All</option>${fs.map(x => `<option ${x === v.invFilter.format ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div><div class="gx-f"><span>Digital or static</span><select id="gfk"><option value="">All</option><option value="digital" ${v.invFilter.kind === 'digital' ? 'selected' : ''}>Digital</option><option value="static" ${v.invFilter.kind === 'static' ? 'selected' : ''}>Static</option></select></div><div class="gx-f"><span>Find an asset</span><input id="gfq" value="${esc(v.invFilter.q)}" placeholder="Asset code or area"></div><span class="gx-fine"><b>${n.toLocaleString('en-US')}</b> of ${rows.length.toLocaleString('en-US')} assets${n > 40 ? ' · Analyse takes up to 40 at a time, so narrow the list' : ''}${v.inv === BUILTIN && v.builtin ? ' · from ' + esc(v.builtin.source) : ''}</span>`;
     $('#gfv').onchange = e => { v.invFilter.vendor = e.target.value; v.invFilter.format = ''; invUI(); if (!v.result) G.show(); };
+    $('#gfk').onchange = e => { v.invFilter.kind = e.target.value; invUI(); if (!v.result) G.show(); };
     $('#gff').onchange = e => { v.invFilter.format = e.target.value; invUI(); if (!v.result) G.show(); };
     $('#gfq').oninput = e => { v.invFilter.q = e.target.value; const p = e.target.selectionStart; invUI(); const q = $('#gfq'); q.focus(); q.setSelectionRange(p, p); if (!v.result) G.show(); };
   };
@@ -114,12 +133,20 @@ PI.tools.geo = async (box, p, a) => {
     if (v.inv) { v.result = null; v.tab = 'map'; v.layers.inv = true; }   // choosing an inventory shows every asset on the map; filter by supplier or medium afterwards
     const qi = $('#gq'); if (qi) qi.blur(); cands(); invUI(); G.show();
   };
-  const AUD = [[/hospital|clinic|pharmac|medical|health/i, 'healthcare'], [/car |auto|showroom|dealer|motor|vehicle/i, 'automotive'], [/hotel|resort|tourist|attraction|museum|airport/i, 'tourists'], [/universit|college|student|campus/i, 'students'], [/school|nursery|famil|supermarket|kids/i, 'families'], [/bank|atm|office|tower|business|corporate|b2b/i, 'office_professionals'], [/luxury|premium|jewel|spa\b/i, 'premium'], [/cafe|gym|cinema|young/i, 'young_professionals']];
-  const infer = text => { if (v.recipeSet) return; const m = AUD.find(([rx]) => rx.test(text || '')); if (m && m[1] !== v.recipe) { v.recipe = m[1]; const g = $('#gaud'); if (g) g.value = m[1]; } };   // a sensible default from the words used; picking an audience by hand stops this
+  // Reads the words used and sets audience, objective and competitor category for you, saying why. A hand-made choice is never overridden.
+  const infer = text => {
+    const x = C.infer(text); if (!x) return; const done = [];
+    if (x.recipe && !v.recipeSet && x.recipe !== v.recipe) { v.recipe = x.recipe; const g = $('#gaud'); if (g) g.value = x.recipe; done.push('audience'); }
+    if (x.objective && !v.objSet && x.objective !== v.objective) { v.objective = x.objective; done.push('objective'); }
+    if (x.competitor && !v.compSet && x.competitor !== v.competitor) { v.competitor = x.competitor; const g = $('#gc'); if (g) g.value = x.competitor; done.push('competitor'); }
+    v.auto = done.length ? { done, reasons: x.reasons, confidence: x.confidence } : v.auto; const el = $('#gauto'); if (el && v.auto) el.innerHTML = autoChip();
+  };
+  const autoChip = () => `${I('sparkles')}<span>Set for you: <b>${v.auto.done.join(', ')}</b> · ${esc(v.auto.reasons.join('; '))}. Change any of it if it is wrong.</span>`;
+  if (v.auto) $('#gauto').innerHTML = autoChip();
   $('#gaud').onchange = e => { v.recipe = e.target.value; v.recipeSet = true; v.weights = null; if (v.result && v.sites) G.analyse(v.sites, { stay: true }); };
   $('#gcl').onchange = e => { v.clientLoc = e.target.value; if (v.result) G.show(); else G.show(); };
-  const us = $('#gusual'); if (us) us.onclick = () => { const u = BR.usual(v.brain); Object.assign(v, { recipe: u.recipe, radius: u.radius, competitor: u.competitor, objective: u.objective }); PI.tools.geo(box, p, a); }; $('#gc').onchange = e => v.competitor = e.target.value; $('#gz').oninput = e => v.zone = e.target.value; $('#gb').oninput = e => v.brief = e.target.value;
-  $$('#grad [data-r]').forEach(b => b.onclick = () => { v.radius = +b.dataset.r; $$('#grad [data-r]').forEach(x => x.classList.toggle('on', x === b)); if (v.result && v.tab === 'map') $('#ggo').click(); });
+  const us = $('#gusual'); if (us) us.onclick = () => { const u = BR.usual(v.brain); Object.assign(v, { recipe: u.recipe, radius: u.radius, competitor: u.competitor, objective: u.objective }); PI.tools.geo(box, p, a); }; $('#gc').onchange = e => { v.competitor = e.target.value; v.compSet = true; }; $('#gz').oninput = e => v.zone = e.target.value; $('#gb').oninput = e => v.brief = e.target.value;
+  $$('#grad [data-r]').forEach(b => b.onclick = () => { v.radius = b.dataset.r === 'auto' ? 'auto' : +b.dataset.r; $$('#grad [data-r]').forEach(x => x.classList.toggle('on', x === b)); if (v.result && v.tab === 'map') $('#ggo').click(); });
   const ub = $('#gusage'); if (ub) ub.onclick = async () => {
     try {
       const u = await PI.api('GET', 'geo/usage'), row = (l, a, c, s) => `<tr><td>${esc(l)}</td><td>${num(a)} / ${num(c)}</td><td><span class="gx-pill ${s === 'normal' ? '' : s === 'stop' || s === 'critical' || s === 'emergency' ? 'bad' : 'warn'}">${esc(s)}</span></td></tr>`;
@@ -177,7 +204,9 @@ PI.tools.geo = async (box, p, a) => {
   };
   const go = () => setTimeout(() => $('#ggo') && $('#ggo').click(), 0);   // choosing a place analyses it straight away
   const asSite = r => ({ id: r.id, name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, vendor: r.vendor, format: r.format, road: r.road, site_description: r.site_description, circuit: r.circuit, screen_type: r.screen_type, notes: r.notes, municipality: r.municipality });
+  G.pickAsset = id => { const x = G.oohAll().find(y => y.id === id); if (!x) return; v.site = asSite(x); v.inv = ''; const gi = $('#ginv'); if (gi) gi.value = ''; v.browseSel = null; G.analyse([{ ...v.site }]); };
   $('#ggo').onclick = () => {
+    infer([v.q, v.brief, (PI.client() || {}).name].filter(Boolean).join(' '));
     if (v.inv) {
       if (v.inv === BUILTIN && !v.builtin) return PI.toast('Still loading the assets');
       const pool = v.browseSel ? [v.browseSel] : filtered(); if (!pool.length) return PI.toast('No assets match those filters');

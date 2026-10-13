@@ -4,7 +4,7 @@
 'use strict';
 const PALETTE = ['#2F6BFF', '#E5486F', '#1FA971', '#D99A12', '#7A5AF8', '#17A2B8', '#F07C3C', '#7C8699', '#5DB02F'];
 const M = PI.geoMap = { failed: false, g: null, map: null, el: null, objs: [], loading: null, mapType: 'roadmap' };
-M.color = (res, cat) => cat === res.competitor ? '#8E3BE0' : PALETTE[Math.max(0, res.recipe.factors.findIndex(f => f.cat === cat)) % PALETTE.length];
+M.color = (res, cat) => { const i = res.recipe.factors.findIndex(f => f.cat === cat); return cat === res.competitor ? '#8E3BE0' : PALETTE[(i < 0 ? 7 : i) % PALETTE.length]; };
 
 window.gm_authFailure = () => { M.failed = true; if (M.onFail) M.onFail(); };
 M.load = key => {
@@ -49,12 +49,14 @@ M.update = st => {
   if (!M.map) return;
   const g = M.g; M.objs.forEach(o => o.setMap(null)); M.objs = [];
   const L = st.layers, sel = st.r, pos = x => ({ lat: x.site.lat, lng: x.site.lon });
-  if (L.rings) { const c = new g.Circle({ map: M.map, center: pos(sel), radius: st.res.radius, strokeColor: '#2F6BFF', strokeWeight: 2, fillColor: '#2F6BFF', fillOpacity: 0.1, clickable: false }); M.objs.push(c); }
+  if (L.rings) { const c = new g.Circle({ map: M.map, center: pos(sel), radius: sel.radius || st.res.radius, strokeColor: '#2F6BFF', strokeWeight: 2, fillColor: '#2F6BFF', fillOpacity: 0.1, clickable: false }); M.objs.push(c); }
   if (L.places) for (const p of st.places || []) if (!L.off[p.c]) M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, clickable: false, icon: { path: g.SymbolPath.CIRCLE, scale: 4.5, fillColor: M.color(st.res, p.c), fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1 } }));
   const sq = (p, fill, sc = 5.5) => M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: p.name, clickable: false, icon: { path: g.SymbolPath.CIRCLE, scale: sc, fillColor: fill, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 } }));
   if (L.clients) (st.clients || []).forEach(p => sq(p, '#1FA971', 6));
-  if (L.inv) (st.inv || []).forEach(p => sq(p, '#98A2B3', 3.5));
-  if (L.sites) st.sites.forEach(x => { const on = x === sel, mk = new g.Marker({ map: M.map, position: pos(x), title: x.site.name || x.site.id, zIndex: on ? 9 : 1, icon: { path: g.SymbolPath.CIRCLE, scale: on ? 9 : 6.5, fillColor: on ? '#E5392B' : '#12121A', fillOpacity: 1, strokeColor: '#fff', strokeWeight: on ? 3 : 2 } }); mk.addListener('click', () => st.onSelect && st.onSelect(x.site.id)); M.objs.push(mk); });
+  if (L.inv) (st.inv || []).forEach(p => { if (p.id === (sel.site && sel.site.id)) return; const mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: (p.name || p.id) + (p.format ? ' · ' + p.format : ''), icon: { path: g.SymbolPath.CIRCLE, scale: 3.5, fillColor: '#98A2B3', fillOpacity: 0.85, strokeColor: '#fff', strokeWeight: 1 } }); mk.addListener('click', () => st.onPickAsset && st.onPickAsset(p.id)); M.objs.push(mk); });
+  (st.near || []).forEach(p => { const mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: (p.name || p.id) + ' · inside the catchment', zIndex: 5, icon: { path: g.SymbolPath.CIRCLE, scale: 6, fillColor: '#2F6BFF', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 } }); mk.addListener('click', () => st.onPickAsset && st.onPickAsset(p.id)); M.objs.push(mk); });
+  (st.ctx || []).forEach(p => M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, clickable: false, icon: { path: g.SymbolPath.CIRCLE, scale: 4, fillColor: p.color, fillOpacity: 0.9, strokeColor: '#fff', strokeWeight: 1 } })));
+  if (L.sites) st.sites.forEach(x => { const on = x === sel, mk = new g.Marker({ map: M.map, position: pos(x), title: x.site.name || x.site.id, zIndex: on ? 9 : 1, icon: { path: g.SymbolPath.CIRCLE, scale: on ? 9 : 6.5, fillColor: on ? '#E5392B' : x.score.value == null ? '#12121A' : x.score.value >= 70 ? '#1FA971' : x.score.value >= 40 ? '#D99A12' : '#7C8699', fillOpacity: 1, strokeColor: on ? '#fff' : '#12121A', strokeWeight: on ? 3 : 1.5 } }); mk.addListener('click', () => st.onSelect && st.onSelect(x.site.id)); M.objs.push(mk); });
   if (st.fit) {
     const b = new g.LatLngBounds();
     if (st.fit === 'all') st.sites.forEach(x => b.extend(pos(x))); else { b.union(M.objs[0] && L.rings ? M.objs[0].getBounds() : new g.Circle({ center: pos(sel), radius: st.res.radius }).getBounds()); }

@@ -681,3 +681,5 @@ pre.code{background:#111114;color:#E8E8ED;font:12.5px/1.55 ui-monospace,SFMono-R
 .hello.slogan{font-size:clamp(32px,4.8vw,60px);line-height:1.08;max-width:20ch;margin:0 auto;letter-spacing:-.04em}
 .slogan-ctl{display:flex;gap:14px;justify-content:center;margin-top:12px;opacity:0;transition:opacity .2s}.hero:hover .slogan-ctl,.slogan-ctl:focus-within{opacity:.7}.slogan-ctl button{background:none;border:0;color:var(--muted);font:inherit;font-size:12.5px;cursor:pointer;text-decoration:underline}
 .chips-wrap{display:flex;flex-wrap:wrap;gap:6px}
+.gx-auto{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--ink-2);margin:0 0 8px}.gx-auto:empty{display:none}.gx-auto svg{flex:none;margin-top:2px;width:15px;height:15px;color:var(--focus)}
+.gx-ctxl{display:grid;gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--line,#E2E6EE)}.gx-ctxl small{color:var(--muted);font-size:11.5px}
