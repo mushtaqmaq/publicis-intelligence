@@ -10,7 +10,7 @@ const pinRe = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/;
 const STATE = { NOT_CONFIGURED: ['Not configured', 'mut'], CONFIGURED_UNVERIFIED: ['Configured, not verified', 'warn'], VERIFIED: ['Verified', 'ok'], DEGRADED: ['Degraded', 'bad'], DISABLED: ['Disabled', 'mut'], AVAILABLE: ['Available', 'ok'] };
 
 PI.tools.geo = async (box, p, a) => {
-  const v = S.drafts.geo || (S.drafts.geo = { tab: 'map', q: '', site: null, cands: [], radius: 'auto', recipe: 'families', competitor: '', objective: 'general', brief: '', zone: '', inv: '', run: 0, sel: 0, sp: 'overview', view: 'site', weights: null, places: {}, routes: {}, cmp: [], layers: { sites: true, rings: true, places: true, clients: true, inv: true, muni: false, off: {} }, mapType: 'roadmap', invFilter: { vendor: '', format: '', q: '' }, clientLoc: '' });
+  const v = S.drafts.geo || (S.drafts.geo = { tab: 'map', q: '', site: null, cands: [], radius: 'auto', recipe: 'families', competitor: '', objective: 'general', brief: '', zone: '', inv: BUILTIN, run: 0, sel: 0, sp: 'overview', view: 'site', weights: null, places: {}, routes: {}, cmp: [], layers: { sites: true, rings: true, places: true, clients: true, inv: true, muni: false, off: {} }, mapType: 'roadmap', invFilter: { vendor: '', format: '', q: '' }, clientLoc: '' });
   v.placesFor = r => (v.places[r.site.id + ':' + (r.radius || v.result.radius)] || { list: [] }).list;
   if (!v.meta) {
     box.innerHTML = '<div class="empty"><span class="spin"></span></div>';
@@ -39,7 +39,7 @@ PI.tools.geo = async (box, p, a) => {
       ${sel('ginv', [['', 'Single location'], [BUILTIN, 'Qatar OOH assets (24 Sep 2026) · 1,351 sites'], ...(v.found ? [[FOUND, `Search: ${v.found.query} · ${v.found.items.length} found`]] : []), ...oohInvs.map(i => [i.id, `${i.name} · ${i.rows.length} sites${i.version > 1 ? ' · v' + i.version : ''}`])], v.inv, 'OOH inventory')}
       ${sel('gaud', meta.recipes.map(r => [r.id, r.label]), v.recipe, 'Who are you reaching?')}
       <button class="btn pri" id="ggo">${I('target')}Analyse</button></div>
-    ${(() => { const u = BR.usual(v.brain); return u && (u.recipe !== v.recipe || u.radius !== v.radius || u.competitor !== v.competitor) ? `<div class="gx-usual"><button class="btn xs" id="gusual">${I('sparkles')}Your usual: ${esc((meta.recipes.find(r => r.id === u.recipe) || {}).label || u.recipe)} · ${u.radius >= 1000 ? u.radius / 1000 + ' km' : u.radius + ' m'}${u.competitor ? ' · ' + esc(meta.categories[u.competitor] || '') : ''}</button><small>learned from ${u.runs} team analyses</small></div>` : ''; })()}
+    ${(() => { const u = BR.usual(v.brain); return u && (u.recipe !== v.recipe || u.radius !== v.radius || u.competitor !== v.competitor) ? `<div class="gx-usual"><button class="btn xs" id="gusual">${I('sparkles')}Your usual: ${esc((meta.recipes.find(r => r.id === u.recipe) || {}).label || u.recipe)} · ${typeof u.radius !== 'number' ? 'Auto' : u.radius >= 1000 ? u.radius / 1000 + ' km' : u.radius + ' m'}${u.competitor ? ' · ' + esc(meta.categories[u.competitor] || '') : ''}</button><small>learned from ${u.runs} team analyses</small></div>` : ''; })()}
     <div id="gauto" class="gx-auto"></div>
     <div id="ginvf" class="gx-invf"></div>
     <details class="gx-more"><summary>Fine-tune: catchment, competitors, client locations, zone, brief, upload</summary><div class="gx-morein">
@@ -139,7 +139,7 @@ PI.tools.geo = async (box, p, a) => {
     if (x.recipe && !v.recipeSet && x.recipe !== v.recipe) { v.recipe = x.recipe; const g = $('#gaud'); if (g) g.value = x.recipe; done.push('audience'); }
     if (x.objective && !v.objSet && x.objective !== v.objective) { v.objective = x.objective; done.push('objective'); }
     if (x.competitor && !v.compSet && x.competitor !== v.competitor) { v.competitor = x.competitor; const g = $('#gc'); if (g) g.value = x.competitor; done.push('competitor'); }
-    v.auto = done.length ? { done, reasons: done.map(k => x.why[k]).filter(Boolean), confidence: x.confidence } : v.auto; const el = $('#gauto'); if (el && v.auto) el.innerHTML = autoChip();
+    v.auto = done.length ? { done, reasons: done.map(k => x.why[k === 'audience' ? 'recipe' : k]).filter(Boolean), confidence: x.confidence } : v.auto; const el = $('#gauto'); if (el && v.auto) el.innerHTML = autoChip();
   };
   const autoChip = () => `${I('sparkles')}<span>Set for you: <b>${v.auto.done.join(', ')}</b> · ${esc(v.auto.reasons.join('; '))}. Change any of it if it is wrong.</span>`;
   if (v.auto) $('#gauto').innerHTML = autoChip();
@@ -211,7 +211,7 @@ PI.tools.geo = async (box, p, a) => {
   const asSite = r => ({ id: r.id, name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, vendor: r.vendor, format: r.format, road: r.road, site_description: r.site_description, circuit: r.circuit, screen_type: r.screen_type, notes: r.notes, municipality: r.municipality });
   G.pickAsset = id => { const x = G.oohAll().find(y => y.id === id); if (!x) return; v.site = asSite(x); v.inv = ''; const gi = $('#ginv'); if (gi) gi.value = ''; v.browseSel = null; G.analyse([{ ...v.site }]); };
   $('#ggo').onclick = async () => {
-    infer([v.q, v.brief, (PI.client() || {}).name].filter(Boolean).join(' '));
+    v.auto = null; infer([v.q, v.brief, (PI.client() || {}).name].filter(Boolean).join(' ')); { const el = $('#gauto'); if (el && !v.auto) el.innerHTML = ''; }
     if (v.inv) {
       if (v.inv === BUILTIN && !v.builtin) return PI.toast('Still loading the assets');
       let pool = v.browseSel ? [v.browseSel] : filtered(); if (!pool.length) return PI.toast('No assets match those filters');
