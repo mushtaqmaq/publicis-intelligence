@@ -64,6 +64,17 @@ M.update = st => {
   }
 };
 
+// The network plan: audience areas shaded by their score, branches, the chosen screens, and the rest of the inventory in grey.
+M.plan = st => {
+  if (!M.map) return; const g = M.g; M.objs.forEach(o => o.setMap(null)); M.objs = [];
+  const col = s => s == null ? '#98A2B3' : s >= 70 ? '#1FA971' : s >= 40 ? '#D99A12' : '#E5486F', b = new g.LatLngBounds();
+  st.areas.forEach(a => { M.objs.push(new g.Circle({ map: M.map, center: { lat: a.lat, lng: a.lon }, radius: a.radius, strokeColor: col(a.score), strokeWeight: 1.5, fillColor: col(a.score), fillOpacity: a.score == null ? 0.05 : 0.08 + 0.22 * a.score / 100, clickable: false })); b.extend({ lat: a.lat, lng: a.lon }); });
+  (st.rest || []).forEach(p => M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, clickable: false, icon: { path: g.SymbolPath.CIRCLE, scale: 2.5, fillColor: '#98A2B3', fillOpacity: 0.6, strokeWeight: 0 } })));
+  st.branches.forEach(p => M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: p.name, clickable: false, zIndex: 4, icon: { path: g.SymbolPath.BACKWARD_CLOSED_ARROW, scale: 4.5, fillColor: '#12121A', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 } })));
+  st.chosen.forEach(p => { const mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: p.name + ' · ' + p.status, zIndex: 8, icon: { path: g.SymbolPath.CIRCLE, scale: 7.5, fillColor: '#2F6BFF', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5 } }); mk.addListener('click', () => st.onPick && st.onPick(p.id)); M.objs.push(mk); });
+  if (st.fit && !b.isEmpty()) M.map.fitBounds(b, 50);
+};
+
 // Browsing an inventory before any analysis: every filtered asset as a dot, the chosen one highlighted.
 M.browse = st => {
   if (!M.map) return; const g = M.g; M.objs.forEach(o => o.setMap(null)); M.objs = [];

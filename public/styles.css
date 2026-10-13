@@ -683,3 +683,13 @@ pre.code{background:#111114;color:#E8E8ED;font:12.5px/1.55 ui-monospace,SFMono-R
 .chips-wrap{display:flex;flex-wrap:wrap;gap:6px}
 .gx-auto{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--ink-2);margin:0 0 8px}.gx-auto:empty{display:none}.gx-auto svg{flex:none;margin-top:2px;width:15px;height:15px;color:var(--focus)}
 .gx-ctxl{display:grid;gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--line,#E2E6EE)}.gx-ctxl small{color:var(--muted);font-size:11.5px}
+.gx-steps{display:grid;grid-template-columns:minmax(260px,2fr) minmax(200px,1.3fr) minmax(170px,1fr) auto;gap:10px;align-items:stretch;margin:12px 0 8px}
+.gx-step{display:flex;gap:10px;padding:12px;border:1px solid var(--hair-2);border-radius:14px;background:var(--bg)}.gx-n{flex:none;width:22px;height:22px;border-radius:50%;background:var(--ink);color:var(--bg);font-size:12px;font-weight:700;display:grid;place-items:center}
+.gx-sb{display:grid;gap:4px;flex:1;min-width:0;align-content:start}.gx-sb>small{color:var(--muted);font-size:12px;margin-bottom:4px}.gx-sb .gx-f{display:block}.gx-sb .gx-f>span:empty{display:none}.gx-sb select{width:100%}.gx-step .gx-search{min-width:0;flex:none}
+.gx-where{display:flex;gap:8px;align-items:center;min-height:22px;margin-top:4px}.gx-go{display:grid;gap:8px;align-content:center}.gx-go .btn{justify-content:center}
+@media(max-width:1100px){.gx-steps{grid-template-columns:1fr 1fr}.gx-go{grid-column:1/-1;grid-auto-flow:column}}@media(max-width:640px){.gx-steps{grid-template-columns:1fr}}
+.gx-hero{border:1px solid var(--hair-2);border-radius:16px;padding:16px 18px;margin-bottom:14px;background:var(--bg);display:grid;gap:12px}.gx-hero small{color:var(--muted);font-size:12.5px}.gx-hero h3{margin:2px 0 6px;font-size:22px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.gx-why{margin:0;padding-left:18px;display:grid;gap:3px;font-size:13.5px;color:var(--ink-2)}
+.gx-cmp td small{display:block;color:var(--muted);font-size:11.5px;font-weight:400;max-width:230px}.gx-cmp tr.on td{background:rgba(31,169,113,.09)}.gx-cmp th{font-size:11.5px;white-space:normal}
+.gx-chk{margin:6px 0 0;padding:0;list-style:none;display:grid;gap:2px;font-size:12px}.gx-chk li.ok::before{content:'✓ ';color:#1FA971}.gx-chk li.no::before{content:'! ';color:#D99A12;font-weight:700}
+.gx-t td small{display:block;color:var(--muted);font-size:11.5px}.gx-layers label i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}[data-pa] b{cursor:pointer}
