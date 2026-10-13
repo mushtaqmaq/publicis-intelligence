@@ -26,7 +26,7 @@ PI.tools.geo = async (box, p, a) => {
   const invRows = id => id === FOUND ? (v.found ? v.found.items.map((x, i) => ({ id: x.id, name: x.name || `${v.found.query} ${i + 1}`, lat: x.lat, lon: x.lon, vendor: v.found.query, format: 'Search result', site_description: x.address || '' })) : []) : id === BUILTIN ? (v.builtin ? v.builtin.rows : []) : ((v.invs.find(i => i.id === id) || {}).rows || []);
   const isDigital = r => r.screen_type === 'Digital' || /digital|led|screen|dome|unipole screen/i.test(r.format || '');
   const filtered = () => { const f = v.invFilter, q = f.q.trim().toLowerCase(); return invRows(v.inv).filter(r => (!f.vendor || r.vendor === f.vendor) && (!f.format || r.format === f.format) && (!f.kind || (isDigital(r) ? 'digital' : 'static') === f.kind) && (!q || (r.name + ' ' + r.id + ' ' + (r.site_description || '')).toLowerCase().includes(q))); };
-  const clients = () => v.clientLoc ? invRows(v.clientLoc) : [];
+  const clients = () => [...(v.clientLoc ? invRows(v.clientLoc) : []), ...(v.targets ? v.targets.items.map((x, i) => ({ id: 't' + i, name: x.name || v.targets.q, lat: x.lat, lon: x.lon })) : [])];
   const ranked = () => v.result ? v.result.results.slice().sort((x, y) => (y.score.value ?? -1) - (x.score.value ?? -1)) : [];
   const current = () => { const rs = ranked(); return rs[Math.min(v.sel, rs.length - 1)]; };
   const pr = () => v.st.providers.google, [gl, gc] = STATE[pr().state], ai = S.me && S.me.caps && S.me.caps.ai;
@@ -129,7 +129,7 @@ PI.tools.geo = async (box, p, a) => {
   };
   G.invUI = invUI; invUI();
   $('#ginv').onchange = e => {
-    v.inv = e.target.value; v.invFilter = { vendor: '', format: '', q: '' }; v.site = null; v.cands = []; v.focus = false; v.openList = false; v.browseSel = null;
+    v.inv = e.target.value; v.targets = null; v.invFilter = { vendor: '', format: '', q: '' }; v.site = null; v.cands = []; v.focus = false; v.openList = false; v.browseSel = null;
     if (v.inv) { v.result = null; v.tab = 'map'; v.layers.inv = true; }   // choosing an inventory shows every asset on the map; filter by supplier or medium afterwards
     const qi = $('#gq'); if (qi) qi.blur(); cands(); invUI(); G.show();
   };
@@ -139,7 +139,7 @@ PI.tools.geo = async (box, p, a) => {
     if (x.recipe && !v.recipeSet && x.recipe !== v.recipe) { v.recipe = x.recipe; const g = $('#gaud'); if (g) g.value = x.recipe; done.push('audience'); }
     if (x.objective && !v.objSet && x.objective !== v.objective) { v.objective = x.objective; done.push('objective'); }
     if (x.competitor && !v.compSet && x.competitor !== v.competitor) { v.competitor = x.competitor; const g = $('#gc'); if (g) g.value = x.competitor; done.push('competitor'); }
-    v.auto = done.length ? { done, reasons: x.reasons, confidence: x.confidence } : v.auto; const el = $('#gauto'); if (el && v.auto) el.innerHTML = autoChip();
+    v.auto = done.length ? { done, reasons: done.map(k => x.why[k]).filter(Boolean), confidence: x.confidence } : v.auto; const el = $('#gauto'); if (el && v.auto) el.innerHTML = autoChip();
   };
   const autoChip = () => `${I('sparkles')}<span>Set for you: <b>${v.auto.done.join(', ')}</b> · ${esc(v.auto.reasons.join('; '))}. Change any of it if it is wrong.</span>`;
   if (v.auto) $('#gauto').innerHTML = autoChip();
@@ -176,14 +176,19 @@ PI.tools.geo = async (box, p, a) => {
   $('#gq').onfocus = () => { v.focus = true; if (!v.site) cands(); };
   $('#gq').onblur = () => setTimeout(() => { v.focus = false; v.openList = false; if (!v.site) cands(); }, 200);
   $('#gq').onkeydown = e => { if (e.key === 'Enter') $('#gfind').click(); };
+  // The OOH inventory is fixed. What the planner types is the thing the assets should be near (a business, a branch network or a place), so it only marks targets.
+  const invLabel = () => v.inv === BUILTIN ? 'Qatar OOH' : ((v.invs.find(i => i.id === v.inv) || {}).name || 'inventory');
+  const findTargets = async q => { const d = await PI.api('POST', 'geo/search', { query: q }); v.targets = { q, items: d.items.slice(0, 200) }; };
   const showAll = async () => {
     const q = v.q.trim(); if (q.length < 3) return PI.toast('Type what to look for');
     if (!v.st.google) return PI.toast('Google Maps is not connected.');
     const btn = $('#gfind'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
+    if (v.inv && v.inv !== FOUND) { try { await findTargets(q); PI.toast(`${v.targets.items.length} found. Analyse picks the ${invLabel()} assets near them.`); PI.tools.geo(box, p, a); } catch (e) { PI.toast(e.message); btn.disabled = false; btn.innerHTML = I('search') + 'Find'; } return; }
     try { const d = await PI.api('POST', 'geo/search', { query: q }); v.found = { query: q, items: d.items, saturated: d.saturated, cached: d.cached }; v.cands = []; v.openList = false; v.inv = FOUND; v.invFilter = { vendor: '', format: '', q: '' }; v.site = null; v.browseSel = null; v.result = null; v.tab = 'map'; if (!d.items.length) PI.toast('Nothing matched in Qatar. Try different words.'); PI.tools.geo(box, p, a); }
     catch (e) { PI.toast(e.message); btn.disabled = false; btn.innerHTML = I('search') + 'Find'; }
   };
-  $('#gfind').onclick = async () => { const m = pinRe.exec(v.q); if (m) { v.site = { id: 'site', name: 'Dropped pin', lat: +m[1], lon: +m[2] }; v.inv = ''; cands(); return go(); }
+  $('#gfind').onclick = async () => { const m = pinRe.exec(v.q);
+    if (v.inv && v.inv !== FOUND) { if (m) { v.targets = { q: v.q.trim(), items: [{ name: 'Dropped pin', lat: +m[1], lon: +m[2] }] }; PI.toast('Pin set. Analyse picks the assets near it.'); return PI.tools.geo(box, p, a); } return showAll(); }   // the inventory is fixed: what is typed only says where the assets should be if (m) { v.site = { id: 'site', name: 'Dropped pin', lat: +m[1], lon: +m[2] }; v.inv = ''; cands(); return go(); }
     if (!v.st.google) return PI.toast('Google Maps is not connected. Use coordinates, or pick an OOH site.');
     if (/(atms|branches|stores|outlets|locations|offices|showrooms|restaurants|cafes|banks|malls|hotels|schools|pharmacies|clinics|hospitals)\s*$/i.test(v.q.trim())) return showAll();   // a plural means "all of them"
     try { v.cands = (await PI.api('POST', 'geo/resolve', { query: v.q })).candidates; v.openList = true; if (!v.cands.length) PI.toast('No match in Qatar. Try an address or coordinates.'); cands(); } catch (e) { PI.toast(e.message); } };
@@ -205,11 +210,19 @@ PI.tools.geo = async (box, p, a) => {
   const go = () => setTimeout(() => $('#ggo') && $('#ggo').click(), 0);   // choosing a place analyses it straight away
   const asSite = r => ({ id: r.id, name: r.name, lat: r.lat, lon: r.lon, zone: r.zone, vendor: r.vendor, format: r.format, road: r.road, site_description: r.site_description, circuit: r.circuit, screen_type: r.screen_type, notes: r.notes, municipality: r.municipality });
   G.pickAsset = id => { const x = G.oohAll().find(y => y.id === id); if (!x) return; v.site = asSite(x); v.inv = ''; const gi = $('#ginv'); if (gi) gi.value = ''; v.browseSel = null; G.analyse([{ ...v.site }]); };
-  $('#ggo').onclick = () => {
+  $('#ggo').onclick = async () => {
     infer([v.q, v.brief, (PI.client() || {}).name].filter(Boolean).join(' '));
     if (v.inv) {
       if (v.inv === BUILTIN && !v.builtin) return PI.toast('Still loading the assets');
-      const pool = v.browseSel ? [v.browseSel] : filtered(); if (!pool.length) return PI.toast('No assets match those filters');
+      let pool = v.browseSel ? [v.browseSel] : filtered(); if (!pool.length) return PI.toast('No assets match those filters');
+      const q = v.q.trim(), hasQ = q.length >= 3 && !v.browseSel && !pinRe.test(q) && v.st.google;
+      if (hasQ && (!v.targets || v.targets.q !== q)) { $('#ggo').disabled = true; try { await findTargets(q); } catch (e) { PI.toast(e.message); v.targets = null; } $('#ggo').disabled = false; }
+      if (!v.browseSel && v.targets && v.targets.q === q && v.targets.items.length) {   // assets near what was typed, most useful first
+        const R = v.radius === 'auto' ? 500 : v.radius, T = v.targets.items, near = pool.map(x => { let n = 0, d = 1e9; for (const t of T) { const m = C.dist(x, t); if (m <= R) n++; if (m < d) d = m; } return { x, n, d }; });
+        const hit = near.filter(y => y.n > 0).sort((y, z) => z.n - y.n || y.d - z.d);
+        if (hit.length) { pool = hit.map(y => y.x); PI.toast(`${hit.length} of ${near.length.toLocaleString('en-US')} assets sit within ${R} m of ${T.length} “${q}” location${T.length === 1 ? '' : 's'}.`); }
+        else { pool = near.sort((y, z) => y.d - z.d).slice(0, 10).map(y => y.x); PI.toast(`No asset within ${R} m of “${q}”. Showing the 10 nearest.`); }
+      } else if (hasQ && v.targets && v.targets.q === q) PI.toast(`Google found nothing for “${q}”, so the whole list is analysed.`);
       if (pool.length > 40) PI.toast(`Analysing the first 40 of ${pool.length.toLocaleString('en-US')}. Narrow the filters to choose which.`);
       return G.analyse(pool.slice(0, 40).map(asSite));
     }

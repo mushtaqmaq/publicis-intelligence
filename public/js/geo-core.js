@@ -82,7 +82,8 @@ function infer(text) {
   if (best) reasons.push(`${why[best[0]]} point to ${best[0].replace(/_/g, ' ')}`);
   if (comp) reasons.push(`"${comp[1].replace(/_/g, ' ')}" looks like the competing category`);
   if (obj) reasons.push(`objective reads as ${OBJECTIVES[obj[1]].label.toLowerCase()}`);
-  return { recipe: best ? best[0] : null, objective: obj ? obj[1] : null, competitor: comp ? comp[1] : null, confidence: best && (!ranked[1] || best[1] > ranked[1][1]) ? 'Higher' : 'Lower', reasons };
+  const whyBy = { recipe: best && reasons[0], competitor: comp && `"${comp[1].replace(/_/g, ' ')}" looks like the competing category`, objective: obj && `objective reads as ${OBJECTIVES[obj[1]].label.toLowerCase()}` };
+  return { why: whyBy, recipe: best ? best[0] : null, objective: obj ? obj[1] : null, competitor: comp ? comp[1] : null, confidence: best && (!ranked[1] || best[1] > ranked[1][1]) ? 'Higher' : 'Lower', reasons };
 }
 const clamp = x => Math.max(0, Math.min(1, x));
 // Objective-dependent opportunity score from evidence already in the result. Missing components are left out, never counted as zero.
