@@ -192,7 +192,7 @@ MB.start = box => {
   async function s4() {
     box.innerHTML = `${head()}<div class="empty"><span class="spin"></span></div>`;
     const dg = await MB.digital(); const list = PI.supplierShortlist(st.brief, dg && !dg.error ? dg : null, dg && !dg.error ? dg.population : null);
-    if (!st.picks) st.picks = PI.defaultPicks(list);
+    if (!st.picks) { st.picks = PI.defaultPicks(list); if (!st.picks.size) st.picks = new Set(list.filter(x => x.reasons.length).slice(0, 8).map(x => x.s.id)); }   // a plain reach brief still gets its best-fit suppliers
     const online = (st.details.type || st.brief.suggestedType) !== 'offline';
     box.innerHTML = `${head()}<div class="band-h" style="margin-top:6px"><h2 style="font-size:30px">Platforms and suppliers</h2><p>${online ? 'Ticked ones match the brief. Each reason comes from what the brief asks for, and reach is the published Qatar figure. Untick anything that does not belong and add suppliers of your own.' : 'This is an offline plan, so online suppliers are optional.'}</p></div>
       <div class="card pad" style="max-width:1000px;margin:0 auto"><div class="tw"><table class="grid-t"><thead><tr><th></th><th>Platform or supplier</th><th>Why it fits this brief</th><th>Published Qatar audience</th></tr></thead><tbody>${list.map(x => `<tr><td><input type="checkbox" data-pick="${x.s.id}" ${st.picks.has(x.s.id) ? 'checked' : ''} aria-label="${esc(x.s.name)}"></td><td><b>${esc(x.s.name)}</b><div class="hint" style="margin:0">${x.s.kind === 'third-party' ? 'Third-party supplier' : 'Platform'} · ${esc(x.s.type)}</div></td><td>${x.reasons.length ? esc(x.reasons.join('; ')) : '<span class="muted">No direct match with the brief</span>'}<div class="hint" style="margin:0">${esc(x.s.note)}</div></td><td>${x.reachNote ? esc(x.reachNote) : '<span class="muted">' + (x.s.kind === 'platform' ? 'Not published' : 'Confirm with the supplier') + '</span>'}</td></tr>`).join('')}</tbody></table></div>
@@ -210,7 +210,11 @@ MB.start = box => {
       S.mb = null; PI.mp.editor(box); PI.toast(ai ? 'Draft ready. Review every rate before sending.' : 'Plan started');
     };
     $('#mpEmpty').onclick = () => create(false); $('#mpBuild').onclick = () => create(true);
-    if (st.auto) { st.auto = false; create(true); }
+    if (st.auto) {   // build without showing the pick list; it only appears again if the build fails
+      st.auto = false; const hid = [...box.children].slice(1); hid.forEach(x => x.hidden = true);
+      const w = document.createElement('div'); w.className = 'empty'; w.innerHTML = '<span class="spin"></span> Building your plan. This can take a minute.'; box.appendChild(w);
+      create(true).then(() => { if (S.mb) { w.remove(); hid.forEach(x => x.hidden = false); } });
+    }
   }
   draw();
 };
