@@ -113,7 +113,7 @@ function opportunity(r, objective, route, extra = {}) {
   const coverage = Math.round(100 * aw / tw) / 100, enough = aw > 0 && coverage >= MIN_COVERAGE && parts[0].value != null, adj = extra.seasonAdj || 0;   // seasonal timing nudges the result by at most 20% and is reported on its own line
   const base = enough ? sum / aw : null, r1 = x => Math.round(1000 * x) / 10;
   for (const p of parts) p.points = p.value == null || !enough ? null : r1(p.weight * p.value / aw);
-  return { value: base == null ? null : r1(clamp(base * (1 + adj))), base: base == null ? null : r1(base), low: enough ? r1(sum / tw) : null, high: enough ? r1((sum + (tw - aw)) / tw) : null, status: enough ? 'ok' : 'insufficient', seasonAdj: adj, coverage, parts, objective, competitionRead: presence ? 'presence' : 'gap', recipeVersion: RECIPE_VERSION,
+  return { value: base == null ? null : r1(clamp(base * (1 + adj))), base: base == null ? null : r1(base), low: enough ? r1(clamp(sum / tw * (1 + adj))) : null, high: enough ? r1(clamp((sum + (tw - aw)) / tw * (1 + adj))) : null, status: enough ? 'ok' : 'insufficient', seasonAdj: adj, coverage, parts, objective, competitionRead: presence ? 'presence' : 'gap', recipeVersion: RECIPE_VERSION,
     missing: parts.filter(p => p.value == null).map(p => p.label) };
 }
 
@@ -136,6 +136,18 @@ const mins = s => s == null ? '–' : Math.round(s / 60) + ' min';
 const rad = d => d * Math.PI / 180;
 function dist(a, b) { const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lon - a.lon) / 2) ** 2; return 2 * 6371008.8 * Math.asin(Math.sqrt(h)); }
 const nearestM = (site, rows) => rows && rows.length ? Math.round(Math.min(...rows.map(r => dist(site, r)))) : null;
-const api = { RECIPE_VERSION, MIN_COVERAGE, objLabel, infer, dist, nearestM, buildPacket, SYSTEM, parseInterpretation, OBJECTIVES, opportunity, story, band, km, mins };
+// CSV for exports. A cell that starts with = + - or @ gets a leading apostrophe, so a spreadsheet shows it and never runs it as a formula.
+const csvCell = t => { let s = String(t ?? ''); if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
+const csv = rows => '\ufeff' + rows.map(r => r.map(csvCell).join(',')).join('\n');
+const download = (name, text) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' })); a.download = name; a.click(); URL.revokeObjectURL(a.href); };
+// The next step for a ranked site. Strong and well evidenced: do it. Promising or thinly evidenced: test it. Weak or unknown: watch.
+function actionFor(o) {
+  const cov = Math.round(o.coverage * 100);
+  if (o.status !== 'ok') return { priority: 'WATCH', cls: 'mut', reason: o.status === 'no-objective' ? 'No objective is set.' : 'There is not enough evidence to rank it.', next: 'Gather the missing evidence before deciding.' };
+  if (o.value >= 60 && o.coverage >= 0.6) return { priority: 'DO NOW', cls: 'ok', reason: `Index ${o.value} on ${cov}% of the evidence.`, next: 'Confirm availability, facing and price with the supplier.' };
+  if (o.value >= 40) return { priority: 'TEST', cls: 'warn', reason: o.value >= 60 ? `Index ${o.value}, but only ${cov}% of the evidence was available.` : `Index ${o.value}: a moderate fit.`, next: 'Pilot it, or validate with traffic or audience measurement before committing.' };
+  return { priority: 'WATCH', cls: 'mut', reason: `Index ${o.value}: weak for this objective.`, next: 'Hold it unless something else supports it.' };
+}
+const api = { csv, csvCell, download, actionFor, RECIPE_VERSION, MIN_COVERAGE, objLabel, infer, dist, nearestM, buildPacket, SYSTEM, parseInterpretation, OBJECTIVES, opportunity, story, band, km, mins };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PIGeoCore = api;
 })(typeof window !== 'undefined' ? window : globalThis);

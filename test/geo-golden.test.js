@@ -86,7 +86,7 @@ test('G08/G12 no objective means no opportunity index; thin evidence is "not eno
 test('G11 catchment: auto explains itself, dense and sparse differ, a manual radius is kept, a network is never swallowed', () => {
   const dense = CA.suggest({ recipe: 'families', sites: [{ id: 'a', lat: 25.3, lon: 51.5, density: 11000 }] }), sparse = CA.suggest({ recipe: 'families', sites: [{ id: 'a', lat: 25.3, lon: 51.5, density: 300 }] });
   assert.ok(dense.radii.a < sparse.radii.a); assert.ok(dense.reasons.length >= 2 && /usually comes from/.test(dense.reasons[0]));
-  const net = CA.suggest({ recipe: 'families', sites: [0, 1, 2, 3, 4].map(i => ({ id: 's' + i, lat: 25.3 + i * 0.004, lon: 51.5 })) }); assert.ok(net.network && net.network.branches === 5 && /nearest branch/.test(net.reasons.join(' ')));
+  const net = CA.suggest({ recipe: 'families', sites: [0, 1, 2, 3, 4].map(i => ({ id: 's' + i, lat: 25.3 + i * 0.004, lon: 51.5 })) }); assert.ok(net.network && net.network.branches === 5 && /nearest other one/.test(net.reasons.join(' ')));
   assert.ok(Object.values(net.radii).every(r => r <= 500));
 });
 test('G13 campaign period: only calendar rules change, each effect is labelled an assumption, an unreadable date falls back to today', () => {

@@ -75,12 +75,26 @@ M.plan = st => {
   if (st.fit && !b.isEmpty()) M.map.fitBounds(b, 50);
 };
 
-// Browsing an inventory before any analysis: every filtered asset as a dot, the chosen one highlighted.
+// Browsing an inventory before any analysis. One dot per spot: faces that share coordinates are a single, larger dot whose name lists
+// them, and choosing it hands back the whole stack so the list can offer each face. st.stacks: [[row, ...], ...].
 M.browse = st => {
   if (!M.map) return; const g = M.g; M.objs.forEach(o => o.setMap(null)); M.objs = [];
-  st.rows.forEach(p => { const on = st.sel && st.sel.id === p.id, mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: (p.name || p.id) + (p.format ? ' · ' + p.format : ''), zIndex: on ? 9 : 1, icon: { path: g.SymbolPath.CIRCLE, scale: on ? 9 : 4, fillColor: on ? '#E5392B' : '#2F6BFF', fillOpacity: on ? 1 : 0.75, strokeColor: '#fff', strokeWeight: on ? 3 : 1 } }); mk.addListener('click', () => st.onSelect && st.onSelect(p)); M.objs.push(mk); });
+  const all = [];
+  st.stacks.forEach(stack => { const p = stack[0], n = stack.length, on = st.sel && stack.some(x => x.id === st.sel.id); all.push(p);
+    const mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: n > 1 ? `${n} faces at this spot: ${stack.map(x => x.id).join(', ')}. Choose one from the list.` : st.name(p), zIndex: on ? 9 : n > 1 ? 3 : 1, label: n > 1 ? { text: String(n), color: '#fff', fontSize: '10px', fontWeight: '700' } : undefined,
+      icon: { path: g.SymbolPath.CIRCLE, scale: on ? 9 : n > 1 ? 7.5 : 4, fillColor: on ? '#E5392B' : '#2F6BFF', fillOpacity: on || n > 1 ? 1 : 0.75, strokeColor: '#fff', strokeWeight: on ? 3 : 1 } });
+    mk.addListener('click', () => st.onSelect && st.onSelect(stack)); M.objs.push(mk); });
   (st.clients || []).forEach(p => M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: p.name, clickable: false, icon: { path: g.SymbolPath.CIRCLE, scale: 6, fillColor: '#1FA971', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 } })));
-  if (st.fit && st.rows.length) { const b = new g.LatLngBounds(); st.rows.forEach(p => b.extend({ lat: p.lat, lng: p.lon })); M.map.fitBounds(b, 40); }
+  if (st.fit && all.length) { const b = new g.LatLngBounds(); all.forEach(p => b.extend({ lat: p.lat, lng: p.lon })); M.map.fitBounds(b, 40); }
+};
+// Competitor networks: one colour per business, the client in black, coverage gaps as amber rings, OOH near rivals in blue.
+M.network = st => {
+  if (!M.map) return; const g = M.g; M.objs.forEach(o => o.setMap(null)); M.objs = []; const b = new g.LatLngBounds();
+  (st.gaps || []).forEach(x => M.objs.push(new g.Circle({ map: M.map, center: { lat: x.lat, lng: x.lon }, radius: st.radius * 2, strokeColor: '#D99A12', strokeWeight: 2, strokeOpacity: 0.9, fillColor: '#D99A12', fillOpacity: 0.08, clickable: false })));
+  (st.ooh || []).forEach(p => { const mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: `${p.id} · ${p.rivalsWithin} rival locations nearby`, zIndex: 2, icon: { path: g.SymbolPath.CIRCLE, scale: 4, fillColor: '#2F6BFF', fillOpacity: 0.9, strokeColor: '#fff', strokeWeight: 1 } }); mk.addListener('click', () => st.onPick && st.onPick(p.id)); M.objs.push(mk); });
+  st.networks.forEach(n => n.points.forEach(p => { const own = n.role === 'client'; b.extend({ lat: p.lat, lng: p.lon });
+    M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: n.name + (own ? ' (your network)' : ''), clickable: false, zIndex: own ? 6 : 4, icon: own ? { path: g.SymbolPath.BACKWARD_CLOSED_ARROW, scale: 4.5, fillColor: n.color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 } : { path: g.SymbolPath.CIRCLE, scale: 5.5, fillColor: n.color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 } })); }));
+  if (st.fit && !b.isEmpty()) M.map.fitBounds(b, 50);
 };
 // Municipality choropleth from the Qatar Open Data boundaries, shaded by census 2020 population.
 M.BOUNDS = { north: 26.3, south: 24.4, west: 50.6, east: 51.8 };   // Qatar and its waters
