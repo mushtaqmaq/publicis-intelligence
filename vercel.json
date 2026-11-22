@@ -7,6 +7,8 @@
   "outputDirectory": "public",
   "functions": { "api/index.js": { "maxDuration": 300 } },
   "rewrites": [
+    { "source": "/media/trends", "destination": "https://publicis-media-trends.vercel.app/media/trends" },
+    { "source": "/media/trends/:path*", "destination": "https://publicis-media-trends.vercel.app/media/trends/:path*" },
     { "source": "/api/:path*", "destination": "/api/index.js" },
     { "source": "/files/:path*", "destination": "/api/index.js" },
     { "source": "/login", "destination": "/login.html" }

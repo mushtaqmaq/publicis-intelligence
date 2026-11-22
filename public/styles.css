@@ -714,3 +714,4 @@ pre.code{background:#111114;color:#E8E8ED;font:12.5px/1.55 ui-monospace,SFMono-R
 .gx-bline{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:13px;flex-wrap:wrap}.gx-delta{margin-top:6px;padding:6px 10px;border-radius:8px;background:rgba(47,107,255,.08)}
 .gx-acts3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.gx-acts3 h5{margin:0 0 4px}
 .gx-seg button[aria-checked=true],.gx-seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+a.agent-b{text-decoration:none}

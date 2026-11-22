@@ -29,3 +29,17 @@ test('per-person tool access is enforced on the server', { skip: !process.env.DA
   await admin.call('PUT', `/api/admin/users/${id}/access`, { tools: null });
   assert.equal((await user.call('GET', '/api/me')).json.access, null);
 });
+
+test('Media > Trends tab: off unless the server flag is set, so the existing Media page is unchanged by default', { skip: !process.env.DATABASE_URL }, async (t) => {
+  const { Pool } = require('pg'), pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
+  const off = await boot({ MEDIA_TRENDS_ENABLED: '' }); t.after(async () => { await off.stop(); await pool.end(); });
+  const a = client(off.base); await a.login('admin@test.local', 'adminpass123');
+  assert.equal((await a.call('GET', '/api/me')).json.caps.trends, false);
+  const on = await boot({ MEDIA_TRENDS_ENABLED: '1' }); t.after(() => on.stop());
+  const b = client(on.base); await b.login('admin@test.local', 'adminpass123');
+  assert.equal((await b.call('GET', '/api/me')).json.caps.trends, true);
+  const views = require('fs').readFileSync(require('path').join(__dirname, '../public/js/views.js'), 'utf8');
+  assert.match(views, /pid === 'media' && PI\.trendsOn\(\)/, 'the tab is added only to Media and only behind the flag');
+  assert.ok(views.indexOf("r === 'p/media/trends'") < views.indexOf("if (r.startsWith('p/'))"), 'the trends address is handled before the generic pillar/agent route');
+});
