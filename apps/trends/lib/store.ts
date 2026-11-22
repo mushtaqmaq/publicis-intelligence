@@ -11,17 +11,19 @@ const ISO: Record<string, string> = { Qatar: 'QA', 'Saudi Arabia': 'SA', 'United
 // Regroup one organisation's recent signals. A group that shares a signal with an existing trend updates that trend (keeping its
 // editorial state); otherwise it becomes a new draft. Every rebuild writes a snapshot of the inputs behind the score.
 export async function rebuildTrends(pool: Pool, orgId: string, now = new Date()): Promise<{ signals: number; groups: number; created: number; updated: number }> {
-  const rows = (await pool.query(`select id, title, canonical_url as url, observed_at, publisher_country, category_hints from signals where organization_id = $1 and editorial_state <> 'hidden' and observed_at > $2 order by id`, [orgId, new Date(now.getTime() - WINDOW_DAYS * 864e5)])).rows;
+  const rows = (await pool.query(`select id, title, canonical_url as url, observed_at, publisher_country, category_hints, editorial_state from signals where organization_id = $1 and editorial_state <> 'hidden' and observed_at > $2 order by id`, [orgId, new Date(now.getTime() - WINDOW_DAYS * 864e5)])).rows;
   const sigs: Sig[] = rows.map(r => ({ id: r.id, title: r.title, url: r.url, observedAt: new Date(r.observed_at).toISOString(), publisherCountry: r.publisher_country, categoryHints: r.category_hints ?? [] }));
   const span = (await pool.query(`select extract(epoch from (max(observed_at) - min(observed_at))) / 86400 as d from signals where organization_id = $1`, [orgId])).rows[0];
   const groups = cluster(sigs, { now, historyDays: Number(span?.d ?? 0) });
+  const approved = new Set(rows.filter(r => r.editorial_state === 'approved').map(r => r.id as string));
   let created = 0, updated = 0;
   for (const g of groups) {
     const m = momentum(g.inputs), status = g.inputs.novelty != null && g.inputs.novelty > 60 ? 'emerging' : 'unknown';
     const hit = (await pool.query(`select ts.trend_id, count(*) n from trend_signals ts join trends t on t.id = ts.trend_id where t.organization_id = $1 and ts.signal_id = any($2::uuid[]) group by ts.trend_id order by n desc, ts.trend_id limit 1`, [orgId, g.signalIds])).rows[0];
     let id: string;
     if (hit) { id = hit.trend_id; updated++; await pool.query(`update trends set last_seen_at = $2, first_seen_at = least(first_seen_at, $3), momentum_score = $4, confidence_score = $5, score_version = $6, status = $7 where id = $1`, [id, g.lastSeen, g.firstSeen, m.value, g.confidence, m.version, status]); }
-    else { id = (await pool.query(`insert into trends(organization_id, title, category, status, first_seen_at, last_seen_at, momentum_score, confidence_score, score_version) values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`, [orgId, g.title.slice(0, 300), g.category, status, g.firstSeen, g.lastSeen, m.value, g.confidence, m.version])).rows[0].id; created++; }
+    else { const state = g.signalIds.every(x => approved.has(x)) ? 'approved' : 'draft';   // a group made only of trusted-source signals needs no second review
+      id = (await pool.query(`insert into trends(organization_id, title, category, status, first_seen_at, last_seen_at, momentum_score, confidence_score, score_version, editorial_state) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id`, [orgId, g.title.slice(0, 300), g.category, status, g.firstSeen, g.lastSeen, m.value, g.confidence, m.version, state])).rows[0].id; created++; }
     await pool.query(`insert into trend_signals(trend_id, signal_id) select $1, unnest($2::uuid[]) on conflict do nothing`, [id, g.signalIds]);
     await pool.query(`insert into trend_snapshots(trend_id, measured_at, momentum_score, confidence_score, score_version, input_metrics) values ($1,$2,$3,$4,$5,$6)`, [id, now, m.value, g.confidence, m.version, JSON.stringify({ inputs: g.inputs, coverage: m.coverage, domains: g.domains.length, countries: g.countries, signals: g.signalIds.length })]);
   }
@@ -57,5 +59,12 @@ export async function setTrendState(pool: Pool, id: string, state: 'approved' | 
   if (!r.rowCount) return false;
   await pool.query(`insert into audit_events(organization_id, action, subject_type, subject_id, metadata) values ($1, $2, 'trend', $3, $4)`, [r.rows[0].organization_id, 'trend.' + state, id, JSON.stringify({ by: actor.slice(0, 120), via: 'publicis-intelligence session' })]);
   return true;
+}
+export type Headline = { id: string; title: string; url: string; host: string; topic: string; departments: string[]; countries: string[]; at: string; dated: boolean; source: string; state: string };
+// The newest single headlines, for the "Latest" list. Viewers get approved ones; an editor also sees drafts.
+export async function readHeadlines(pool: Pool, opts: { drafts: boolean; days: number; limit?: number }): Promise<Headline[]> {
+  const rows = (await pool.query(`select g.id, g.title, g.canonical_url, g.category_hints, g.publisher_country, coalesce(g.published_at, g.observed_at) as at, g.published_at is not null as dated, g.editorial_state, src.name as source
+    from signals g join sources src on src.id = g.source_id where g.editorial_state = any($1::text[]) and coalesce(g.published_at, g.observed_at) > now() - make_interval(days => $2) order by at desc limit $3`, [opts.drafts ? ['approved', 'draft'] : ['approved'], opts.days, opts.limit ?? 300])).rows;
+  return rows.map(r => ({ id: r.id, title: r.title, url: r.canonical_url, host: (() => { try { return new URL(r.canonical_url).hostname.replace(/^www\./, ''); } catch { return ''; } })(), topic: (r.category_hints ?? [])[0] ?? 'Other', departments: (r.category_hints ?? []).filter((d: string) => DEPTS.includes(d)), countries: r.publisher_country ? [ISO[r.publisher_country] ?? r.publisher_country] : [], at: new Date(r.at).toISOString(), dated: r.dated, source: r.source, state: r.editorial_state }));
 }
 export const organisations = async (pool: Pool) => (await pool.query(`select id from organizations order by created_at`)).rows.map(r => r.id as string);

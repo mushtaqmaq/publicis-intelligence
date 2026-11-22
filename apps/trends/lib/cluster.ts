@@ -12,7 +12,10 @@ export function terms(title: string): Set<string> {
   for (const w of title.toLowerCase().normalize('NFKC').split(/[^\p{L}\p{N}]+/u)) { if (!w || STOP.has(w) || /^\d+$/.test(w)) continue; if (w.length >= 4 || (/[^\x00-\x7f]/.test(w) && w.length >= 3)) out.add(w); }
   return out;
 }
-const jaccard = (a: Set<string>, b: Set<string>) => { let n = 0; for (const x of a) if (b.has(x)) n++; return n ? n / (a.size + b.size - n) : 0; };
+const shared = (a: Set<string>, b: Set<string>) => { let n = 0; for (const x of a) if (b.has(x)) n++; return n; };
+// Two headlines are about the same thing when they share most of their words, or at least four meaningful ones (publishers word
+// the same story differently).
+const same = (a: Set<string>, b: Set<string>) => { const n = shared(a, b); return n >= 4 || (n > 0 && n / (a.size + b.size - n) >= SIMILAR); };
 const host = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
 const SIMILAR = 0.5, MIN_TERMS = 3, DAY = 864e5;
 
@@ -22,7 +25,7 @@ export function cluster(signals: Sig[], opts: { now?: Date; historyDays?: number
   const now = (opts.now ?? new Date()).getTime(), history = opts.historyDays ?? 0;
   const list = signals.map(s => ({ s, t: terms(s.title) })).filter(x => x.t.size >= MIN_TERMS).sort((a, b) => a.s.id.localeCompare(b.s.id));
   const parent = list.map((_, i) => i), find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
-  for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) if (jaccard(list[i].t, list[j].t) >= SIMILAR) parent[find(j)] = find(i);
+  for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) if (same(list[i].t, list[j].t)) parent[find(j)] = find(i);
   const groups = new Map<number, typeof list>(); list.forEach((x, i) => { const r = find(i); (groups.get(r) ?? groups.set(r, []).get(r)!).push(x); });
   const out: Cluster[] = [];
   for (const g of groups.values()) {
@@ -31,7 +34,8 @@ export function cluster(signals: Sig[], opts: { now?: Date; historyDays?: number
     const times = g.map(x => new Date(x.s.observedAt).getTime()).filter(t => !isNaN(t)), first = Math.min(...times), last = Math.max(...times);
     const countries = [...new Set(g.map(x => x.s.publisherCountry).filter((c): c is string => !!c))].sort();
     const cur = times.filter(t => t > now - DAY).length, prev = times.filter(t => t <= now - DAY && t > now - 2 * DAY).length;
-    const hints = g.flatMap(x => x.s.categoryHints), category = hints.sort((a, b) => hints.filter(h => h === b).length - hints.filter(h => h === a).length || a.localeCompare(b))[0] ?? 'other';
+    const hints = g.map(x => x.s.categoryHints[0]).filter(Boolean), category   // the first hint of a source is its topic
+       = hints.sort((a, b) => hints.filter(h => h === b).length - hints.filter(h => h === a).length || a.localeCompare(b))[0] ?? 'other';
     const inputs: MomentumInputs = {
       velocity: history >= 2 ? Math.round(50 + (50 * (cur - prev)) / Math.max(cur, prev, 1)) : null,
       breadth: Math.min(100, domains.length * 20),

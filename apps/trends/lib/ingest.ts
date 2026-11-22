@@ -11,7 +11,7 @@ const list = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => ty
 // Builds the connector a source row describes. Anything not understood is refused, never guessed.
 export function connectorFor(s: SourceRow, fetchImpl?: typeof fetch): Connector {
   const c = s.config_public;
-  if (s.kind === 'gdelt' && str(c.query)) return gdelt({ sourceId: s.id, query: str(c.query), categoryHints: list(c.categoryHints), timespan: str(c.timespan) || undefined, fetchImpl });
+  if (s.kind === 'gdelt' && str(c.query)) return gdelt({ sourceId: s.id, query: str(c.query), categoryHints: list(c.categoryHints), timespan: str(c.timespan) || undefined, titleTerms: list(c.titleTerms), fetchImpl });
   if (s.kind === 'rss' && str(c.feedUrl) && list(c.allow).length) return rss({ sourceId: s.id, feedUrl: str(c.feedUrl), allow: list(c.allow), publisherCountry: str(c.publisherCountry) || undefined, categoryHints: list(c.categoryHints), fetchImpl });
   throw new ConnectorError('bad-response', `Source "${s.name}" is not set up: its ${s.kind} settings are missing.`);
 }
@@ -31,8 +31,10 @@ export async function runSource(pool: Pool, s: SourceRow, opts: { now?: Date; fe
     const cursor = last.rows[0]?.cursor_state?.cursor as string | undefined;
     const r = await connectorFor(s, opts.fetchImpl).fetchSince({ cursor, maxItems: opts.maxItems ?? 75 });
     const { kept } = dedupe(r.items); let inserted = 0;
-    for (const x of kept) inserted += await insertSignal(pool, s, x);
-    const status = r.skipped ? 'partial' : 'success';
+    // A source the owner has marked as trusted publishes straight away; anything else waits for an editor.
+    const state = s.config_public.autoApprove === true ? 'approved' : 'draft';
+    for (const x of kept) inserted += await insertSignal(pool, s, x, state);
+    const status = r.skipped ? 'partial' : 'success';   // off-topic rows are a filter doing its job, not a fault
     await finish(status, r.items.length, inserted, r.nextCursor ?? cursor);
     await pool.query(`update sources set last_success_at = now() where id = $1`, [s.id]);
     return { source: s.name, status, seen: r.items.length, inserted };
@@ -43,16 +45,15 @@ export async function runSource(pool: Pool, s: SourceRow, opts: { now?: Date; fe
     return { source: s.name, status: 'error', seen: 0, inserted: 0, error: code };
   }
 }
-// New signals arrive as drafts: nothing is visible to viewers until an editor approves it or a later phase clusters it.
-async function insertSignal(pool: Pool, s: SourceRow, x: NormalizedSignal): Promise<number> {
+async function insertSignal(pool: Pool, s: SourceRow, x: NormalizedSignal, state: 'approved' | 'draft'): Promise<number> {
   const r = await pool.query(
-    `insert into signals(organization_id, source_id, external_id, canonical_url, title, summary, language, published_at, observed_at, publisher_country, about_countries, category_hints, metrics, source_metadata, rights_status)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) on conflict do nothing`,
-    [s.organization_id, s.id, x.externalId ?? null, x.canonicalUrl, x.title, x.summary ?? null, x.language ?? null, x.publishedAt ?? null, x.observedAt, x.publisherCountry ?? null, x.aboutCountries, x.categoryHints, JSON.stringify(x.metrics), JSON.stringify({ pointer: x.rawPointer ?? null }), x.rightsStatus]);
+    `insert into signals(organization_id, source_id, external_id, canonical_url, title, summary, language, published_at, observed_at, publisher_country, about_countries, category_hints, metrics, source_metadata, rights_status, editorial_state)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) on conflict do nothing`,
+    [s.organization_id, s.id, x.externalId ?? null, x.canonicalUrl, x.title, x.summary ?? null, x.language ?? null, x.publishedAt ?? null, x.observedAt, x.publisherCountry ?? null, x.aboutCountries, x.categoryHints, JSON.stringify(x.metrics), JSON.stringify({ pointer: x.rawPointer ?? null }), x.rightsStatus, state]);
   return r.rowCount ?? 0;
 }
 // Enabled sources whose refresh window has passed, oldest first, a few at a time so one call stays short.
-export async function dueSources(pool: Pool, limit = 3): Promise<SourceRow[]> {
+export async function dueSources(pool: Pool, limit = 20): Promise<SourceRow[]> {
   return (await pool.query(`select id, organization_id, kind, name, config_public, refresh_minutes from sources where enabled and kind in ('gdelt', 'rss') and (last_success_at is null or last_success_at < now() - make_interval(mins => refresh_minutes)) order by last_success_at asc nulls first limit $1`, [limit])).rows;
 }
 // What the Sources page shows: each source, its last run and how many signals it has brought in.

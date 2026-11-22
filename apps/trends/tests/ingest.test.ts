@@ -70,6 +70,15 @@ describe.skipIf(!base)('ingestion', () => {
     const [seen] = await readTrends(pool, { drafts: false }); expect(seen.id).toBe(draft.id); expect(seen.state).toBe('approved'); expect(seen.evidence.length).toBe(3); expect(seen.aboutCountries).toContain('EG');
     expect((await pool.query(`select count(*)::int n from trend_snapshots where trend_id = $1`, [draft.id])).rows[0].n).toBe(2);
     expect((await pool.query(`select action, metadata->>'by' as by from audit_events`)).rows).toEqual([{ action: 'trend.approved', by: 'Editor' }]);
+    // a source the owner marked as trusted publishes straight away, and a group made only of its signals is approved too
+    const { readHeadlines } = await import('../lib/store');
+    const trusted = (await pool.query(`insert into sources(organization_id, kind, name, config_public, enabled) values ($1, 'gdelt', 'Trusted topic', $2, true) returning id, organization_id, kind, name, config_public, refresh_minutes`, [ORG, JSON.stringify({ query: 'x', autoApprove: true, categoryHints: ['Social media', 'Social'], titleTerms: ['instagram'] })])).rows[0];
+    const t = (h: number) => new Date(Date.now() - h * 36e5).toISOString().replace(/[-:]/g, '').replace(/\.\d+Z/, 'Z');
+    const run = await runSource(pool, trusted, { fetchImpl: fake([{ url: 'https://pub-a.test/1', title: 'Instagram launches new shopping tools for creators', seendate: t(1), sourcecountry: 'Qatar' }, { url: 'https://pub-b.test/2', title: 'Instagram launches shopping tools for creators today', seendate: t(2), sourcecountry: 'United States' }, { url: 'https://pub-c.test/3', title: 'Lottery winner announced', seendate: t(3) }]) });
+    expect(run).toMatchObject({ status: 'success', seen: 2, inserted: 2 });
+    const heads = await readHeadlines(pool, { drafts: false, days: 7 }); expect(heads.filter(h => h.source === 'Trusted topic').map(h => [h.topic, h.departments, h.state])).toEqual([['Social media', ['Social'], 'approved'], ['Social media', ['Social'], 'approved']]); expect(heads.some(h => /Lottery/.test(h.title))).toBe(false);
+    await rebuildTrends(pool, ORG); const pub = (await readTrends(pool, { drafts: false })).find(x => /Instagram/.test(x.title)); expect(pub).toMatchObject({ state: 'approved', category: 'Social media' });
+    await setTrendState(pool, pub!.id, 'hidden', 'Editor');
     await setTrendState(pool, draft.id, 'hidden', 'Editor'); expect(await readTrends(pool, { drafts: true })).toEqual([]); expect(await readTrends(pool, { drafts: false, id: draft.id })).toEqual([]);
   });
 });
