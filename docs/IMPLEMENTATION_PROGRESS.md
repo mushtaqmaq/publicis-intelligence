@@ -6,7 +6,9 @@ Branch `feat/media-trends`. Updated 22 November 2026. Not deployed.
 |---|---|---|---|
 | P0 | Audit of the existing app, branch, rollback | Done | `docs/ADR-001-media-trends-microfrontend.md` |
 | P0 | Spec and schema draft in the repo | Done | `docs/trends/`, `database/drafts/SUPABASE_SCHEMA_STARTER.sql` (not run) |
-| P0 | Trends Vercel project and Supabase project authorised | **Blocked** | Needs the owner; neither exists |
+| P0 | Trends Vercel project and Supabase project | Done 22 Nov 2026 | Vercel project `publicis-media-trends` (team maq5); Supabase resource `publicis-trends-db` created through the Vercel Marketplace with `--plan free`, connected to that project only. The database is empty: no schema has been run |
+| P1 | Preview deployment of the Trends service | Done | Protected preview builds and serves under `/media/trends`; assets load from `/media/trends/_next`. Not mounted on the main site |
+| P1 | Pages cannot leak when access is refused | Fixed | Found on the preview: a layout that hides its children still let Next.js send the page. Every page now checks access itself (`lib/gate.ts`, test "page guard") |
 | P1 | Next.js app with `basePath: '/media/trends'` | Done | `apps/trends`; `next build` passes, 7 routes |
 | P1 | Media shell, breadcrumb, four-tab row, local navigation, filters, search | Done | Checked in a local browser through one origin |
 | P1 | Radar, Discover, Trend detail with labelled fixtures | Done | `TRENDS_FIXTURES=1`; refused in production (test) |
@@ -24,7 +26,7 @@ Branch `feat/media-trends`. Updated 22 November 2026. Not deployed.
 
 ## Verified
 
-- `apps/trends`: `npx vitest run` 25 passed; `npx tsc --noEmit` clean; `npx next build` succeeds.
+- `apps/trends`: `npx vitest run` 26 passed; `npx tsc --noEmit` clean; `npx next build` succeeds.
 - Existing app: `npm test` 94 passed (93 before, plus the flag test).
 - Browser, both services on one local address: `/#/p/media` shows four tabs in order; the fourth opens `/media/trends` in the same tab with the Media shell and Trends selected; `/#/p/media/trends` lands on `/media/trends`; `/media/trends/discover?region=qatar&days=7` reloads to the same filtered view; Back from Trends returns to Geo Intelligence and Forward returns to Trends; an unknown trend returns 404; opening `/media/trends` signed out shows a sign-in message and no content.
 
@@ -35,7 +37,6 @@ Branch `feat/media-trends`. Updated 22 November 2026. Not deployed.
 
 ## Next tickets
 
-1. Owner: create the Trends Vercel project and the Supabase project, or say who will. Acceptance: an upstream URL and project refs exist.
 2. Preview mount: add the two rewrites on a preview of the main site. Acceptance: the smoke table in `MEDIA_INTEGRATION.md` passes on the preview.
 3. Security review of the session check in `apps/trends/lib/access.ts`.
 4. P2: turn the schema draft into reviewed migrations on a local Supabase stack, with the RLS negative tests.

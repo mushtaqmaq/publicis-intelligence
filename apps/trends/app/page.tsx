@@ -1,9 +1,11 @@
+import { allowed } from '@/lib/gate';
 import { FilterBar, NoData, SampleBanner, TrendCard } from '@/components/trend-ui';
 import { listTrends } from '@/lib/data';
 import { applyFilters, freshness, parseFilters } from '@/lib/trends';
 
 // Radar: what is moving now, for the chosen region and period.
 export default async function Radar({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  if (!(await allowed())) return null;   // nothing is rendered or sent unless access was confirmed
   const f = parseFilters(await searchParams), { trends, sample } = await listTrends(), list = applyFilters(trends, f);
   const fresh = list.slice().sort((a, b) => b.lastSeen.localeCompare(a.lastSeen)).slice(0, 5);
   return (<>

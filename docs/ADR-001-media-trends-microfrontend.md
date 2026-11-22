@@ -32,7 +32,7 @@ Source documents: `docs/trends/BUILD_SPEC.md`, `docs/trends/MEDIA_INTEGRATION.md
 
 - **The session check is unreviewed.** It forwards the user's cookie from the Trends service to the main site. It depends on Vercel passing cookies through the `/media/trends` rewrite, which has not been tested on Vercel. It needs a security review before any rollout.
 - **Same-origin mounting is proven locally only**, in the reverse direction (the Trends dev server passing everything else to the existing app). The real rewrite order, `_next` assets and deep-link refresh must be tested on a Vercel preview.
-- **No Supabase project and no Trends Vercel project exist.** Creating them needs the owner. `database/drafts/SUPABASE_SCHEMA_STARTER.sql` has not been run anywhere.
+- **The Trends Vercel project and a free Supabase database now exist** (22 Nov 2026), but the database is empty. `database/drafts/SUPABASE_SCHEMA_STARTER.sql` has not been reviewed or run anywhere. Supabase's free plan pauses a project after one week without activity.
 - **Per-person access to Trends alone is not possible yet**: any Media tool grants it. A `media/trends` key would need the admin access screen to list a non-agent tool.
 
 ## Rollback

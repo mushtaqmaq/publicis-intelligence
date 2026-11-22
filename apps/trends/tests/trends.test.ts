@@ -41,3 +41,11 @@ describe('sample data', () => {
     process.env.VERCEL_ENV = 'production'; expect(fixturesOn()).toBe(false); delete process.env.VERCEL_ENV; delete process.env.TRENDS_FIXTURES;
   });
 });
+describe('page guard', () => {
+  it('every page checks access itself before it reads or renders anything', async () => {
+    const fs = await import('node:fs'), path = await import('node:path');
+    const pages = (fs.readdirSync('app', { recursive: true }) as string[]).filter(f => f.endsWith('page.tsx'));
+    expect(pages.length).toBeGreaterThanOrEqual(6);
+    for (const f of pages) { const body = fs.readFileSync(path.join('app', f), 'utf8'), fn = body.slice(body.indexOf('export default')); expect(fn.split('\n')[1], f).toContain('if (!(await allowed())) return null;'); }
+  });
+});

@@ -1,16 +1,16 @@
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
 import { Shell } from '@/components/shell';
 import { LocalNav } from '@/components/local-nav';
-import { checkAccess, mayView } from '@/lib/access';
+import { mayView } from '@/lib/access';
+import { access as getAccess } from '@/lib/gate';
 import './trends.css';
 
 export const metadata: Metadata = { title: 'Media · Trends & Intelligence · Publicis Intelligence' };
 export const dynamic = 'force-dynamic';   // access is checked per request; nothing here may be cached across users
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const access = await checkAccess((await headers()).get('cookie'));
+  const access = await getAccess();
   return (
     <html lang="en">
       <head>

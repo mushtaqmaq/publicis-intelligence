@@ -1,3 +1,4 @@
+import { allowed } from '@/lib/gate';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { SampleBanner, Score } from '@/components/trend-ui';
@@ -9,6 +10,7 @@ const when = (s?: string) => (s ? new Date(s).toISOString().slice(0, 16).replace
 
 // Trend detail: the claim, how sure we are, and every piece of evidence behind it.
 export default async function TrendPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  if (!(await allowed())) return null;   // nothing is rendered or sent unless access was confirmed
   const t = await getTrend((await params).id); if (!t) notFound();
   const f = parseFilters(await searchParams), m = momentum(t.inputs), fr = freshness(t.lastSeen);
   return (<>
