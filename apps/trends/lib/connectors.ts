@@ -60,11 +60,12 @@ const iso = (d: Date) => (isNaN(d.getTime()) ? undefined : d.toISOString());
 const GdeltArticle = z.object({ url: z.string().url(), title: z.string().min(1), seendate: z.string().regex(/^\d{8}T\d{6}Z$/), domain: z.string().optional(), language: z.string().optional(), sourcecountry: z.string().optional() });
 const GdeltBody = z.object({ articles: z.array(z.unknown()).optional() });
 const gdeltDate = (s: string) => iso(new Date(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}T${s.slice(9, 11)}:${s.slice(11, 13)}:${s.slice(13, 15)}Z`));
-export function gdelt(opts: { sourceId: string; query: string; categoryHints?: string[]; fetchImpl?: F; now?: () => Date }): Connector {
+// Settings follow GDELT's own query builder (gdelt.github.io): mode=ArtList, maxrecords up to 75, timespan=1d.
+export function gdelt(opts: { sourceId: string; query: string; categoryHints?: string[]; timespan?: string; fetchImpl?: F; now?: () => Date }): Connector {
   const f = opts.fetchImpl ?? fetch, now = opts.now ?? (() => new Date());
   const run = async (maxItems: number, cursor?: string, signal?: AbortSignal): Promise<FetchResult> => {
     const u = safeUrl('https://api.gdeltproject.org/api/v2/doc/doc', ['gdeltproject.org']);
-    u.search = new URLSearchParams({ query: opts.query, mode: 'ArtList', format: 'json', sort: 'DateDesc', maxrecords: String(Math.max(1, Math.min(250, maxItems))), timespan: '3d' }).toString();
+    u.search = new URLSearchParams({ query: opts.query, mode: 'ArtList', maxrecords: String(Math.max(1, Math.min(75, maxItems))), timespan: /^\d{1,3}(min|h|d|w|m)$/.test(opts.timespan ?? '') ? opts.timespan! : '1d', format: 'json' }).toString();
     const text = await (await get(u, f, signal, {}, 25000)).text();   // GDELT often takes 10 seconds or more to answer
     // GDELT answers a rate limit with status 200 and a plain sentence, so "not JSON" means slow down, not "no news".
     let body: unknown; try { body = JSON.parse(text); } catch { throw new ConnectorError(/limit requests/i.test(text) ? 'rate-limited' : 'bad-response', /limit requests/i.test(text) ? 'GDELT asked for one request every 5 seconds.' : 'GDELT did not answer with JSON.', 5000); }

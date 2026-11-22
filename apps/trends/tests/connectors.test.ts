@@ -40,7 +40,7 @@ describe('gdelt', () => {
     const r = await c.fetchSince({ maxItems: 50 });
     expect(r.items.map(i => i.canonicalUrl)).toEqual(['https://example.com/story-1', 'https://example.com/story-2']); expect(r.skipped).toBe(2); expect(r.quotaUsed).toBe(1);
     expect(r.items[0]).toMatchObject({ title: 'Story 1', observedAt: '2026-11-22T09:15:00.000Z', publisherCountry: 'United States', aboutCountries: [], rightsStatus: 'link_only', categoryHints: ['Media'] }); expect(r.items[0].publishedAt).toBeUndefined();
-    expect(r.nextCursor).toBe('2026-11-22T09:15:00.000Z'); expect(calls[0].url).toContain('api.gdeltproject.org'); expect(calls[0].url).toContain('maxrecords=50');
+    expect(r.nextCursor).toBe('2026-11-22T09:15:00.000Z'); expect(calls[0].url).toContain('api.gdeltproject.org'); expect(calls[0].url).toContain('mode=ArtList&maxrecords=50&timespan=1d&format=json');
   });
   it('takes only what is newer than the cursor, so a rerun returns nothing', async () => {
     const c = gdelt({ sourceId: 'g', query: 'x', fetchImpl: fake(() => res(JSON.stringify({ articles: [art(1, '20261122T091500Z'), art(2, '20261121T080000Z')] }))) });

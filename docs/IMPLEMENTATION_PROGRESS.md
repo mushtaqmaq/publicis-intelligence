@@ -26,7 +26,7 @@ Branch `feat/media-trends`. Updated 22 November 2026. Not deployed.
 | P3 | Job runner, idempotent store, protected dispatch endpoint | Done | `lib/ingest.ts`, `app/api/jobs/dispatch/route.ts`; `tests/ingest.test.ts` against a real local Postgres: one run per window, failed windows retryable, repeats add nothing, errors stored as short codes |
 | P3 | Sources page reads the real database | Done | Shows each source, last run, and signals stored |
 | P3 | Dispatch on the Vercel preview | Works up to the source | 401 without the secret; with it the job is claimed and recorded in Supabase. One starter source is seeded: "GDELT: advertising and marketing news" |
-| P3 | Live GDELT run | **Not passed** | 22 Nov 2026: GDELT answered 429 to this network all day and was unreachable or timed out from Vercel (3 tries). **Zero real signals are stored.** The connector has only ever seen invented articles |
+| P3 | Live GDELT run | **Passed 22 Nov 2026** | After matching the settings of GDELT's own query builder (`mode=ArtList`, `maxrecords=75`, `timespan=1d`, no sort), the dispatch on the Vercel preview stored 71 real signals in Supabase (4 rows skipped as unusable, so the run is marked partial): 71 distinct addresses, all drafts, 18 publisher countries, no publish dates because GDELT gives none. A second dispatch ran nothing. Earlier the same day GDELT had refused every call, so it can be unreliable |
 | P3 | Schedule (Vercel Cron) | Not set | No cron is configured, so nothing runs by itself. The plan's cron limits need checking first |
 | P3 | YouTube connector, manual entries, job table, source health | Not started | YouTube needs an API key; the rest need the database |
 | P2, P4 to P6 | Database, auth, scoring store, AI, workflows, hardening | Not started | |
@@ -46,6 +46,6 @@ Branch `feat/media-trends`. Updated 22 November 2026. Not deployed.
 
 2. Preview mount: add the two rewrites on a preview of the main site. Acceptance: the smoke table in `MEDIA_INTEGRATION.md` passes on the preview.
 3. Security review of the session check in `apps/trends/lib/access.ts`.
-4. P3: get one live GDELT run to succeed (retry on another day; if Vercel's addresses stay blocked, choose approved RSS feeds instead), then add the schedule.
+4. P3: add the schedule, after checking the Vercel plan's cron limits, and watch a few days of runs for GDELT refusals.
 5. Owner: name the publisher feeds that are approved for RSS, and the GDELT topics to follow. The seeded query is only a starter.
 6. P4: group stored signals into trends and score them, so the Radar can show real data.

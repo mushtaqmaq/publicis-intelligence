@@ -11,7 +11,7 @@ const list = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => ty
 // Builds the connector a source row describes. Anything not understood is refused, never guessed.
 export function connectorFor(s: SourceRow, fetchImpl?: typeof fetch): Connector {
   const c = s.config_public;
-  if (s.kind === 'gdelt' && str(c.query)) return gdelt({ sourceId: s.id, query: str(c.query), categoryHints: list(c.categoryHints), fetchImpl });
+  if (s.kind === 'gdelt' && str(c.query)) return gdelt({ sourceId: s.id, query: str(c.query), categoryHints: list(c.categoryHints), timespan: str(c.timespan) || undefined, fetchImpl });
   if (s.kind === 'rss' && str(c.feedUrl) && list(c.allow).length) return rss({ sourceId: s.id, feedUrl: str(c.feedUrl), allow: list(c.allow), publisherCountry: str(c.publisherCountry) || undefined, categoryHints: list(c.categoryHints), fetchImpl });
   throw new ConnectorError('bad-response', `Source "${s.name}" is not set up: its ${s.kind} settings are missing.`);
 }
@@ -29,7 +29,7 @@ export async function runSource(pool: Pool, s: SourceRow, opts: { now?: Date; fe
   try {
     const last = await pool.query(`select cursor_state from source_runs where source_id = $1 and status in ('success', 'partial') order by created_at desc limit 1`, [s.id]);
     const cursor = last.rows[0]?.cursor_state?.cursor as string | undefined;
-    const r = await connectorFor(s, opts.fetchImpl).fetchSince({ cursor, maxItems: opts.maxItems ?? 50 });
+    const r = await connectorFor(s, opts.fetchImpl).fetchSince({ cursor, maxItems: opts.maxItems ?? 75 });
     const { kept } = dedupe(r.items); let inserted = 0;
     for (const x of kept) inserted += await insertSignal(pool, s, x);
     const status = r.skipped ? 'partial' : 'success';
