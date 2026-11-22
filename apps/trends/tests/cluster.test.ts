@@ -33,3 +33,14 @@ describe('scoring inputs', () => {
   });
   it('says spread is unknown when no publisher country is known', () => { expect(cluster(tax.map(x => ({ ...x, publisherCountry: null })), { now })[0].inputs.geoSpread).toBeNull(); });
 });
+
+import { themes } from '../lib/cluster';
+describe('themes', () => {
+  const h = (title: string, host: string) => ({ title, host });
+  it('keeps what several publishers mention and drops generic marketing words', () => {
+    const out = themes([h('TikTok Shop expands to new markets', 'a.com'), h('Why brands bet on TikTok Shop', 'b.com'), h('TikTok Shop marketing tips', 'c.com'), h('Marketing budgets rise', 'a.com'), h('Marketing teams shrink', 'b.com'), h('Marketing is changing', 'c.com'), h('Creators lead campaigns', 'a.com')]);
+    expect(out.map(t => t.q)).toEqual(['tiktok shop']);   // "tiktok" and "shop" fold into the phrase; "marketing" is generic; "creators" is one publisher
+    expect(out[0]).toMatchObject({ label: 'TikTok Shop', headlines: 3, publishers: 3 });
+  });
+  it('does not count one publisher repeating itself', () => { expect(themes([h('Threads adds ads', 'a.com'), h('Threads grows', 'a.com'), h('Threads tests feeds', 'a.com')])).toEqual([]); });
+});

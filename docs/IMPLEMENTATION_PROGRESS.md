@@ -12,6 +12,7 @@ Branch `feat/media-trends`. Updated 22 November 2026. Not deployed.
 | P1 | Next.js app with `basePath: '/media/trends'` | Done | `apps/trends`; `next build` passes, 7 routes |
 | P1 | Media shell, breadcrumb, four-tab row, local navigation, filters, search | Done | Checked in a local browser through one origin |
 | P1 | Radar, Discover, Trend detail with labelled fixtures | Done | `TRENDS_FIXTURES=1`; refused in production (test) |
+| P3 | Radar themes: words and phrases several publishers repeat | Built, not deployed | `themes` in `apps/trends/lib/cluster.ts`; counted, no AI. Filler-word list will need tuning as more headlines arrive |
 | P1 | Client intelligence, Idea Lab | **Placeholder only** | Pages say they are not built; they wait for P2 and P4 |
 | P1 | Sources page | Done | Lists four connectors, all "Not connected" |
 | P1 | Arabic and right-to-left smoke check | Done | Arabic sample card renders right-to-left |

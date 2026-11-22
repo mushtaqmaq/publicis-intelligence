@@ -49,3 +49,24 @@ export function cluster(signals: Sig[], opts: { now?: Date; historyDays?: number
   }
   return out.sort((a, b) => b.domains.length - a.domains.length || a.title.localeCompare(b.title));
 }
+
+// Words every marketing headline uses; they say nothing about what is being talked about.
+const GENERIC = new Set('marketing marketers marketer brand brands branding social media digital advertising advertisers adverts campaign campaigns agency agencies launch launches launched announces announced unveils reveals year years week month today best guide tips ways using make makes need know here first latest report reports news says business company companies industry content strategy strategies people time work works help helps want plans plan gets get takes take names named appoints wins video data next adds add play study platform platforms open opens show shows inside real every still back role smart team'.split(' '));
+export type Theme = { label: string; q: string; headlines: number; publishers: number };
+// Themes: the words and two-word phrases that several publishers used in their headlines. This is what makes a list of headlines
+// a view of what the trade press keeps coming back to. Counted, not interpreted: no AI, and the same headlines give the same list.
+export function themes(heads: { title: string; host: string }[], opts: { minPublishers?: number; minHeadlines?: number; limit?: number } = {}): Theme[] {
+  const minP = opts.minPublishers ?? 2, minH = opts.minHeadlines ?? 3, seen = new Map<string, { label: string; heads: Set<number>; hosts: Set<string> }>();
+  const add = (key: string, label: string, i: number, host: string) => { const e = seen.get(key) ?? seen.set(key, { label, heads: new Set(), hosts: new Set() }).get(key)!; e.heads.add(i); e.hosts.add(host); };
+  const key = (w: string) => w.toLowerCase().replace(/(?<=.{4})s$/, '');   // creator and creators are one theme
+  heads.forEach((h, i) => {
+    const words = h.title.normalize('NFKC').split(/[^\p{L}\p{N}]+/u).filter(w => terms(w).size && !GENERIC.has(w.toLowerCase()) && !GENERIC.has(key(w)));
+    words.forEach((w, k) => { add(key(w), w, i, h.host); if (k + 1 < words.length) add(key(w) + ' ' + key(words[k + 1]), w + ' ' + words[k + 1], i, h.host); });
+  });
+  const kept = [...seen.entries()].filter(([, e]) => e.hosts.size >= minP && e.heads.size >= minH);
+  const phrases = kept.filter(([k]) => k.includes(' '));
+  // A single word that almost always appears inside a kept phrase is the phrase, said twice.
+  return kept.filter(([k, e]) => k.includes(' ') || !phrases.some(([pk, pe]) => pk.split(' ').includes(k) && pe.heads.size >= e.heads.size * 0.8))
+    .map(([k, e]) => ({ label: e.label, q: k, headlines: e.heads.size, publishers: e.hosts.size }))
+    .sort((a, b) => b.publishers - a.publishers || b.headlines - a.headlines || a.q.localeCompare(b.q)).slice(0, opts.limit ?? 12);
+}
