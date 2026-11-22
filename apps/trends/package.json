@@ -1,0 +1,27 @@
+{
+  "name": "publicis-media-trends",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Media > Trends & Intelligence. A separate Next.js service served on the main site under /media/trends.",
+  "scripts": {
+    "dev": "next dev -p 3210",
+    "build": "next build",
+    "start": "next start -p 3210",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "engines": { "node": ">=22.13" },
+  "dependencies": {
+    "lucide-react": "1.77.0",
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "7.0.2",
+    "vitest": "5.1.1"
+  }
+}

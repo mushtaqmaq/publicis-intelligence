@@ -9,6 +9,8 @@ PI.render = () => {
   const r = PI.route(), v = $('#view');
   v.style.animation = 'none'; void v.offsetWidth; v.style.animation = '';
   if (r === 'home') return viewHome(v);
+  // Trends & Intelligence is a separate service on this site, not an agent: hand its old-style address to /media/trends in the same tab.
+  if ((r === 'p/media/trends' || r.startsWith('p/media/trends/')) && PI.trendsOn()) return location.replace('/media/trends' + r.slice('p/media/trends'.length));
   if (r.startsWith('p/')) { const [, pid, aid] = r.split('/'); if (PI.pillar(pid)) return viewPillar(v, pid, aid); }
   if (r === 'library' || r.startsWith('library/')) return viewLibrary(v, r.split('/')[1]);
   if (r === 'clients') return viewClients(v);
@@ -56,13 +58,15 @@ function libRow(o) {
 PI.libRow = libRow;
 
 /* ================= Pillar and generic agent ================= */
+// The fourth Media tab shows only when the server says the Trends service is mounted and the person has a Media tool.
+PI.trendsOn = () => !!(S.me && S.me.caps && S.me.caps.trends) && PI.can('media');
 function viewPillar(v, pid, aid) {
   const p = PI.pillar(pid), list = p.agents.filter(x => PI.can(pid, x.id));
   if (!list.length) return PI.go('home');
   const a = list.find(x => x.id === aid) || list[0];
   PI.crumb(p.icon, p.name + ' · ' + a.name, p.color);
   v.innerHTML = `${PI.creditNotice()}${PI.pageHead(p.icon, p.color, p.name, p.desc)}
-    <div class="agents" role="tablist">${list.map(x => `<button class="agent-b" role="tab" aria-selected="${x.id === a.id}" data-go="p/${p.id}/${x.id}">${I(x.icon)}${esc(x.name)}</button>`).join('')}</div>
+    <div class="agents" role="tablist">${list.map(x => `<button class="agent-b" role="tab" aria-selected="${x.id === a.id}" data-go="p/${p.id}/${x.id}">${I(x.icon)}${esc(x.name)}</button>`).join('')}${pid === 'media' && PI.trendsOn() ? `<a class="agent-b" role="tab" aria-selected="false" href="/media/trends">${I('trending-up')}Trends &amp; Intelligence</a>` : ''}</div>
     <div id="tool"></div>`;
   const box = $('#tool');
   if (a.tool) { if (PI.tools[a.tool]) return PI.tools[a.tool](box, p, a); box.innerHTML = '<div class="empty">This tool is unavailable.</div>'; return; }
