@@ -1,8 +1,8 @@
 import { allowed } from '@/lib/gate';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { SampleBanner, Score } from '@/components/trend-ui';
-import { getTrend } from '@/lib/data';
+import { Review, SampleBanner, Score } from '@/components/trend-ui';
+import { getTrend, isEditor } from '@/lib/data';
 import { freshness, momentum, parseFilters, query } from '@/lib/trends';
 
 const LABEL = { velocity: 'Velocity', breadth: 'Breadth of sources', persistence: 'Persistence', geoSpread: 'Geographic spread', novelty: 'Novelty' } as const;
@@ -17,9 +17,9 @@ export default async function TrendPage({ params, searchParams }: { params: Prom
     {t.sample ? <SampleBanner /> : null}
     <p><Link href={`/${query(f)}`}>← Back to the radar</Link></p>
     <article className="tr-detail">
-      <div className="card pad"><span className="pill">{t.category}</span> <span className={`pill ${fr.stale ? 'bad' : 'ok'}`}>{fr.label}</span>
+      <div className="card pad"><span className="pill">{t.category}</span> <span className={`pill ${fr.stale ? 'bad' : 'ok'}`}>{fr.label}</span>{t.state === 'draft' ? <> <span className="pill bad">Not reviewed</span></> : null}
         <h2 dir="auto">{t.title}</h2><p dir="auto">{t.summary}</p>
-        <dl className="tr-dl"><dt>First seen</dt><dd>{when(t.firstSeen)}</dd><dt>Last seen</dt><dd>{when(t.lastSeen)}</dd><dt>About</dt><dd>{t.aboutCountries.join(', ')}</dd><dt>Departments</dt><dd>{t.departments.join(', ')}</dd><dt>Confidence</dt><dd>{t.confidence}</dd><dt>What is uncertain</dt><dd>{t.uncertainty}</dd></dl></div>
+        <dl className="tr-dl"><dt>First seen</dt><dd>{when(t.firstSeen)}</dd><dt>Last seen</dt><dd>{when(t.lastSeen)}</dd><dt>Published in</dt><dd>{t.aboutCountries.join(', ') || 'Unknown'}</dd><dt>Departments</dt><dd>{t.departments.join(', ') || 'Not assigned'}</dd><dt>Confidence</dt><dd>{t.confidence}</dd><dt>What is uncertain</dt><dd>{t.uncertainty}</dd></dl>{!t.sample && (await isEditor()) ? <Review t={t} /> : null}</div>
       <div className="card pad"><h3>Momentum <Score t={t} /></h3>
         <table className="t"><thead><tr><th>Component</th><th className="num">Measured (0 to 100)</th></tr></thead><tbody>{(Object.keys(LABEL) as (keyof typeof LABEL)[]).map(k => <tr key={k}><td>{LABEL[k]}</td><td className="num">{t.inputs[k] ?? 'Not measured'}</td></tr>)}</tbody></table>
         <p className="hint">Score {m.version}. {m.missing.length ? `${m.missing.length} of 5 components were not measured, so they are left out, not counted as zero. ` : ''}Momentum is separate from confidence and from relevance to any client.</p></div>

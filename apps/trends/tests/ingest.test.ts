@@ -57,6 +57,21 @@ describe.skipIf(!base)('ingestion', () => {
     const empty = (await pool.query(`insert into sources(organization_id, kind, name, enabled) values ($1, 'rss', 'Feed with no settings', true) returning id, organization_id, kind, name, config_public, refresh_minutes`, [ORG])).rows[0];
     expect(await runSource(pool, empty, { now: t0 })).toMatchObject({ status: 'error', error: 'bad-response' });
   });
+  it('rebuilds groups as drafts, keeps an editor decision across rebuilds, and shows viewers approved trends only', async () => {
+    const { rebuildTrends, readTrends, setTrendState } = await import('../lib/store');
+    const now = new Date('2026-11-22T12:00:00Z'), add = (n: number, title: string, host: string, country: string) => pool.query(`insert into signals(organization_id, source_id, canonical_url, title, observed_at, publisher_country, category_hints) values ($1,$2,$3,$4,$5,$6,'{Media}')`, [ORG, src.id, `https://${host}/t/${n}`, title, new Date(now.getTime() - n * 36e5), country]);
+    await add(1, 'Region proposes tax on Big Tech to boost budget', 'one.test', 'Qatar'); await add(2, 'Region proposes tax on Big Tech to boost budget', 'two.test', 'Spain');
+    const first = await rebuildTrends(pool, ORG, now); expect(first).toMatchObject({ groups: 1, created: 1, updated: 0 });
+    expect(await readTrends(pool, { drafts: false })).toEqual([]);   // nothing reaches a viewer before review
+    const [draft] = await readTrends(pool, { drafts: true }); expect(draft).toMatchObject({ state: 'draft', title: 'Region proposes tax on Big Tech to boost budget', confidence: 'Low', departments: ['Media'], aboutCountries: ['QA', 'Spain'] }); expect(draft.evidence.length).toBe(2); expect(draft.inputs.velocity).toBeNull(); expect(draft.summary).toMatch(/2 articles from 2 publishers in 2 countries/);
+    expect(await setTrendState(pool, draft.id, 'approved', 'Editor')).toBe(true); expect(await setTrendState(pool, 'not-an-id', 'approved', 'x')).toBe(false);
+    await add(3, 'Region proposes tax on Big Tech to boost its budget', 'three.test', 'Egypt');
+    const second = await rebuildTrends(pool, ORG, now); expect(second).toMatchObject({ groups: 1, created: 0, updated: 1 });
+    const [seen] = await readTrends(pool, { drafts: false }); expect(seen.id).toBe(draft.id); expect(seen.state).toBe('approved'); expect(seen.evidence.length).toBe(3); expect(seen.aboutCountries).toContain('EG');
+    expect((await pool.query(`select count(*)::int n from trend_snapshots where trend_id = $1`, [draft.id])).rows[0].n).toBe(2);
+    expect((await pool.query(`select action, metadata->>'by' as by from audit_events`)).rows).toEqual([{ action: 'trend.approved', by: 'Editor' }]);
+    await setTrendState(pool, draft.id, 'hidden', 'Editor'); expect(await readTrends(pool, { drafts: true })).toEqual([]); expect(await readTrends(pool, { drafts: false, id: draft.id })).toEqual([]);
+  });
 });
 
 describe('dispatch endpoint', () => {

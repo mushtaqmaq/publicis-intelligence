@@ -18,7 +18,6 @@ Branch `feat/media-trends`. Updated 22 November 2026. Not deployed.
 | P1 | Keyboard reachability | Partly | Tabs, navigation and filters are links in tab order; no screen-reader run |
 | P1 | Mobile | Checked at 375 px | The four tabs wrap as on the existing Media page, none hidden, no sideways page scroll, cards in one column. **Gap:** no menu button to open the sidebar on a phone |
 | P5 (early) | Fourth Media tab behind a flag, hash hand-off | Done, off by default | `test/access.test.js` "Media > Trends tab"; browser check with the flag on |
-| P5 | Vercel rewrites for `/media/trends` | Not done | Needs the upstream URL; see `docs/trends/MEDIA_INTEGRATION.md` |
 | P3 (early) | GDELT and RSS connectors, URL safety, canonical address, dedupe, backoff | Done as code and mock tests | `apps/trends/lib/connectors.ts`, `tests/connectors.test.ts` (13 tests). Not wired to any page, store or schedule |
 | P2 | Schema as a reviewed migration | Done | `apps/trends/supabase/migrations/20261122120000_trends_core.sql`: the starter plus one tightening (all default privileges removed from the browser role). Applied to `publicis-trends-db` with `supabase db push`: 16 tables, all with row-level security, 20 policies |
 | P2 | Access tests on a local database | Done | `supabase/tests/run.sh`: 22 checks (anonymous, viewer, admin, client member, other organisation, inactive user, self-promotion, writes) all pass |
@@ -27,7 +26,10 @@ Branch `feat/media-trends`. Updated 22 November 2026. Not deployed.
 | P3 | Sources page reads the real database | Done | Shows each source, last run, and signals stored |
 | P3 | Dispatch on the Vercel preview | Works up to the source | 401 without the secret; with it the job is claimed and recorded in Supabase. One starter source is seeded: "GDELT: advertising and marketing news" |
 | P3 | Live GDELT run | **Passed 22 Nov 2026** | After matching the settings of GDELT's own query builder (`mode=ArtList`, `maxrecords=75`, `timespan=1d`, no sort), the dispatch on the Vercel preview stored 71 real signals in Supabase (4 rows skipped as unusable, so the run is marked partial): 71 distinct addresses, all drafts, 18 publisher countries, no publish dates because GDELT gives none. A second dispatch ran nothing. Earlier the same day GDELT had refused every call, so it can be unreliable |
-| P3 | Schedule (Vercel Cron) | Not set | No cron is configured, so nothing runs by itself. The plan's cron limits need checking first |
+| P3 | Schedule (Vercel Cron) | Set | Once a day at 03:00 UTC on the Trends project. Daily is the limit that works on every Vercel plan; the first scheduled run has not happened yet |
+| P4 | Grouping and momentum scores from real signals | Done | `lib/cluster.ts`, `lib/store.ts`; 9 new tests. On 22 Nov 2026 the 71 stored signals formed 7 draft groups. Velocity and persistence are reported as not measured until there are days of history. At least one group is a false match (two different legal notices with the same template wording), which is why review exists |
+| P4 | Editorial review | Done, minimal | Admins of the existing app see drafts and can Approve, Hide or return to draft; every decision is written to the audit table. Viewers see approved trends only |
+| P5 | Mounted on the main site | Done 22 Nov 2026 | Two rewrites in the main `vercel.json` to `publicis-media-trends.vercel.app`; `MEDIA_TRENDS_ENABLED=1` on the main project. Signed-in use through the rewrite has not been checked by me (I have no production login) |
 | P3 | YouTube connector, manual entries, job table, source health | Not started | YouTube needs an API key; the rest need the database |
 | P2, P4 to P6 | Database, auth, scoring store, AI, workflows, hardening | Not started | |
 
@@ -48,4 +50,4 @@ Branch `feat/media-trends`. Updated 22 November 2026. Not deployed.
 3. Security review of the session check in `apps/trends/lib/access.ts`.
 4. P3: add the schedule, after checking the Vercel plan's cron limits, and watch a few days of runs for GDELT refusals.
 5. Owner: name the publisher feeds that are approved for RSS, and the GDELT topics to follow. The seeded query is only a starter.
-6. P4: group stored signals into trends and score them, so the Radar can show real data.
+6. Owner: sign in on the live site, open the fourth Media tab and confirm it shows Trends and not the sign-in message (this proves the session passes through the rewrite). Then review the 7 draft groups.

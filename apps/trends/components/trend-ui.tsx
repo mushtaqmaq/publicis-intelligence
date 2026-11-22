@@ -1,11 +1,19 @@
 import Link from 'next/link';
 import { DEPARTMENTS, REGIONS, freshness, momentum, query, type Filters, type Trend } from '@/lib/trends';
+import { reviewTrend } from '@/app/actions';
+
+// Approve or hide a trend. Shown to editors only; the server checks again.
+export const Review = ({ t }: { t: Trend }) => (
+  <form action={reviewTrend} className="tr-review"><input type="hidden" name="id" value={t.id} />
+    {t.state !== 'approved' ? <button className="btn sm pri" name="state" value="approved">Approve</button> : <button className="btn sm" name="state" value="draft">Back to draft</button>}
+    <button className="btn sm" name="state" value="hidden">Hide</button></form>
+);
 
 export const SampleBanner = () => <p className="tr-sample" role="note"><b>SAMPLE DATA</b> Everything on this page is invented to show the layout. None of it is a real trend, source or score.</p>;
 
 // Shown when there is nothing real to show. An empty state is better than a made-up number.
 export const NoData = ({ what }: { what: string }) => (
-  <div className="empty"><b>No trends yet</b><p>{what} No source is connected, so there is nothing real to show and nothing is made up to fill the space.</p><Link className="btn" href="/admin/sources">See what needs connecting</Link></div>
+  <div className="empty"><b>No reviewed trends yet</b><p>{what} News signals are collected and grouped automatically, but a group appears here only after an editor has approved it. Nothing is made up to fill the space.</p><Link className="btn" href="/admin/sources">See the sources</Link></div>
 );
 
 // Filters are links, so the view is always in the address bar: it survives reload, Back and sharing, and works without scripts.
@@ -30,14 +38,15 @@ export function Score({ t }: { t: Trend }) {
     <b>{m.value ?? '–'}</b><small>{m.value == null ? 'not enough evidence' : `momentum${m.missing.length ? ', partial' : ''}`}</small></span>;
 }
 
-export function TrendCard({ t, f }: { t: Trend; f: Filters }) {
+export function TrendCard({ t, f, editor }: { t: Trend; f: Filters; editor?: boolean }) {
   const fr = freshness(t.lastSeen);
   return (
     <article className="card pad tr-card">
-      <header><span className="pill">{t.category}</span>{t.sample ? <span className="pill bad">SAMPLE</span> : null}<span className={`pill ${fr.stale ? 'bad' : 'ok'}`}>{fr.label}</span></header>
+      <header><span className="pill">{t.category}</span>{t.sample ? <span className="pill bad">SAMPLE</span> : null}{t.state === 'draft' ? <span className="pill bad">Not reviewed</span> : null}<span className={`pill ${fr.stale ? 'bad' : 'ok'}`}>{fr.label}</span></header>
       <h3 dir="auto"><Link href={`/trends/${t.id}${query(f)}`}>{t.title}</Link></h3>
       <p dir="auto">{t.summary}</p>
-      <footer><Score t={t} /><span className="hint">{t.evidence.length} source{t.evidence.length === 1 ? '' : 's'} · confidence {t.confidence.toLowerCase()} · {t.aboutCountries.join(', ')}</span></footer>
+      <footer><Score t={t} /><span className="hint">{t.evidence.length} source{t.evidence.length === 1 ? '' : 's'} · confidence {t.confidence.toLowerCase()}{t.aboutCountries.length ? ' · published in ' + t.aboutCountries.slice(0, 4).join(', ') + (t.aboutCountries.length > 4 ? ' and more' : '') : ''}</span></footer>
+      {editor && !t.sample ? <Review t={t} /> : null}
     </article>
   );
 }

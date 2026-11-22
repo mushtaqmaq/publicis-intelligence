@@ -2,6 +2,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { db, dbConfigured } from '@/lib/db';
 import { dueSources, runSource } from '@/lib/ingest';
+import { organisations, rebuildTrends } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -14,6 +15,7 @@ export async function GET(req: Request) {
   try {
     const pool = db(), results = [];
     for (const s of await dueSources(pool)) results.push(await runSource(pool, s));
-    return Response.json({ ran: results.length, results });
+    const trends = []; for (const org of await organisations(pool)) trends.push(await rebuildTrends(pool, org));   // regroup after every run; new groups arrive as drafts
+    return Response.json({ ran: results.length, results, trends });
   } catch (e) { console.error('dispatch failed:', e instanceof Error ? e.message : 'unknown'); return Response.json({ error: 'The run could not start.' }, { status: 500 }); }   // the detail goes to the server log, never to the caller
 }

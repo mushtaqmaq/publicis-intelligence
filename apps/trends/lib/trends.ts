@@ -15,7 +15,7 @@ export type Evidence = { sourceName: string; kind: 'gdelt' | 'rss' | 'youtube' |
 export type MomentumInputs = { velocity: number | null; breadth: number | null; persistence: number | null; geoSpread: number | null; novelty: number | null };
 export type Trend = {
   id: string; title: string; summary: string; category: string; departments: Department[]; aboutCountries: string[];
-  firstSeen: string; lastSeen: string; inputs: MomentumInputs; confidence: 'High' | 'Medium' | 'Low'; uncertainty: string; evidence: Evidence[]; sample?: true;
+  firstSeen: string; lastSeen: string; inputs: MomentumInputs; confidence: 'High' | 'Medium' | 'Low'; uncertainty: string; evidence: Evidence[]; sample?: true; state?: 'draft' | 'approved' | 'hidden';
 };
 
 export const SCORE_VERSION = 'trend_v1';

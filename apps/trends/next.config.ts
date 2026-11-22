@@ -8,6 +8,8 @@ import type { NextConfig } from 'next';
 const legacy = process.env.NODE_ENV !== 'production' && /^https?:\/\//.test(process.env.LEGACY_ORIGIN ?? '') ? process.env.LEGACY_ORIGIN : undefined;
 const config: NextConfig = {
   basePath: '/media/trends',
+  // Forms are posted from the main site's address, which reaches this service through a rewrite.
+  experimental: { serverActions: { allowedOrigins: ['publicis-intelligence.vercel.app'] } },
   async rewrites() {
     return { beforeFiles: [], afterFiles: [], fallback: legacy ? [{ source: '/:path*', destination: `${legacy}/:path*`, basePath: false as const }] : [] };
   },

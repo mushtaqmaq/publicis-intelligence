@@ -2,6 +2,9 @@
 // returns nothing unless TRENDS_FIXTURES=1, which loads clearly labelled SAMPLE DATA for design and testing. Fixtures are refused
 // in production so a sample can never be mistaken for a real trend.
 import type { Trend } from './trends';
+import { db, dbConfigured } from './db';
+import { readTrends } from './store';
+import { access } from './gate';
 
 export const fixturesOn = () => process.env.TRENDS_FIXTURES === '1' && process.env.VERCEL_ENV !== 'production';
 const day = (n: number) => new Date(Date.now() - n * 864e5).toISOString();
@@ -15,12 +18,22 @@ const SAMPLES: Trend[] = [
   { id: 'sample-d', title: 'Sample trend D: thin evidence', summary: 'Placeholder with too little evidence to score.', category: 'Technology', departments: ['Production', 'Finance'], aboutCountries: ['JP'], firstSeen: day(3), lastSeen: day(5), inputs: { velocity: 70, breadth: null, persistence: null, geoSpread: null, novelty: null }, confidence: 'Low', uncertainty: 'Sample only. One component is not enough for a score.', evidence: [ev(7, 'rss', 5)], sample: true },
 ];
 
-export async function listTrends(): Promise<{ trends: Trend[]; sample: boolean; connected: boolean }> {
-  return fixturesOn() ? { trends: SAMPLES, sample: true, connected: false } : { trends: [], sample: false, connected: false };
+// Admins of the existing app act as editors here: they also see unreviewed drafts and can approve or hide them.
+export const isEditor = async () => { const a = await access(); return a.state === 'ok' && a.role === 'admin'; };
+export async function listTrends(): Promise<{ trends: Trend[]; sample: boolean; connected: boolean; editor: boolean; problem?: string }> {
+  if (fixturesOn()) return { trends: SAMPLES, sample: true, connected: false, editor: false };
+  if (!dbConfigured()) return { trends: [], sample: false, connected: false, editor: false };
+  const editor = await isEditor();
+  try { return { trends: await readTrends(db(), { drafts: editor }), sample: false, connected: true, editor }; }
+  catch { return { trends: [], sample: false, connected: true, editor, problem: 'The Trends database could not be reached.' }; }
 }
-export async function getTrend(id: string): Promise<Trend | null> { return (await listTrends()).trends.find(t => t.id === id) ?? null; }
+export async function getTrend(id: string): Promise<Trend | null> {
+  if (fixturesOn()) return SAMPLES.find(t => t.id === id) ?? null;
+  if (!dbConfigured()) return null;
+  return (await readTrends(db(), { drafts: await isEditor(), id }))[0] ?? null;
+}
 
-// The four connectors the pilot is allowed to use. None is configured yet, and the page says so.
+// The four connectors the pilot is allowed to use.
 export const SOURCES = [
   { kind: 'gdelt', name: 'GDELT DOC 2.0', needs: 'No key. News coverage only: attention, not consumer uptake.' },
   { kind: 'rss', name: 'Publisher RSS (allow-listed)', needs: 'A reviewed list of feeds and their terms.' },

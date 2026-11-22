@@ -12,3 +12,4 @@ a.nav-i,a.agent-b{text-decoration:none}.crumb a{color:inherit}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 a:focus-visible{outline:2px solid var(--focus,#2F6BFF);outline-offset:2px}
 @media(max-width:900px){.tr-cols,.tr-detail{grid-template-columns:1fr}}   /* the tab row wraps on narrow screens exactly as the existing Media page does */
+.tr-review{display:flex;gap:6px;margin-top:10px}
