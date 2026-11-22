@@ -5,7 +5,7 @@
 export type Access = { state: 'ok'; name: string; role: string } | { state: 'signed-out' } | { state: 'forbidden' } | { state: 'unverified'; reason: string };
 
 export async function checkAccess(cookie: string | null, origin = process.env.LEGACY_ORIGIN, fetchImpl: typeof fetch = fetch): Promise<Access> {
-  if (!origin) return { state: 'unverified', reason: 'This preview is not connected to Publicis Intelligence, so access could not be checked.' };
+  if (!origin || !/^https?:\/\//.test(origin)) return { state: 'unverified', reason: 'This preview is not connected to Publicis Intelligence, so access could not be checked.' };
   if (!cookie) return { state: 'signed-out' };
   let r: Response;
   try { r = await fetchImpl(`${origin}/api/me`, { headers: { cookie }, cache: 'no-store', signal: AbortSignal.timeout(5000) }); }

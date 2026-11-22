@@ -49,3 +49,10 @@ describe('page guard', () => {
     for (const f of pages) { const body = fs.readFileSync(path.join('app', f), 'utf8'), fn = body.slice(body.indexOf('export default')); expect(fn.split('\n')[1], f).toContain('if (!(await allowed())) return null;'); }
   });
 });
+describe('database address', () => {
+  it('drops only sslmode and leaves the database name and other settings intact', async () => {
+    const { withoutSslMode } = await import('../lib/db');
+    expect(withoutSslMode('postgres://u:p@h:6543/postgres?sslmode=require&supa=base-pooler.x')).toBe('postgres://u:p@h:6543/postgres?supa=base-pooler.x');
+    expect(withoutSslMode('postgres://u:p@h/db?a=1&sslmode=require')).toBe('postgres://u:p@h/db?a=1'); expect(withoutSslMode('postgres://u:p@h/db')).toBe('postgres://u:p@h/db');
+  });
+});

@@ -45,8 +45,8 @@ export function dedupe(items: NormalizedSignal[], seen = new Set<string>()): { k
 export const backoffMs = (n: number, rand = Math.random) => Math.round(Math.min(5000 * 2 ** n, 300000) * (1 + 0.2 * rand()));
 
 type F = typeof fetch;
-async function get(url: URL, f: F, signal?: AbortSignal, headers: Record<string, string> = {}): Promise<Response> {
-  const timeout = AbortSignal.timeout(10000);
+async function get(url: URL, f: F, signal?: AbortSignal, headers: Record<string, string> = {}, timeoutMs = 10000): Promise<Response> {
+  const timeout = AbortSignal.timeout(timeoutMs);
   let r: Response;
   try { r = await f(url, { headers, redirect: 'error', signal: signal ? AbortSignal.any([signal, timeout]) : timeout, cache: 'no-store' }); }   // shortcut: redirects are refused, not followed; add a re-validated single hop if an approved feed needs it
   catch (e) { throw new ConnectorError(timeout.aborted ? 'timeout' : 'unavailable', timeout.aborted ? 'The source did not answer in time.' : 'The source could not be reached.'); }
@@ -65,7 +65,7 @@ export function gdelt(opts: { sourceId: string; query: string; categoryHints?: s
   const run = async (maxItems: number, cursor?: string, signal?: AbortSignal): Promise<FetchResult> => {
     const u = safeUrl('https://api.gdeltproject.org/api/v2/doc/doc', ['gdeltproject.org']);
     u.search = new URLSearchParams({ query: opts.query, mode: 'ArtList', format: 'json', sort: 'DateDesc', maxrecords: String(Math.max(1, Math.min(250, maxItems))), timespan: '3d' }).toString();
-    const text = await (await get(u, f, signal)).text();
+    const text = await (await get(u, f, signal, {}, 25000)).text();   // GDELT often takes 10 seconds or more to answer
     // GDELT answers a rate limit with status 200 and a plain sentence, so "not JSON" means slow down, not "no news".
     let body: unknown; try { body = JSON.parse(text); } catch { throw new ConnectorError(/limit requests/i.test(text) ? 'rate-limited' : 'bad-response', /limit requests/i.test(text) ? 'GDELT asked for one request every 5 seconds.' : 'GDELT did not answer with JSON.', 5000); }
     const parsed = GdeltBody.safeParse(body); if (!parsed.success) throw new ConnectorError('bad-response', 'GDELT answered in an unexpected shape.');

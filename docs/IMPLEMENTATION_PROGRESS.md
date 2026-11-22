@@ -20,13 +20,20 @@ Branch `feat/media-trends`. Updated 22 November 2026. Not deployed.
 | P5 (early) | Fourth Media tab behind a flag, hash hand-off | Done, off by default | `test/access.test.js` "Media > Trends tab"; browser check with the flag on |
 | P5 | Vercel rewrites for `/media/trends` | Not done | Needs the upstream URL; see `docs/trends/MEDIA_INTEGRATION.md` |
 | P3 (early) | GDELT and RSS connectors, URL safety, canonical address, dedupe, backoff | Done as code and mock tests | `apps/trends/lib/connectors.ts`, `tests/connectors.test.ts` (13 tests). Not wired to any page, store or schedule |
-| P3 | Live GDELT smoke run | **Not passed** | Two tries on 22 Nov 2026 were rate-limited by GDELT (429). Real articles have never been through the connector |
+| P2 | Schema as a reviewed migration | Done | `apps/trends/supabase/migrations/20261122120000_trends_core.sql`: the starter plus one tightening (all default privileges removed from the browser role). Applied to `publicis-trends-db` with `supabase db push`: 16 tables, all with row-level security, 20 policies |
+| P2 | Access tests on a local database | Done | `supabase/tests/run.sh`: 22 checks (anonymous, viewer, admin, client member, other organisation, inactive user, self-promotion, writes) all pass |
+| P2 | Supabase sign-in, profiles, client membership screens | Not started | Access still rests on the existing app's session check |
+| P3 | Job runner, idempotent store, protected dispatch endpoint | Done | `lib/ingest.ts`, `app/api/jobs/dispatch/route.ts`; `tests/ingest.test.ts` against a real local Postgres: one run per window, failed windows retryable, repeats add nothing, errors stored as short codes |
+| P3 | Sources page reads the real database | Done | Shows each source, last run, and signals stored |
+| P3 | Dispatch on the Vercel preview | Works up to the source | 401 without the secret; with it the job is claimed and recorded in Supabase. One starter source is seeded: "GDELT: advertising and marketing news" |
+| P3 | Live GDELT run | **Not passed** | 22 Nov 2026: GDELT answered 429 to this network all day and was unreachable or timed out from Vercel (3 tries). **Zero real signals are stored.** The connector has only ever seen invented articles |
+| P3 | Schedule (Vercel Cron) | Not set | No cron is configured, so nothing runs by itself. The plan's cron limits need checking first |
 | P3 | YouTube connector, manual entries, job table, source health | Not started | YouTube needs an API key; the rest need the database |
 | P2, P4 to P6 | Database, auth, scoring store, AI, workflows, hardening | Not started | |
 
 ## Verified
 
-- `apps/trends`: `npx vitest run` 26 passed; `npx tsc --noEmit` clean; `npx next build` succeeds.
+- `apps/trends`: `npx vitest run` 33 passed with the local database (27 without it); `npx tsc --noEmit` clean; `npx next build` succeeds.
 - Existing app: `npm test` 94 passed (93 before, plus the flag test).
 - Browser, both services on one local address: `/#/p/media` shows four tabs in order; the fourth opens `/media/trends` in the same tab with the Media shell and Trends selected; `/#/p/media/trends` lands on `/media/trends`; `/media/trends/discover?region=qatar&days=7` reloads to the same filtered view; Back from Trends returns to Geo Intelligence and Forward returns to Trends; an unknown trend returns 404; opening `/media/trends` signed out shows a sign-in message and no content.
 
@@ -39,5 +46,6 @@ Branch `feat/media-trends`. Updated 22 November 2026. Not deployed.
 
 2. Preview mount: add the two rewrites on a preview of the main site. Acceptance: the smoke table in `MEDIA_INTEGRATION.md` passes on the preview.
 3. Security review of the session check in `apps/trends/lib/access.ts`.
-4. P2: turn the schema draft into reviewed migrations on a local Supabase stack, with the RLS negative tests.
-5. P3: repeat the live GDELT run from a network that is not rate-limited (one request every 5 seconds at most), then put the connectors behind a job table.
+4. P3: get one live GDELT run to succeed (retry on another day; if Vercel's addresses stay blocked, choose approved RSS feeds instead), then add the schedule.
+5. Owner: name the publisher feeds that are approved for RSS, and the GDELT topics to follow. The seeded query is only a starter.
+6. P4: group stored signals into trends and score them, so the Radar can show real data.
