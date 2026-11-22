@@ -20,7 +20,7 @@ Run everything: `DATABASE_URL=postgres://… node --test --test-concurrency=1 te
 | Seven entry modes into one engine (B) | `public/js/geo-state-core.js` `MODES`, `readiness`; `public/js/geo-brief.js` | `geo-golden` G16 | PASS; UI checked for competitors, area, OOH, opportunity, audience |
 | One editable brief shared by every tab (B, P1-02) | `geo-brief.js` `html`/`wire`; `v.bf`, `v.objective`, `v.recipe` in `geo.js`; `briefLine` in `geo-tabs.js` | G16 readiness | PASS logic; UI checked |
 | No objective means no opportunity index (mission, I) | `geo-core.js` `opportunity` (`status: 'no-objective'`) | `geo-golden` G08/G12 | PASS |
-| Industry taxonomy, validated Google types (D1) | `lib/geo/industry.js`, `lib/geo/data/google-types.json` (478 Table A types, fetched 22 Nov 2026) | `geo-competitors` G02; `geo-golden` "every category is a real Google type" | PASS |
+| Industry taxonomy, validated Google types (D1) | `lib/geo/industry.js`, `lib/geo/google-types.json` (478 Table A types, fetched 22 Nov 2026) | `geo-competitors` G02; `geo-golden` "every category is a real Google type" | PASS |
 | Industry resolution: stated, then registry, then product words; never invented (D1) | `industry.js` `resolveIndustryContext` | `geo-competitors` G01/G02 | PASS |
 | Two-stage competitor selector, manual choices and None preserved (D1, P3-01) | `geo-state-core.js` `applySuggestion`, `setNone`, `toggleBrand`, `addBrand`; `geo-brief.js` `compUI` | `geo-golden` G02 | PASS; UI checked |
 | Selector costs zero Google calls (D1) | `/api/geo/industry`, `/api/geo/industry/resolve` | `geo-accept` G05/G16 (usage stays 0) | PASS |
