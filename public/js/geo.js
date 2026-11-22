@@ -229,7 +229,8 @@ PI.tools.geo = async (box, p, a) => {
     catch (e) { PI.toast(e.message); btn.disabled = false; btn.innerHTML = I('search') + 'Find'; }
   };
   $('#gfind').onclick = async () => { const m = pinRe.exec(v.q);
-    if (v.inv && v.inv !== FOUND && v.mode !== 'area') { if (m) { v.targets = { q: v.q.trim(), items: [{ name: 'Dropped pin', lat: +m[1], lon: +m[2] }] }; PI.toast('Pin set. The assets near it are used.'); return PI.tools.geo(box, p, a); } return showAll(); }   // the inventory is fixed: what is typed only says where the assets should be if (m) { v.site = { id: 'site', name: 'Dropped pin', lat: +m[1], lon: +m[2] }; cands(); return go(); }
+    if (v.inv && v.inv !== FOUND && v.mode !== 'area') { if (m) { v.targets = { q: v.q.trim(), items: [{ name: 'Dropped pin', lat: +m[1], lon: +m[2] }] }; PI.toast('Pin set. The assets near it are used.'); return PI.tools.geo(box, p, a); } return showAll(); }   // the inventory is fixed: what is typed only says where the assets should be
+    if (m) { v.site = { id: 'site', name: 'Dropped pin', lat: +m[1], lon: +m[2] }; cands(); return go(); }
     if (!v.st.google) return PI.toast('Google Maps is not connected. Use coordinates, or pick an OOH site.');
     if (/(atms|branches|stores|outlets|locations|offices|showrooms|restaurants|cafes|banks|malls|hotels|schools|pharmacies|clinics|hospitals)\s*$/i.test(v.q.trim())) return showAll();   // a plural means "all of them"
     try { v.cands = (await PI.api('POST', 'geo/resolve', { query: v.q })).candidates; v.openList = true; if (!v.cands.length) PI.toast('No match in Qatar. Try an address or coordinates.'); cands(); } catch (e) { PI.toast(e.message); } };
@@ -301,7 +302,7 @@ PI.tools.geo = async (box, p, a) => {
     for (const r of rows) { const k = Math.floor(r.lat / 0.01) + '-' + Math.floor(r.lon / 0.01); (cells.get(k) || cells.set(k, []).get(k)).push(r); }
     let areas = [...cells.entries()].map(([k, m]) => ({ id: 'AREA-' + k, name: `Area around ${m[0].name || m[0].id} (${m.length} ${m.length === 1 ? 'asset' : 'assets'})`, lat: m.reduce((a, x) => a + x.lat, 0) / m.length, lon: m.reduce((a, x) => a + x.lon, 0) / m.length }));
     const total = areas.length; let selection = { eligible: total, prescreened: total, enriched: total, notEnriched: 0, excluded: {}, rule: `The ${rows.length.toLocaleString('en-US')} assets were grouped into ${total} areas of about 1 km.`, caveat: '', scope: null, inventory: total };
-    if (total > 40) { const ps = await PI.api('POST', 'geo/prescreen', { assets: areas.map(mini), targets: [], limit: 40 }), by = new Map(areas.map(x => [x.id, x])); areas = ps.selected.map(id => by.get(id)).filter(Boolean); selection = { ...ps, index: undefined, rule: `The ${rows.length.toLocaleString('en-US')} assets were grouped into ${total} areas of about 1 km. ${ps.rule}`, scope: null, inventory: total }; }
+    if (total > 40) { const ps = await PI.api('POST', 'geo/prescreen', { assets: areas.map(mini), targets: [], limit: 40 }), by = new Map(areas.map(x => [x.id, x])); areas = ps.selected.map(id => by.get(id)).filter(Boolean); selection = { ...ps, index: undefined, rule: `The ${rows.length.toLocaleString('en-US')} assets were grouped into ${total} areas of about 1 km. ${ps.rule.replace(/eligible assets/g, 'areas').replace('one face per spot and ', '')}`, caveat: 'Areas that were not analysed were not judged worse; they were not looked up.', scope: null, inventory: total }; }
     return G.run({ sites: areas, selection, label: 'areas' });
   };
   // Competitor and network discovery. Google is asked only after the forecast is confirmed; a first-party list is never replaced.
