@@ -55,7 +55,8 @@ const OBJECTIVES = {
   b2b: { label: 'B2B / workplace', w: { audience: 4, official: 1, competition: 2, access: 2, coverage: 1 } },
   family: { label: 'Family', w: { audience: 4, official: 3, competition: 1, access: 1, coverage: 1 } },
   premium: { label: 'Premium', w: { audience: 4, official: 1, competition: 2, access: 1, coverage: 1 } },
-  mass: { label: 'Mass retail', w: { audience: 2, official: 4, competition: 2, access: 2, coverage: 2 } }
+  mass: { label: 'Mass retail', w: { audience: 2, official: 4, competition: 2, access: 2, coverage: 2 } },
+  conquest: { label: 'Competitor conquesting', competition: 'presence', w: { audience: 3, official: 1, competition: 4, access: 1, coverage: 1 } }
 };
 
 // Reads the words the planner used (search, brief, client) and works out the audience, objective and competitor category. Rule-based, with reasons.
@@ -86,20 +87,34 @@ function infer(text) {
   return { why: whyBy, recipe: best ? best[0] : null, objective: obj ? obj[1] : null, competitor: comp ? comp[1] : null, confidence: best && (!ranked[1] || best[1] > ranked[1][1]) ? 'Higher' : 'Lower', reasons };
 }
 const clamp = x => Math.max(0, Math.min(1, x));
-// Objective-dependent opportunity score from evidence already in the result. Missing components are left out, never counted as zero.
-// route: optional { seconds } driving time from a chosen origin. Returns { value, coverage, parts }.
+// Opportunity recipes, by objective. A recipe is a visible set of weights plus how competition is read: as a 'gap' (fewer rivals is
+// better) or as 'presence' (more rivals is better, for conquesting). The index is relative to the sites compared under one recipe;
+// it is not a probability, footfall, reach or money. Change a recipe -> bump RECIPE_VERSION so saved results stay reproducible.
+const RECIPE_VERSION = 'opportunity-2';
+const MIN_COVERAGE = 0.4;
+const WHY = { audience: 'Places around the site that match the audience', official: 'Official population and density of the area the site sits in', competition: 'Competitors counted around the site', coverage: 'Distance to your nearest own location', access: 'Driving time, only when it was measured' };
+const objLabel = o => OBJECTIVES[o] ? OBJECTIVES[o].label : 'No objective (describe only)';
+// Objective-dependent opportunity index from evidence already in the result. With no objective there is no index: the result stays
+// descriptive. Missing parts are never zero: they are left out, lower the coverage, and widen the low-to-high range shown beside the
+// value. Below the minimum coverage, or without audience evidence, the answer is "not enough evidence", not a number.
+// route: optional { seconds } driving time. Returns { value, low, high, status, coverage, parts, recipeVersion }.
 function opportunity(r, objective, route, extra = {}) {
-  const w = (OBJECTIVES[objective] || OBJECTIVES.general).w, o = r.official, mu = r.municipalityContext, pc = (o && o.percentile) || (mu && mu.percentile);
+  const rec = OBJECTIVES[objective];
+  if (!rec) return { value: null, base: null, low: null, high: null, status: 'no-objective', seasonAdj: 0, coverage: 0, parts: [], objective: null, recipeVersion: RECIPE_VERSION };
+  const w = rec.w, o = r.official, mu = r.municipalityContext, pc = (o && o.percentile) || (mu && mu.percentile), presence = rec.competition === 'presence', n = r.pressure ? clamp(r.pressure.count / 20) : null;
   const parts = [
-    { key: 'audience', label: 'Audience fit', value: r.score.value == null ? null : r.score.value / 100, note: 'Recipe score from places around the site' },
-    { key: 'official', label: 'Official area context', value: pc ? (pc.population + pc.density) / 200 : null, note: o && o.percentile ? `Zone population and density rank among zones in ${o.year}` : mu ? `Municipality-level only: ${mu.name} ranks among the 8 municipalities (census ${mu.year})` : 'No official area matched' },
-    { key: 'competition', label: 'Competitor gap', value: r.pressure ? 1 - clamp(r.pressure.count / 20) : null, note: 'Fewer competitors nearby scores higher' },
-    { key: 'coverage', label: 'Client coverage gap', value: extra.clientNearestM == null ? null : clamp(extra.clientNearestM / 3000), note: 'Farther from the nearest client location means more uncovered ground (3 km or more is the full gap)' },
-    { key: 'access', label: 'Accessibility', value: route && route.seconds != null ? clamp(1 - (route.seconds / 60 - 10) / 30) : null, note: 'Driving time from the chosen origin: 10 min or less is best, 40 or more is worst' }
-  ].map(p => ({ ...p, weight: w[p.key] }));
-  const avail = parts.filter(p => p.value != null), aw = avail.reduce((a, p) => a + p.weight, 0), tw = parts.reduce((a, p) => a + p.weight, 0);
-  const base = aw ? avail.reduce((a, p) => a + p.weight * p.value, 0) / aw : null, adj = extra.seasonAdj || 0;   // seasonal timing nudges the result by at most 20% and is reported on its own line
-  return { value: base == null ? null : Math.round(1000 * clamp(base * (1 + adj))) / 10, base: base == null ? null : Math.round(1000 * base) / 10, seasonAdj: adj, coverage: Math.round(100 * aw / tw) / 100, parts };
+    { key: 'audience', label: 'Audience fit', value: r.score.value == null ? null : r.score.value / 100, kind: 'CALCULATED', note: 'Recipe score from places around the site' },
+    { key: 'official', label: 'Official area context', value: pc ? (pc.population + pc.density) / 200 : null, kind: 'OBSERVED', note: o && o.percentile ? `Zone population and density rank among zones in ${o.year}` : mu ? `Municipality-level only: ${mu.name} ranks among the 8 municipalities (census ${mu.year || 2020})` : 'No official area matched' },
+    { key: 'competition', label: presence ? 'Competitor presence' : 'Competitor gap', value: n == null ? null : presence ? n : 1 - n, kind: 'CALCULATED', note: presence ? 'More competitors nearby scores higher: the aim is to reach their customers' : 'Fewer competitors nearby scores higher' },
+    { key: 'coverage', label: 'Client coverage gap', value: extra.clientNearestM == null ? null : clamp(extra.clientNearestM / 3000), kind: 'CALCULATED', note: 'Farther from the nearest client location means more uncovered ground (3 km or more is the full gap)' },
+    { key: 'access', label: 'Accessibility', value: route && route.seconds != null ? clamp(1 - (route.seconds / 60 - 10) / 30) : null, kind: 'OBSERVED', note: 'Driving time from the chosen origin: 10 min or less is best, 40 or more is worst' }
+  ].map(p => ({ ...p, weight: w[p.key], why: WHY[p.key] }));
+  const avail = parts.filter(p => p.value != null), aw = avail.reduce((a, p) => a + p.weight, 0), tw = parts.reduce((a, p) => a + p.weight, 0), sum = avail.reduce((a, p) => a + p.weight * p.value, 0);
+  const coverage = Math.round(100 * aw / tw) / 100, enough = aw > 0 && coverage >= MIN_COVERAGE && parts[0].value != null, adj = extra.seasonAdj || 0;   // seasonal timing nudges the result by at most 20% and is reported on its own line
+  const base = enough ? sum / aw : null, r1 = x => Math.round(1000 * x) / 10;
+  for (const p of parts) p.points = p.value == null || !enough ? null : r1(p.weight * p.value / aw);
+  return { value: base == null ? null : r1(clamp(base * (1 + adj))), base: base == null ? null : r1(base), low: enough ? r1(clamp(sum / tw * (1 + adj))) : null, high: enough ? r1(clamp((sum + (tw - aw)) / tw * (1 + adj))) : null, status: enough ? 'ok' : 'insufficient', seasonAdj: adj, coverage, parts, objective, competitionRead: presence ? 'presence' : 'gap', recipeVersion: RECIPE_VERSION,
+    missing: parts.filter(p => p.value == null).map(p => p.label) };
 }
 
 // Signal -> Pattern -> Implication -> Action, from rules only (no AI).
@@ -121,6 +136,18 @@ const mins = s => s == null ? '–' : Math.round(s / 60) + ' min';
 const rad = d => d * Math.PI / 180;
 function dist(a, b) { const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lon - a.lon) / 2) ** 2; return 2 * 6371008.8 * Math.asin(Math.sqrt(h)); }
 const nearestM = (site, rows) => rows && rows.length ? Math.round(Math.min(...rows.map(r => dist(site, r)))) : null;
-const api = { infer, dist, nearestM, buildPacket, SYSTEM, parseInterpretation, OBJECTIVES, opportunity, story, band, km, mins };
+// CSV for exports. A cell that starts with = + - or @ gets a leading apostrophe, so a spreadsheet shows it and never runs it as a formula.
+const csvCell = t => { let s = String(t ?? ''); if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
+const csv = rows => '\ufeff' + rows.map(r => r.map(csvCell).join(',')).join('\n');
+const download = (name, text) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' })); a.download = name; a.click(); URL.revokeObjectURL(a.href); };
+// The next step for a ranked site. Strong and well evidenced: do it. Promising or thinly evidenced: test it. Weak or unknown: watch.
+function actionFor(o) {
+  const cov = Math.round(o.coverage * 100);
+  if (o.status !== 'ok') return { priority: 'WATCH', cls: 'mut', reason: o.status === 'no-objective' ? 'No objective is set.' : 'There is not enough evidence to rank it.', next: 'Gather the missing evidence before deciding.' };
+  if (o.value >= 60 && o.coverage >= 0.6) return { priority: 'DO NOW', cls: 'ok', reason: `Index ${o.value} on ${cov}% of the evidence.`, next: 'Confirm availability, facing and price with the supplier.' };
+  if (o.value >= 40) return { priority: 'TEST', cls: 'warn', reason: o.value >= 60 ? `Index ${o.value}, but only ${cov}% of the evidence was available.` : `Index ${o.value}: a moderate fit.`, next: 'Pilot it, or validate with traffic or audience measurement before committing.' };
+  return { priority: 'WATCH', cls: 'mut', reason: `Index ${o.value}: weak for this objective.`, next: 'Hold it unless something else supports it.' };
+}
+const api = { csv, csvCell, download, actionFor, RECIPE_VERSION, MIN_COVERAGE, objLabel, infer, dist, nearestM, buildPacket, SYSTEM, parseInterpretation, OBJECTIVES, opportunity, story, band, km, mins };
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PIGeoCore = api;
 })(typeof window !== 'undefined' ? window : globalThis);
