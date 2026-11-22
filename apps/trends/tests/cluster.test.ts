@@ -18,6 +18,10 @@ describe('grouping', () => {
   it('skips headlines too short to compare', () => { expect(cluster([s('y1', 'Search', 'one.test', 1), s('y2', 'Search', 'two.test', 1)], { now })).toEqual([]); });
 });
 describe('scoring inputs', () => {
+  it('groups the same story worded differently when four meaningful words are shared, and names the group by its topic', () => {
+    const out = cluster([s('m1', 'Instagram launches new shopping tools for creators in Europe', 'one.test', 2, 'United States', ['Social media', 'Social']), s('m2', 'New Instagram shopping tools let creators sell directly', 'two.test', 3, 'United Kingdom', ['Social media', 'Social']), s('m3', 'TikTok tests longer videos for some users', 'three.test', 3)], { now });
+    expect(out.length).toBe(1); expect(out[0].signalIds).toEqual(['m1', 'm2']); expect(out[0].category).toBe('Social media');
+  });
   it('measures breadth, spread and novelty, and refuses to guess velocity or persistence without history', () => {
     const c = cluster(tax, { now, historyDays: 0.5 })[0];
     expect(c.inputs).toEqual({ velocity: null, breadth: 60, persistence: null, geoSpread: 50, novelty: 97 }); expect(c.confidence).toBe(55);

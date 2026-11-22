@@ -8,7 +8,15 @@ export type NormalizedSignal = {
   language?: string; publisherCountry?: string; aboutCountries: string[]; categoryHints: string[]; metrics: Record<string, number | string | null>;
   rightsStatus: 'link_only' | 'licensed' | 'editorial'; rawPointer?: string;
 };
-export type FetchResult = { items: NormalizedSignal[]; nextCursor?: string; quotaUsed?: number; skipped: number };
+// skipped: rows that could not be used. offTopic: usable rows dropped because the headline is not about the topic.
+export type FetchResult = { items: NormalizedSignal[]; nextCursor?: string; quotaUsed?: number; skipped: number; offTopic?: number };
+// GDELT matches words anywhere in an article, so a story that mentions "marketing" once comes back. A topic therefore lists the
+// words a headline must contain; whole words or phrases, any language.
+export function onTopic(title: string, terms?: string[]): boolean {
+  if (!terms || !terms.length) return true;
+  const t = ' ' + title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim() + ' ';
+  return terms.some(w => t.includes(' ' + w.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim() + ' '));
+}
 export interface Connector {
   readonly kind: 'gdelt' | 'rss' | 'youtube' | 'manual';
   fetchSince(args: { cursor?: string; maxItems: number; signal?: AbortSignal }): Promise<FetchResult>;
@@ -61,7 +69,7 @@ const GdeltArticle = z.object({ url: z.string().url(), title: z.string().min(1),
 const GdeltBody = z.object({ articles: z.array(z.unknown()).optional() });
 const gdeltDate = (s: string) => iso(new Date(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}T${s.slice(9, 11)}:${s.slice(11, 13)}:${s.slice(13, 15)}Z`));
 // Settings follow GDELT's own query builder (gdelt.github.io): mode=ArtList, maxrecords up to 75, timespan=1d.
-export function gdelt(opts: { sourceId: string; query: string; categoryHints?: string[]; timespan?: string; fetchImpl?: F; now?: () => Date }): Connector {
+export function gdelt(opts: { sourceId: string; query: string; categoryHints?: string[]; timespan?: string; titleTerms?: string[]; fetchImpl?: F; now?: () => Date }): Connector {
   const f = opts.fetchImpl ?? fetch, now = opts.now ?? (() => new Date());
   const run = async (maxItems: number, cursor?: string, signal?: AbortSignal): Promise<FetchResult> => {
     const u = safeUrl('https://api.gdeltproject.org/api/v2/doc/doc', ['gdeltproject.org']);
@@ -70,22 +78,23 @@ export function gdelt(opts: { sourceId: string; query: string; categoryHints?: s
     // GDELT answers a rate limit with status 200 and a plain sentence, so "not JSON" means slow down, not "no news".
     let body: unknown; try { body = JSON.parse(text); } catch { throw new ConnectorError(/limit requests/i.test(text) ? 'rate-limited' : 'bad-response', /limit requests/i.test(text) ? 'GDELT asked for one request every 5 seconds.' : 'GDELT did not answer with JSON.', 5000); }
     const parsed = GdeltBody.safeParse(body); if (!parsed.success) throw new ConnectorError('bad-response', 'GDELT answered in an unexpected shape.');
-    const items: NormalizedSignal[] = []; let skipped = 0, newest = cursor ?? '';
+    const items: NormalizedSignal[] = []; let skipped = 0, offTopic = 0, newest = cursor ?? '';
     for (const raw of parsed.data.articles ?? []) {
       const a = GdeltArticle.safeParse(raw); if (!a.success) { skipped++; continue; }
       const seen = gdeltDate(a.data.seendate); if (!seen || (cursor && seen <= cursor)) { if (!seen) skipped++; continue; }   // the cursor is the newest date already taken
       let canon: string; try { canon = canonicalUrl(safeUrl(a.data.url).toString()); } catch { skipped++; continue; }
       if (seen > newest) newest = seen;
+      if (!onTopic(a.data.title, opts.titleTerms)) { offTopic++; continue; }
       // GDELT gives when it saw the article, not when it was published, and where the publisher is, not what the story is about.
       items.push({ sourceId: opts.sourceId, canonicalUrl: canon, title: a.data.title.trim().slice(0, 300), observedAt: seen, language: a.data.language, publisherCountry: a.data.sourcecountry, aboutCountries: [], categoryHints: opts.categoryHints ?? [], metrics: { domain: a.data.domain ?? null }, rightsStatus: 'link_only', rawPointer: 'gdelt:doc:artlist' });
     }
-    void now; return { items, nextCursor: newest || undefined, quotaUsed: 1, skipped };
+    void now; return { items, nextCursor: newest || undefined, quotaUsed: 1, skipped, offTopic };
   };
   return { kind: 'gdelt', fetchSince: ({ cursor, maxItems, signal }) => run(maxItems, cursor, signal), health: async () => { try { await run(1); return { ok: true }; } catch (e) { return { ok: false, detail: e instanceof Error ? e.message : 'failed' }; } } };
 }
 
 /* ---------- Publisher RSS or Atom, from an approved list only ---------- */
-const un = (s: string) => s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]+>/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+const un = (s: string) => s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]+>/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&amp;/g, '&').replace(/&#(x[0-9a-f]+|\d+);/gi, (_, n) => { const c = n[0].toLowerCase() === 'x' ? parseInt(n.slice(1), 16) : parseInt(n, 10); return c > 31 && c < 0x110000 ? String.fromCodePoint(c) : ' '; }).replace(/\s+/g, ' ').trim();
 const tag = (xml: string, t: string) => { const m = new RegExp(`<${t}\\b[^>]*>([\\s\\S]*?)</${t}>`, 'i').exec(xml); return m ? un(m[1]) : ''; };
 export function rss(opts: { sourceId: string; feedUrl: string; allow: string[]; publisherCountry?: string; categoryHints?: string[]; fetchImpl?: F }): Connector {
   const f = opts.fetchImpl ?? fetch;

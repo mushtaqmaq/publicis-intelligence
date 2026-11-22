@@ -3,7 +3,7 @@
 // in production so a sample can never be mistaken for a real trend.
 import type { Trend } from './trends';
 import { db, dbConfigured } from './db';
-import { readTrends } from './store';
+import { readHeadlines, readTrends, type Headline } from './store';
 import { access } from './gate';
 
 export const fixturesOn = () => process.env.TRENDS_FIXTURES === '1' && process.env.VERCEL_ENV !== 'production';
@@ -26,6 +26,10 @@ export async function listTrends(): Promise<{ trends: Trend[]; sample: boolean; 
   const editor = await isEditor();
   try { return { trends: await readTrends(db(), { drafts: editor }), sample: false, connected: true, editor }; }
   catch { return { trends: [], sample: false, connected: true, editor, problem: 'The Trends database could not be reached.' }; }
+}
+export async function listHeadlines(days: number): Promise<Headline[]> {
+  if (fixturesOn() || !dbConfigured()) return [];
+  try { return await readHeadlines(db(), { drafts: await isEditor(), days }); } catch { return []; }
 }
 export async function getTrend(id: string): Promise<Trend | null> {
   if (fixturesOn()) return SAMPLES.find(t => t.id === id) ?? null;

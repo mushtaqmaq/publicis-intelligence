@@ -58,6 +58,19 @@ describe('gdelt', () => {
   });
 });
 
+describe('topic filter', () => {
+  it('keeps a headline only when it contains one of the topic words as a whole word or phrase', async () => {
+    const { onTopic } = await import('../lib/connectors');
+    const t = ['tiktok', 'social media', 'ad', 'تسويق'];
+    expect(onTopic('TikTok tests longer videos', t)).toBe(true); expect(onTopic('Why Social-Media rules changed', t)).toBe(true); expect(onTopic('New ad from a car brand', t)).toBe(true); expect(onTopic('حملة تسويق جديدة', t)).toBe(true);
+    expect(onTopic('Woman fell at the Grand Canyon', t)).toBe(false); expect(onTopic('Adding sugar to bread', t)).toBe(false, ); expect(onTopic('Anything at all', [])).toBe(true); expect(onTopic('Anything at all')).toBe(true);
+  });
+  it('drops off-topic GDELT rows and counts them apart from unusable ones', async () => {
+    const c = gdelt({ sourceId: 'g', query: 'x', titleTerms: ['instagram'], fetchImpl: fake(() => res(JSON.stringify({ articles: [art(1, '20261122T091500Z', { title: 'Instagram adds a feature' }), art(2, '20261122T081500Z', { title: 'Lottery ticket wins' })] }))) });
+    const r = await c.fetchSince({ maxItems: 10 }); expect(r.items.length).toBe(1); expect(r.offTopic).toBe(1); expect(r.skipped).toBe(0); expect(r.nextCursor).toBe('2026-11-22T09:15:00.000Z');
+  });
+});
+
 describe('rss', () => {
   const feed = `<?xml version="1.0"?><rss><channel><title>Sample feed</title>
     <item><title><![CDATA[First &amp; <b>bold</b> story]]></title><link>https://news.example.com/a?utm_medium=rss</link><guid>id-1</guid><pubDate>Sun, 22 Nov 2026 09:00:00 GMT</pubDate><description>Body text that must not be kept</description></item>
@@ -78,6 +91,11 @@ describe('rss', () => {
   it('never fetches a feed outside the approved list', async () => {
     calls.length = 0; const c = rss({ sourceId: 'r', feedUrl: 'https://evil.test/rss', allow: ['example.com'], fetchImpl: fake(() => res(feed)) });
     await expect(c.fetchSince({ maxItems: 5 })).rejects.toMatchObject({ code: 'blocked-url' }); expect(calls.length).toBe(0);
+  });
+  it('decodes numbered characters in headlines, including ones written twice over', async () => {
+    const f = `<rss><channel><item><title>Coke&amp;#8217;s holiday ad &#x2014; no AI &#38; no fuss</title><link>https://news.example.com/c</link></item></channel></rss>`;
+    const r = await rss({ sourceId: 'r', feedUrl: 'https://feeds.example.com/rss', allow: ['example.com'], fetchImpl: fake(() => res(f)) }).fetchSince({ maxItems: 5 });
+    expect(r.items[0].title).toBe('Coke\u2019s holiday ad \u2014 no AI & no fuss');
   });
   it('reads Atom entries', async () => {
     const atom = `<feed><entry><title>Atom story</title><link href="https://news.example.com/atom-1"/><id>tag:1</id><updated>2026-11-20T10:00:00Z</updated></entry></feed>`;

@@ -33,6 +33,16 @@ Branch `feat/media-trends`. Updated 22 November 2026. Not deployed.
 | P3 | YouTube connector, manual entries, job table, source health | Not started | YouTube needs an API key; the rest need the database |
 | P2, P4 to P6 | Database, auth, scoring store, AI, workflows, hardening | Not started | |
 
+## Agency topics (22 Nov 2026, after owner feedback that the Radar showed general news)
+
+- The placeholder source is disabled and its 71 signals and 7 groups are hidden.
+- Sources are now nine trade feeds (Social Media Today, Hootsuite, Social Media Examiner, Marketing Dive, Adweek, Digiday, OOH Today, Campaign Middle East, Communicate) and six GDELT news searches (social platforms, branding and campaigns, OOH and digital OOH, paid media and lead generation, AI in marketing, Gulf marketing). Definitions: `apps/trends/supabase/seed/agency_sources.sql`.
+- GDELT rows must have a topic word in the headline (`onTopic` in `lib/connectors.ts`), because GDELT matches words anywhere in an article.
+- These sources are marked `autoApprove`: their headlines show without review, and an admin can still hide any item. This relaxes the package's review-everything rule at the owner's request for usable content.
+- The Radar has a "Latest by topic" list of single headlines, because trade publications rarely word a story alike and so form few groups.
+- First run: 110 headlines stored from the nine feeds. All six GDELT searches were rate-limited (run from a development machine); they have never returned data with the new topics. Feeds that refuse automated readers (Marketing Week, Search Engine Land, TechCrunch) are not used.
+- **Not yet on the live site**: the Trends service's production deployment still runs the previous build.
+
 ## Verified
 
 - `apps/trends`: `npx vitest run` 33 passed with the local database (27 without it); `npx tsc --noEmit` clean; `npx next build` succeeds.

@@ -13,3 +13,4 @@ a.nav-i,a.agent-b{text-decoration:none}.crumb a{color:inherit}
 a:focus-visible{outline:2px solid var(--focus,#2F6BFF);outline-offset:2px}
 @media(max-width:900px){.tr-cols,.tr-detail{grid-template-columns:1fr}}   /* the tab row wraps on narrow screens exactly as the existing Media page does */
 .tr-review{display:flex;gap:6px;margin-top:10px}
+.tr-topics{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;align-items:start}.tr-list a{color:inherit;text-decoration:none}.tr-list a:hover{text-decoration:underline}.tr-h small{font-weight:400;margin-left:6px}
