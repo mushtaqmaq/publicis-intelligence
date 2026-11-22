@@ -80,7 +80,7 @@ PI.tools.geo = async (box, p, a) => {
   };
   G.explain = async () => {
     const res = v.result; if (!res) return; const id = v.run; v.ai = { busy: true }; G.show();
-    const pk = C.buildPacket(res, [v.brief, 'Objective: ' + C.OBJECTIVES[v.objective].label].filter(Boolean).join('\n')), tc = BR.digest(v.brain, G.brainLabels()); if (tc) pk.team_context = tc;
+    const pk = C.buildPacket(res, [v.brief, 'Objective: ' + C.objLabel(v.objective)].filter(Boolean).join('\n')), tc = BR.digest(v.brain, G.brainLabels()); if (tc) pk.team_context = tc;
     try { const r = await PI.ai({ tier: 'complex', json: true, web: false, route: 'media/geo', system: C.SYSTEM + '\n\n' + PI.clientBlock(), prompt: JSON.stringify(pk) }); if (id !== v.run) return; v.ai = C.parseInterpretation(r.text, pk); }
     catch (e) { if (id !== v.run) return; v.ai = { ok: false, error: e.message + '.' }; }
     G.show();
