@@ -178,8 +178,8 @@ M.zones = st => {
     M.zoneLayer.addListener('click', e => M.zoneSt && M.zoneSt.onZone && M.zoneSt.onZone(+e.feature.getProperty('no')));
     M.zoneLayer.addListener('mouseover', e => { M.zoneLayer.overrideStyle(e.feature, { strokeWeight: 2.5 }); }); M.zoneLayer.addListener('mouseout', () => M.zoneLayer.revertStyle()); }
   M.zoneSt = st; M.zoneLayer.setMap(st.off ? null : M.map);
-  M.zoneLayer.setStyle(f => { const no = +f.getProperty('no'), x = (st.scores || {})[no], on = st.selected === no, show = x && x.score != null && (st.mode === 'all' || x.status === 'top');
-    return { fillColor: show ? M.rampOf(x.score) : '#000', fillOpacity: show ? 0.62 : 0, strokeColor: on ? '#12121A' : show ? '#7A2E0E' : '#5B6577', strokeOpacity: on ? 1 : show ? 0.8 : st.mode === 'outline' || st.outline ? 0.35 : 0.12, strokeWeight: on ? 3 : show ? 1 : 0.6, zIndex: on ? 3 : show ? 2 : 1, clickable: true }; });
+  M.zoneLayer.setStyle(f => { const no = +f.getProperty('no'), x = (st.scores || {})[no], on = st.selected === no, show = x && x.score != null && (st.mode === 'all' || x.status === 'top'), mk = !!(st.marked && st.marked.includes(no));   // marked = the area a research brief names
+    return { fillColor: show ? M.rampOf(x.score) : mk ? '#0E7C7B' : '#000', fillOpacity: show ? 0.62 : mk ? 0.18 : 0, strokeColor: on ? '#12121A' : mk ? '#0E7C7B' : show ? '#7A2E0E' : '#5B6577', strokeOpacity: on || mk ? 1 : show ? 0.8 : st.mode === 'outline' || st.outline ? 0.35 : 0.12, strokeWeight: on || mk ? 3 : show ? 1 : 0.6, zIndex: on ? 3 : show || mk ? 2 : 1, clickable: true }; });
 };
 // Google's live traffic tiles: a picture of now, tier CURRENT_TRAFFIC_VISUAL_ONLY. Never read, stored or exported as data.
 M.traffic = on => { if (!M.map) return; if (on && !M.trafficLayer) M.trafficLayer = new M.g.TrafficLayer(); if (M.trafficLayer) M.trafficLayer.setMap(on ? M.map : null); };
@@ -193,6 +193,9 @@ M.gtm = st => {
     line.addListener('click', () => st.onCorridor && st.onCorridor(c.corridorId)); M.gtmObjs.push(line); });
   // Branches by brand: the client in black with a ring, each rival in its own colour. The label is our brand name, never Google's place name.
   (st.branches || []).forEach(p => M.gtmObjs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, clickable: false, title: p.brand, zIndex: p.role === 'client' ? 7 : 6, icon: { path: g.SymbolPath.CIRCLE, scale: p.role === 'client' ? 6.5 : 5, fillColor: p.color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: p.role === 'client' ? 2.5 : 1.5 } })));
+  // Priority zones, numbered like the list beside the map. shortcut: the marker sits at the centre of the zone's bounding box, which can fall outside an L-shaped zone; use a true interior point if that ever misleads.
+  (st.zoneMarks || []).forEach(m => { const b = M.zoneBounds(m.no); if (!b) return; const mk = new g.Marker({ map: M.map, position: b.getCenter(), zIndex: 40 - m.n, title: `Priority ${m.n}: ${m.title}`, label: { text: String(m.n), color: '#fff', fontSize: '12px', fontWeight: '700' }, icon: { path: g.SymbolPath.CIRCLE, scale: 13, fillColor: '#0E7C7B', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5 } });
+    mk.addListener('click', () => st.onZone && st.onZone(m.no)); M.gtmObjs.push(mk); });
   (st.pins || []).forEach(p => { const mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, zIndex: 20 - Math.min(19, p.rank), title: `#${p.rank} ${p.assetFaceId}${p.circuit ? ' · circuit ' + p.circuit : ''}`, label: { text: String(p.rank), color: '#fff', fontSize: '11px', fontWeight: '700' },
     icon: { path: g.SymbolPath.CIRCLE, scale: 10, fillColor: p.rank === st.selectedPin ? '#E5392B' : '#12121A', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 } });
     mk.addListener('click', () => { const hit = M.near(st.pins.map(q => ({ lat: q.lat, lon: q.lon, label: `#${q.rank} ${q.assetFaceId}${q.circuit ? ' · circuit ' + q.circuit : ''}`, act: () => st.onPin && st.onPin(q.rank) })), p.lat, p.lon); M.picker(hit, p.lat, p.lon); }); M.gtmObjs.push(mk); });

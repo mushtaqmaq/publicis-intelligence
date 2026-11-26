@@ -25,7 +25,7 @@ test('strategy competitors: cost check first, branches by zone, real rival count
 
   // 1. nothing stored: the run still answers, asks before spending, and scores rivals from mapped places meanwhile
   const a = await run(); assert.equal(calls, 0); assert.equal(a.competitors.status, 'NEEDS_APPROVAL'); assert.deepEqual(a.competitors.names, ['QNB', 'Commercial Bank', 'Doha Bank']);
-  assert.equal(a.competitors.forecast.minUnits, 18); assert.equal(a.competitors.forecast.maxUnits, 54); assert.match(a.opportunity.rivalSource, /OpenStreetMap/); assert.match(a.executive_recommendation.first_action, /Search for QNB, Commercial Bank, Doha Bank/);
+  assert.equal(a.competitors.forecast.minUnits, 18); assert.equal(a.competitors.forecast.maxUnits, 54); assert.match(a.opportunity.rivalSource, /OpenStreetMap/); assert.match(a.executive_recommendation.first_action, /Map the QNB, Commercial Bank, Doha Bank branches/);
   assert.equal(a.usage.google.units, 0); assert.equal(a.status, 'PLANNING_READY');
 
   // 2. approved: named networks, ATMs apart, branches placed in zones, no Google names kept
