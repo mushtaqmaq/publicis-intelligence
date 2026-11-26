@@ -44,7 +44,8 @@ function suggest(b, text, limit = 6) {
 const top = (o, n = 1) => Object.entries(o || {}).sort((a, b) => b[1] - a[1]).slice(0, n);
 
 // The planner's usual set-up, offered as one click.
-function usual(b) { const a = top(b && b.audiences)[0], r = top(b && b.radii)[0], c = top(b && b.competitors)[0], o = top(b && b.objectives)[0]; return b && b.runs >= 3 && a ? { recipe: a[0], radius: r ? +r[0] : 500, competitor: c ? c[0] : '', objective: o ? o[0] : 'general', runs: b.runs } : null; }
+// The team's usual radius can be Auto, which is not a number.
+function usual(b) { const a = top(b && b.audiences)[0], r = top(b && b.radii)[0], c = top(b && b.competitors)[0], o = top(b && b.objectives)[0]; return b && b.runs >= 3 && a ? { recipe: a[0], radius: r ? (isFinite(+r[0]) ? +r[0] : 'auto') : 500, competitor: c ? c[0] : '', objective: o ? o[0] : 'general', runs: b.runs } : null; }
 
 // Suggested weights for a recipe: the team's adjustments, shrunk toward the defaults (K pseudo-votes), only after MIN_VOTES adjustments.
 function tuned(b, recipeId, defaults) {

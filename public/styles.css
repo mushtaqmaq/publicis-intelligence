@@ -731,3 +731,4 @@ a.agent-b{text-decoration:none}
 .gx-ai{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:99px;background:color-mix(in srgb,#7A5AF8 14%,white);color:#6941C6;vertical-align:middle}.gx-ai svg{width:12px;height:12px}
 .gx-why2{display:block;font-weight:400;color:var(--ink-3,#667085);font-size:12px;margin-top:2px;white-space:normal;text-align:left}#gtzone .gx-li{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
 #gtbusy{display:flex;gap:8px;align-items:center;justify-content:center;padding:28px}
+#gtzone .gx-li>span:first-child{flex:1;min-width:0}#gtzone .gx-li .gx-pill{flex:none}
