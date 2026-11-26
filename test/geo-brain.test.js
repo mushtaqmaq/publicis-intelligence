@@ -62,6 +62,9 @@ test('G57 G69 brain: ledger, budget, call cap, timeout, malformed and refused ou
   sent.length = 0; const c1 = await GT.run(ctx(), { text: 'students near universities in qatar', aiEnhance: true, aiNarrate: true, user: 'u1', inventory: [] }); assert.equal(sent.length, 2); assert.ok(c1.aiPlanUsed && c1.aiPlanUsed.mode);
   sent.length = 0; const c2 = await GT.run(ctx(), { text: 'students near universities in qatar', aiEnhance: true, aiNarrate: true, user: 'u1', inventory: [] }); assert.equal(sent.length, 0, 'cached'); assert.equal(c2.wordingSource, 'ai-validated'); assert.ok(c2.usage.ai.calls.every(k => k.cached && k.input + k.output === 0));
   assert.equal(c2.executive_recommendation.headline, c1.executive_recommendation.headline);
+  // unticked boxes and empty fields do not change the question, so they still hit the cache; a real choice does not
+  sent.length = 0; await GT.run(ctx(), { text: 'students near universities in qatar ', known: { wantsOoh: false, wantsCorridor: false, competitorNone: false, product: '' }, aiEnhance: true, aiNarrate: true, user: 'u1', inventory: [] }); assert.equal(sent.length, 0, 'still cached');
+  sent.length = 0; await GT.run(ctx(), { text: 'students near universities in qatar', known: { wantsOoh: true }, aiEnhance: true, user: 'u1', inventory: [] }); assert.equal(sent.length, 1, 'a real choice asks again');
   // a busy service is retried once
   mode = 'busy-once'; sent.length = 0; const b1 = await GT.run(ctx(), { text: 'tourists and luxury shopping in qatar', aiEnhance: true, user: 'u1', inventory: [] }); assert.equal(sent.length, 2); assert.equal(b1.usage.ai.status, 'used');
 

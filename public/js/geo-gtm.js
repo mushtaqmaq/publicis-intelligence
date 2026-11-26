@@ -83,6 +83,7 @@ async function run(el, G, keepAi, opts = {}) {
     const d = await PI.api('POST', 'geo/gtm/run', { ...base, aiEnhance: aiOn && !reuse, aiPlan: reuse ? s.aiPlan : undefined, aiNarrate: false, rivalsConfirm: opts.rivalsConfirm === true });
     if (s.opened && s.refreshing) { s.delta = delta(s.opened.result, d); s.refreshing = false; s.opened.refreshed = true; }
     s.result = d; s.brief = d.brief; s.selZone = null; s.selPin = null; s.fb = null;
+    if (d.aiPlanUsed) { s.aiPlan = d.aiPlanUsed; s.aiPlanText = s.text; }   // keep the AI's reading of this brief: analysing the same text again does not ask for it twice
     if (d.usage.google.units) PI.api('GET', 'geo/status').then(st => { v.st = st; if (PI.geoQuotaPaint) PI.geoQuotaPaint(st); }).catch(() => { });   // a rival search spent Google lookups: show the new count
     if (d.usage.ai.status === 'unavailable' && aiOn) PI.toast('AI unavailable; calculated evidence and rule-based wording are shown.');
     // Second step, in the background: the same run again with AI wording. The numbers cannot change; only the sentences do.
