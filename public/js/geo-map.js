@@ -7,6 +7,13 @@ const M = PI.geoMap = { failed: false, g: null, map: null, el: null, objs: [], l
 M.color = (res, cat) => { const i = res.recipe.factors.findIndex(f => f.cat === cat); return cat === res.competitor ? '#8E3BE0' : PALETTE[(i < 0 ? 7 : i) % PALETTE.length]; };
 
 window.gm_authFailure = () => { M.failed = true; if (M.onFail) M.onFail(); };
+// A muted basemap: less colour, no shop and transit icons, soft water and land, so zones, corridors and pins carry the eye.
+// Legacy style array (works without a Google Cloud Map ID); it applies to the road map only, never to satellite.
+M.STYLE = [{ elementType: 'geometry', stylers: [{ saturation: -70 }, { lightness: 8 }] }, { elementType: 'labels.text.fill', stylers: [{ color: '#5B6577' }] }, { elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }, { weight: 3 }] },
+  { featureType: 'poi.business', stylers: [{ visibility: 'off' }] }, { featureType: 'poi', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] }, { featureType: 'transit', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] }, { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] }, { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#E4E7EC' }] },
+  { featureType: 'road.arterial', elementType: 'labels.text.fill', stylers: [{ color: '#98A2B3' }] }, { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#D9E6F2' }] }, { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#F4F5F7' }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#E3EFE3' }] }, { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#344054' }] }];
 M.load = key => {
   if (M.g) return Promise.resolve(M.g);
   if (window.google && window.google.maps) return Promise.resolve(M.g = window.google.maps);
@@ -26,7 +33,7 @@ M.mount = (box) => {
   box.appendChild(M.el);
   // Country lock: zooming out stops where the whole of Qatar is in view (worked out from the box's size), so it never reaches the globe.
   // A strict bounds restriction was not used: Qatar is taller than a wide map is, so it would crop the country at the lowest zoom.
-  if (!M.map) M.map = new M.g.Map(M.el, { center: { lat: 25.2854, lng: 51.531 }, zoom: 11, minZoom: 7, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'cooperative' });
+  if (!M.map) M.map = new M.g.Map(M.el, { center: { lat: 25.2854, lng: 51.531 }, zoom: 11, minZoom: 7, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'cooperative', styles: M.STYLE });
   else { M.g.event.trigger(M.map, 'resize'); clearTimeout(M.rf); M.rf = setTimeout(M.refresh, 700); }
   setTimeout(() => M.fitMinZoom(), 60);
   if (!M.locked) { M.locked = true;
@@ -122,7 +129,7 @@ M.network = st => {
   (st.gaps || []).forEach(x => M.objs.push(new g.Circle({ map: M.map, center: { lat: x.lat, lng: x.lon }, radius: st.radius * 2, strokeColor: '#D99A12', strokeWeight: 2, strokeOpacity: 0.9, fillColor: '#D99A12', fillOpacity: 0.08, clickable: false })));
   (st.ooh || []).forEach(p => { const mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: `${p.id} · ${p.rivalsWithin} rival locations nearby`, zIndex: 2, icon: { path: g.SymbolPath.CIRCLE, scale: 4, fillColor: '#2F6BFF', fillOpacity: 0.9, strokeColor: '#fff', strokeWeight: 1 } }); mk.addListener('click', () => st.onPick && st.onPick(p.id)); M.objs.push(mk); });
   st.networks.forEach(n => n.points.forEach(p => { const own = n.role === 'client'; b.extend({ lat: p.lat, lng: p.lon });
-    M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: n.name + (own ? ' (your network)' : ''), clickable: false, zIndex: own ? 6 : 4, icon: own ? { path: g.SymbolPath.BACKWARD_CLOSED_ARROW, scale: 4.5, fillColor: n.color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 } : { path: g.SymbolPath.CIRCLE, scale: 5.5, fillColor: n.color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 } })); }));
+    M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: n.name + (own ? ' (your network)' : ''), clickable: false, zIndex: own ? 6 : 4, icon: { path: g.SymbolPath.CIRCLE, scale: own ? 6.5 : 5, fillColor: n.color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: own ? 2.5 : 1.5 } })); }));
   if (st.fit && !b.isEmpty()) M.fit(b, 50);
 };
 // Municipality choropleth from the Qatar Open Data boundaries, shaded by census 2020 population.
