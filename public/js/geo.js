@@ -46,7 +46,7 @@ PI.tools.geo = async (box, p, a) => {
       <div class="gx-f"><span id="gradl">Catchment: a straight-line radius around each location</span><div class="gx-seg" id="grad" role="radiogroup" aria-labelledby="gradl"><button role="radio" aria-checked="${v.radius === 'auto'}" data-r="auto" class="${v.radius === 'auto' ? 'on' : ''}">Auto</button>${meta.radii.map(m => `<button role="radio" aria-checked="${m === v.radius}" data-r="${m}" class="${m === v.radius ? 'on' : ''}">${m >= 1000 ? m / 1000 + ' km' : m + ' m'}</button>`).join('')}</div><small class="gx-fine">Auto picks the radius from the audience, the area's official density and how far apart your locations are. The radius it picked, and why, is shown before any Google lookup is spent.</small></div>
       ${sel('gcl', [['', 'None'], ...clientInvs.map(i => [i.id, `${i.name} · ${i.rows.length}`])], v.clientLoc, 'Client locations')}
       <label>Official zone<input id="gz" list="gzl" value="${esc(v.zone)}" placeholder="e.g. Al Dafna"><datalist id="gzl">${(v.zones || []).map(z => `<option value="${esc(z)}">`).join('')}</datalist></label>
-      <label>Inventory file: CSV, Excel, or KMZ/KML from Google Earth (only latitude and longitude are required)<input type="file" id="gf" accept=".csv,.xlsx,.xls,.kmz,.kml"></label><label class="gx-check"><input type="checkbox" id="gkind"> These are client locations (branches), not OOH assets</label><div id="gchk"></div></div></details>
+      <label>Inventory file: CSV, Excel, or KMZ/KML from Google Earth (only latitude and longitude are required)<input type="file" id="gf" accept=".csv,.xlsx,.xls,.kmz,.kml"></label><label class="gx-check"><input type="checkbox" id="gkind"> These are client locations (branches), not OOH assets</label><label class="gx-check"><input type="checkbox" id="gexp" ${v.expand ? 'checked' : ''}> Widen sparse catchments (one step at a time, up to 3 km; the extra lookups are shown before anything runs)</label><div id="gchk"></div></div></details>
     </details>
     <div id="gopened"></div>
     <div class="gx-tabs" role="tablist">${TABS.map(([k, l]) => `<button role="tab" aria-selected="${v.tab === k}" data-t="${k}">${l}</button>`).join('')}</div>
@@ -72,7 +72,7 @@ PI.tools.geo = async (box, p, a) => {
   };
   G.analyse = async (sites, opts = {}) => {
     const id = ++v.run; v.tab = opts.stay ? v.tab : 'map'; $('#gxb').innerHTML = `<div class="gx-empty"><span class="spin"></span><b>Analysing</b></div>`; $$('[data-t]').forEach(b => b.setAttribute('aria-selected', b.dataset.t === v.tab));
-    let res; try { res = await PI.api('POST', 'geo/analyze', { sites, radius: v.radius, recipe: v.recipe, competitor: v.competitor, weights: v.weights, period: v.bf.period }); } catch (e) { if (id === v.run) $('#gxb').innerHTML = `<div class="gx-empty"><b>${esc(e.message)}</b></div>`; return; }
+    let res; try { res = await PI.api('POST', 'geo/analyze', { sites, radius: v.radius, recipe: v.recipe, competitor: v.competitor, weights: v.weights, period: v.bf.period, expand: !!v.expand, expandBudget: v.expand && opts.preflight && opts.preflight.expansion ? opts.preflight.expansion.maxExtraLookups : 0 }); } catch (e) { if (id === v.run) $('#gxb').innerHTML = `<div class="gx-empty"><b>${esc(e.message)}</b></div>`; return; }
     if (id !== v.run) return;   // a newer analysis replaced this one
     res.selection = opts.selection || null; res.preflight = opts.preflight || null;   // how the sites were chosen and what the run was told beforehand stay with the result
     if (v.opened && v.opened.kind === 'analysis' && v.refreshing) { v.delta = ST.delta(v.opened.snap, res); v.refreshing = false; }
@@ -287,8 +287,9 @@ PI.tools.geo = async (box, p, a) => {
     el.innerHTML = `<div class="gx-prec" role="region" aria-label="Before this runs"><h4>Before this runs</h4>
       <dl class="gx-dl"><dt>What is analysed</dt><dd>${p.sites.length} ${p.label || (p.sites.length === 1 ? 'location' : 'locations')}${sl && sl.inventory > p.sites.length ? ` of ${sl.inventory.toLocaleString('en-US')} in the inventory` : ''}.${sl ? ' ' + esc(sl.rule) : ''}${sl && sl.scope ? ' ' + esc(sl.scope) : ''}${sl && sl.caveat ? ' ' + esc(sl.caveat) : ''}</dd>
         <dt>Catchment</dt><dd><b>${esc(p.pf.method)}</b>: ${Object.entries(p.pf.radii).map(([r, n]) => `${rad(+r)}${p.sites.length > 1 ? ' for ' + n : ''}`).join(', ')} (${p.pf.mode === 'auto' ? 'chosen by Auto' : 'your choice'}). ${p.pf.reasons.map(esc).join(' ')} ${esc(p.pf.notes[0])}</dd>
+        ${v.expand && p.pf.expansion ? `<dt>Widening</dt><dd>${esc(p.pf.expansion.rule)} At most <b>${p.pf.expansion.maxExtraLookups}</b> extra lookups, only for sites that are too thin.</dd>` : ''}
         <dt>What is counted</dt><dd>${p.pf.categories.map(esc).join(', ')}</dd>
-        <dt>Google cost</dt><dd>${f ? `<b>${f.newLookups}</b> new lookups, ${f.alreadyStored} already stored and free, ${f.room.toLocaleString('en-US')} left this month, ${esc(f.zoneLookups)}.${short ? ' <b>There is not enough allowance for all of it, so the least important categories will be left out and marked.</b>' : ''}` : 'Google Maps is not connected, so nothing is spent. Official data and your own lists are still used.'}</dd></dl>
+        <dt>Google cost</dt><dd>${f ? `<b>${f.newLookups}</b> new lookups, ${f.alreadyStored} already stored and free, ${f.room.toLocaleString('en-US')} left this month. Official zones come from local polygons, at no cost.${short ? ' <b>There is not enough allowance for all of it, so the least important categories will be left out and marked.</b>' : ''}` : 'Google Maps is not connected, so nothing is spent. Official data and your own lists are still used.'}</dd></dl>
       <div class="gx-acts"><button class="btn pri sm" id="gprego">${I('target')}Run analysis</button><button class="btn sm" id="gprex">Cancel</button><small>To change the radius, open Fine-tune below.</small></div></div>`;
     $('#gprego').onclick = () => { el.innerHTML = ''; G.analyse(p.sites, { selection: p.selection, preflight: p.pf }); }; $('#gprex').onclick = () => { el.innerHTML = ''; v.pre = null; };
     el.scrollIntoView({ block: 'nearest' }); $('#gprego').focus();
@@ -297,11 +298,12 @@ PI.tools.geo = async (box, p, a) => {
     const pk = given || await pickSites(); if (!pk) return;
     let pf; try { pf = await PI.api('POST', 'geo/preflight', { sites: pk.sites, radius: v.radius, recipe: v.recipe, competitor: v.competitor }); } catch (e) { return PI.toast(e.message); }
     v.pre = { ...pk, pf };
-    if (!confirmed && pf.forecast && pf.forecast.newLookups > 0) return preUI();   // nothing new to buy: run straight away
+    if (!confirmed && pf.forecast && (pf.forecast.newLookups > 0 || (v.expand && pf.expansion && pf.expansion.maxExtraLookups > 0))) return preUI();   // nothing new to buy: run straight away
     const pe = $('#gpre'); if (pe) pe.innerHTML = '';
     return G.analyse(pk.sites, { selection: pk.selection, preflight: pf });
   };
   $('#ggo').onclick = () => G.run();
+  const gx = $('#gexp'); if (gx) gx.onchange = () => { v.expand = gx.checked; };
   // Audience finder: the areas where media can be bought (assets grouped into ~1 km cells), ranked for the chosen audience.
   G.audienceAreas = async () => {
     const rows = v.inv && v.inv !== FOUND ? filtered() : clients(), cells = new Map();

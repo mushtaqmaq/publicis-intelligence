@@ -17,5 +17,5 @@ Sources: "Geo Intelligence Audit" (earlier, 21 pages) and "Geo Intelligence Post
 | **P2** Network and GTM proof absent | – | `lib/geo/gtm.js` strategy result and tests | G60–G65 | Fixed (local data) |
 | **P2** Saved analyses unverified | – | Strategy save, reopen and refresh; fingerprint covers strategy rankings and evidence | G66, G67 | Fixed |
 | **P2** 2019 data mixed with 2020 polygons | Yes | 2020 polygons use 2020 population from the same service; 2019 rows joined only by number with an agreeing area | G22 | Fixed |
-| **P2** Accessibility | – | Picker with focus; zone table rows focusable with Enter; SVG zones focusable with labels; legend text | Partial browser check | Partial: no screen-reader or mobile pass |
+| **P2** Accessibility | – | Picker with focus; zone table rows focusable with Enter; shaded SVG zones focusable with labels; legend text; phone layout | Browser: 163/163 controls named, Enter selects, 375 px fits | Fixed; no real screen-reader session |
 | Earlier: Nuaija toggling, None reset, hidden prerequisites, empty tabs | Existing fixes kept | Zone identity is number + geometry version everywhere | G21, G28; existing G02/G07/G16 tests | Kept |
