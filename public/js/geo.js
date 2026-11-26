@@ -347,5 +347,9 @@ PI.tools.geo = async (box, p, a) => {
   PI.geoBrief.wire(G);
   G.show(); G.banner();
   if (v.pendingRefresh) { v.pendingRefresh = false; G.refresh(); }
+  // A shared link to a saved item (…/geo/s/<id>): open it once, then the address is the plain page again. Signed-in teammates only.
+  const lk = PI.route().split('/'); if (lk[3] === 's' && /^[\w-]{1,80}$/.test(lk[4] || '')) { history.replaceState(null, '', '#/' + lk.slice(0, 3).join('/'));
+    try { G.open({ id: lk[4], ...(await PI.api('GET', 'db/geosaved/' + lk[4])) }); } catch (_) { PI.toast('That saved item could not be opened. It may have been deleted.'); } }
 };
+PI.geoShare = async id => { const url = location.origin + location.pathname + '#/p/media/geo/s/' + id; try { await navigator.clipboard.writeText(url); PI.toast('Link copied. Signed-in teammates can open it; nothing is recalculated.'); } catch (_) { PI.toast(url); } };
 })();

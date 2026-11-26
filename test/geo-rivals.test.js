@@ -12,14 +12,19 @@ test('strategy competitors: cost check first, branches by zone, real rival count
   const P = (id, name, no, k = 0) => { const p = inside(no); return { id, displayName: { text: name }, formattedAddress: 'Demo', location: { latitude: p.latitude + k * 1e-4, longitude: p.longitude } }; };
   const DATA = { 'qnb': [P('q1', 'QNB Al Sadd Branch', 38), P('q2', 'QNB Al Sadd Plaza Branch', 38, 3), P('q3', 'QNB City Center Branch', 61), P('q4', 'QNB ATM', 61, 2)],
     'commercial bank': [P('c1', 'Commercial Bank Al Sadd Branch', 38, 6), P('c2', 'Commercial Bank Branch', 38, 9), P('c3', 'Commercial Bank West Bay Branch', 63)], 'doha bank': [P('d1', 'Doha Bank West Bay Branch', 63, 4), P('x1', 'Some Other Exchange', 63, 8)] };
+  const HS = [P('h1', 'HSBC West Bay Branch', 63, 20)];
   const QIB = [P('qb1', 'QIB West Bay Branch', 63, 12), P('qb2', 'QIB Al Sadd Branch', 38, 12), P('qb3', 'QIB ATM', 38, 14)];
   let calls = 0;
   const fetchImpl = async (url, init) => { if (!/places:searchText/.test(url)) return { ok: false, status: 404, json: async () => ({}) }; calls++;
     const b = JSON.parse(init.body), first = Math.abs(b.locationRestriction.rectangle.low.latitude - 25.20) < 1e-6 && Math.abs(b.locationRestriction.rectangle.low.longitude - 51.40) < 1e-6;
     // the second pass: "qib branch" in the four quarters of the central area returns the two branches the ATMs had crowded out
     if (b.textQuery === 'qib branch') { const q = b.locationRestriction.rectangle, inQ = p => p.location.latitude >= q.low.latitude && p.location.latitude < q.high.latitude && p.location.longitude >= q.low.longitude && p.location.longitude < q.high.longitude; return { ok: true, status: 200, json: async () => ({ places: QIB.filter(inQ) }) }; }
+    // "hsbc branch": the quarter that holds the branch is itself full (three pages), so only a further split of that quarter finds it
+    if (b.textQuery === 'hsbc branch') { const q = b.locationRestriction.rectangle, inQ = p => p.location.latitude >= q.low.latitude && p.location.latitude < q.high.latitude && p.location.longitude >= q.low.longitude && p.location.longitude < q.high.longitude;
+      if (q.high.latitude - q.low.latitude > 0.07) return { ok: true, status: 200, json: async () => (inQ(HS[0]) ? { nextPageToken: 't', places: Array.from({ length: 20 }, (_, i) => ({ id: 'hatm' + calls + '_' + i, displayName: { text: 'HSBC ATM' }, formattedAddress: 'Demo', location: { latitude: 25.3 + i * 1e-4, longitude: 51.5 + calls * 1e-4 } })) } : { places: [] }) };
+      return { ok: true, status: 200, json: async () => ({ places: HS.filter(inQ) }) }; }
     // "qib" fills the central area to Google's cap of 60 with ATMs, the way a real bank search does
-    if (first && b.textQuery === 'qib') return { ok: true, status: 200, json: async () => ({ nextPageToken: 't', places: Array.from({ length: 20 }, (_, i) => ({ id: 'atm' + calls + '_' + i, displayName: { text: 'QIB ATM' }, formattedAddress: 'Demo', location: { latitude: 25.3 + i * 1e-4, longitude: 51.5 + calls * 1e-4 } })) }) };
+    if (first && (b.textQuery === 'qib' || b.textQuery === 'hsbc')) return { ok: true, status: 200, json: async () => ({ nextPageToken: 't', places: Array.from({ length: 20 }, (_, i) => ({ id: 'atm' + calls + '_' + i, displayName: { text: 'QIB ATM' }, formattedAddress: 'Demo', location: { latitude: 25.3 + i * 1e-4, longitude: 51.5 + calls * 1e-4 } })) }) };
     return { ok: true, status: 200, json: async () => ({ places: first ? DATA[b.textQuery] || [] : [] }) }; };
   const ctx = { db, fetchImpl }, text = 'QNB premium credit cards for office professionals', run = extra => GT.run(ctx, { text, known: { audiences: ['office_professionals'], objective: 'banking' }, inventory: [], ...extra });
 
@@ -67,6 +72,16 @@ test('strategy competitors: cost check first, branches by zone, real rival count
   assert.equal(f.cutOffZones, 0); assert.deepEqual([f.topZones.find(x => x.zoneNo === 63).verdict, f.topZones.find(x => x.zoneNo === 38).verdict], ['rivals only', 'contested']);
   assert.ok(fine.opportunity.rows.find(r => r.zoneNo === 63).competitorStrategicFit != null, 'rival presence is known again, so it counts');
   const free = await run({ known }); assert.equal(calls, before + 4, 'the stored second pass is applied for free'); assert.equal(free.competitors.refine.done, 1); assert.equal(free.competitors.brands.find(x => x.name === 'QIB').branches, 2); assert.match(q.limitations.join(' '), /at most 60 places/); assert.ok(!q.topZones.some(x => x.searchCutOff && x.verdict === 'none found'));
+  // 7. a quarter that is still full after the second pass: a further, separately priced step splits only that quarter
+  const kh = { audiences: ['office_professionals'], objective: 'banking', confirmedRivals: ['HSBC'] }, hs = r => r.competitors.brands.find(x => x.name === 'HSBC');
+  const h0 = await run({ known: kh, rivalsConfirm: true }); assert.deepEqual([h0.competitors.refine.minUnits, h0.competitors.refine.maxUnits], [4, 12]);
+  let c0 = calls; const h1 = await run({ known: kh, rivalsRefine: true }); assert.equal(calls, c0 + 6, 'three empty quarters and one full one (three pages); the deeper split does not run in the same click');
+  assert.deepEqual(h1.competitors.refine.areas, [{ brand: 'HSBC', area: 1, cells: 1 }]); assert.deepEqual([h1.competitors.refine.available, h1.competitors.refine.minUnits, h1.competitors.refine.maxUnits], [true, 4, 12]); assert.equal(hs(h1).coverage, 'partial'); assert.equal(hs(h1).branches, 0);
+  c0 = calls; const h2 = await run({ known: kh, rivalsRefine: true }); assert.equal(calls, c0 + 4, 'only the full quarter is split, into four');
+  assert.equal(h2.competitors.refine.available, false); assert.equal(hs(h2).branches, 1); assert.equal(hs(h2).coverage, 'complete-as-observed');
+  c0 = calls; const h3 = await run({ known: kh }); assert.equal(calls, c0, 'both stored passes are applied for free'); assert.equal(hs(h3).branches, 1);
+  // the brief says what counts as a rival, what is only a substitute and what is just surroundings
+  assert.deepEqual(a.brief.rivals.groups.direct, ['Bank branches']); assert.ok(a.brief.rivals.groups.adjacent.length && a.brief.rivals.groups.context.includes('atm'));
 });
 
 test('without Google the strategy still runs and says named branches are unavailable', async () => {
