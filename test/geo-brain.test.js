@@ -93,3 +93,22 @@ test('G57 G69 brain: ledger, budget, call cap, timeout, malformed and refused ou
   sent.length = 0; const ev = await require('../lib/geo/ai-eval').run(ctx(), { user: 'u1' }); assert.equal(ev.ai.total, 8); assert.equal(sent.length, 8); assert.ok(ev.tokens > 0); assert.equal(ev.rules.total, 8); assert.ok(ev.rules.passed >= 5);
   assert.ok(sent.every(x => JSON.parse(x.b.input[0].content[0].text).past_corrections.length === 0));
 });
+
+test('follow-up analyst: answers from the strategy evidence only, an unsupported answer is withheld, nothing runs with AI off', opts, async () => {
+  const { db, init } = require('../lib/db'), B = require('../lib/geo/brain'), GT = require('../lib/geo/gtm'); await init();
+  await db.prepare("DELETE FROM geo_cache WHERE kind='ai'").run().catch(() => { });
+  const cfg = B.config({ GEO_OPENAI_ENABLED: '1', OPENAI_API_KEY: 'test-not-a-key', GEO_OPENAI_PLANNER_MODEL: 'test-planner', GEO_OPENAI_SYNTH_MODEL: 'test-synth' }), sent = []; let answer;
+  const fetchImpl = async (url, init) => { const b = JSON.parse(init.body); sent.push(b); const inp = JSON.parse(b.input[0].content[0].text);
+    return { ok: true, status: 200, json: async () => ({ output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(answer(inp.bundle, inp)) }] }], usage: { input_tokens: 500, output_tokens: 60 } }) }; };
+  const ctx = () => ({ db, fetchImpl, brainConfig: cfg, aiCalls: 0, retryMs: 0 }), base = { text: 'families in qatar', user: 'u1', inventory: [] };
+  answer = bun => ({ answer: `${bun.top_zones[0].label} leads on Audience Fit.`, evidence_ids: bun.top_zones[0].evidence_ids.slice(0, 1), follow_ups: ['Which zone is second?', 'b', 'c', 'd'] });
+  const a = await GT.ask(ctx(), { ...base, question: 'Why is the first zone first?' });
+  assert.match(a.answer, /leads on Audience Fit/); assert.equal(a.follow_ups.length, 3); assert.equal(sent.length, 1); assert.equal(sent[0].text.format.name, 'geo_strategy_answer'); assert.equal(sent[0].text.format.strict, true); assert.equal(sent[0].model, 'test-planner', 'the cheaper model answers');
+  sent.length = 0; const again = await GT.ask(ctx(), { ...base, question: 'why is the  first zone first?' }); assert.equal(sent.length, 0, 'the same question is not paid for twice'); assert.equal(again.ai.cached, true);
+  // a number that is not in the evidence: one retry with the problems, then no answer is shown
+  answer = () => ({ answer: 'About 48,000 people pass every day.', evidence_ids: [], follow_ups: [] });
+  sent.length = 0; const bad = await GT.ask(ctx(), { ...base, question: 'How many people pass?' }); assert.equal(bad.answer, null); assert.equal(sent.length, 2); assert.ok(bad.rejected.length); assert.match(sent[1].input[0].content[0].text, /not in the evidence/);
+  await assert.rejects(GT.ask({ db, fetchImpl, brainConfig: B.config({}) }, { ...base, question: 'Why?' }), /not configured/);
+  await assert.rejects(GT.ask(ctx(), { text: 'Understand the commercial context around Lusail', question: 'What is here?', user: 'u1', inventory: [] }), /no ranked strategy/);
+  await assert.rejects(GT.ask(ctx(), { ...base, question: 'a' }), /question/);
+});
