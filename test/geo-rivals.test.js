@@ -13,6 +13,9 @@ test('strategy competitors: cost check first, branches by zone, real rival count
   const DATA = { 'qnb': [P('q1', 'QNB Al Sadd Branch', 38), P('q2', 'QNB Al Sadd Plaza Branch', 38, 3), P('q3', 'QNB City Center Branch', 61), P('q4', 'QNB ATM', 61, 2)],
     'commercial bank': [P('c1', 'Commercial Bank Al Sadd Branch', 38, 6), P('c2', 'Commercial Bank Branch', 38, 9), P('c3', 'Commercial Bank West Bay Branch', 63)], 'doha bank': [P('d1', 'Doha Bank West Bay Branch', 63, 4), P('x1', 'Some Other Exchange', 63, 8)] };
   const HS = [P('h1', 'HSBC West Bay Branch', 63, 20)];
+  // a point in a neighbouring zone that is within 400 m of zone 38 (found by scanning, so the test does not depend on a hand-picked coordinate)
+  const edge = (() => { const NB = Z.ZONES.filter(z => z.no !== 38), dLat = 400 / 110574, ring = (la, lo) => [0, 1, 2, 3, 4, 5, 6, 7].map(k => Z.zoneAt(la + dLat * Math.sin(k * Math.PI / 4), lo + 400 / (111320 * Math.cos(la * Math.PI / 180)) * Math.cos(k * Math.PI / 4)));
+    const b = Z.byNo(38).bbox; for (let i = -6; i < 26; i++) for (let j = -6; j < 26; j++) { const la = b[1] + (b[3] - b[1]) * i / 20, lo = b[0] + (b[2] - b[0]) * j / 20, z = Z.zoneAt(la, lo); if (z && z.no !== 38 && NB.includes(z) && ring(la, lo).some(r => r && r.no === 38)) return { no: z.no, latitude: la, longitude: lo }; } throw new Error('no edge point'); })();
   const QIB = [P('qb1', 'QIB West Bay Branch', 63, 12), P('qb2', 'QIB Al Sadd Branch', 38, 12), P('qb3', 'QIB ATM', 38, 14)];
   let calls = 0;
   const fetchImpl = async (url, init) => { if (!/places:searchText/.test(url)) return { ok: false, status: 404, json: async () => ({}) }; calls++;
@@ -25,6 +28,7 @@ test('strategy competitors: cost check first, branches by zone, real rival count
       return { ok: true, status: 200, json: async () => ({ places: HS.filter(inQ) }) }; }
     // "qib" fills the central area to Google's cap of 60 with ATMs, the way a real bank search does
     if (first && (b.textQuery === 'qib' || b.textQuery === 'hsbc')) return { ok: true, status: 200, json: async () => ({ nextPageToken: 't', places: Array.from({ length: 20 }, (_, i) => ({ id: 'atm' + calls + '_' + i, displayName: { text: 'QIB ATM' }, formattedAddress: 'Demo', location: { latitude: 25.3 + i * 1e-4, longitude: 51.5 + calls * 1e-4 } })) }) };
+    if (b.textQuery === 'ahlibank') return { ok: true, status: 200, json: async () => ({ places: first ? [{ id: 'ah1', displayName: { text: 'Ahlibank Branch' }, formattedAddress: 'Demo', location: { latitude: edge.latitude, longitude: edge.longitude } }] : [] }) };
     return { ok: true, status: 200, json: async () => ({ places: first ? DATA[b.textQuery] || [] : [] }) }; };
   const ctx = { db, fetchImpl }, text = 'QNB premium credit cards for office professionals', run = extra => GT.run(ctx, { text, known: { audiences: ['office_professionals'], objective: 'banking' }, inventory: [], ...extra });
 
@@ -52,6 +56,9 @@ test('strategy competitors: cost check first, branches by zone, real rival count
   const bundle = GT.bundleFor(b); assert.equal(bundle.payload.competitors.brands.length, 3); assert.ok(bundle.evidenceIds.includes('ev:calc:rivals:z38'));
   assert.deepEqual(require('../lib/geo/brain').validate({ executive: b.executive_recommendation, claims: b.claims.filter(k => /contested|no QNB branch/.test(k.signal)), channel_notes: [], messaging: b.messaging, risks: b.risks }, bundle), [], 'the competitor claims pass the claim validator');
 
+  // branches just across a zone boundary are counted apart, so an empty zone is not read as a gap; a branch is never "near" its own zone
+  assert.ok(c.topZones.every(x => x.nearM === 400 && Number.isInteger(x.near.client) && Number.isInteger(x.near.rivalTotal)));
+  assert.ok(c.topZones.reduce((n, x) => n + x.near.client + x.near.rivalTotal, 0) <= c.points.length * 8); assert.ok(bundle.payload.competitors.top_zones.every(x => 'client_branches_within_400m_outside' in x));
   // 3. repeat: stored for 30 days, so no request and no prompt
   const again = await run(); assert.equal(calls, 18); assert.equal(again.competitors.status, 'OK'); assert.equal(again.usage.google.units, 0); assert.deepEqual(again.competitors.topZones.map(x => x.verdict), c.topZones.map(x => x.verdict));
   // 4. the planner's own ticks win; None means none; an unsearched name asks again
@@ -80,6 +87,10 @@ test('strategy competitors: cost check first, branches by zone, real rival count
   c0 = calls; const h2 = await run({ known: kh, rivalsRefine: true }); assert.equal(calls, c0 + 4, 'only the full quarter is split, into four');
   assert.equal(h2.competitors.refine.available, false); assert.equal(hs(h2).branches, 1); assert.equal(hs(h2).coverage, 'complete-as-observed');
   c0 = calls; const h3 = await run({ known: kh }); assert.equal(calls, c0, 'both stored passes are applied for free'); assert.equal(hs(h3).branches, 1);
+  // 8. a rival branch just across the boundary of a priority zone is reported as near it, not as inside it
+  const ah = await run({ known: { audiences: ['office_professionals'], objective: 'banking', confirmedRivals: ['Ahlibank'] }, rivalsConfirm: true }), zEdge = ah.competitors.topZones.find(x => x.zoneNo === 38);
+  assert.equal(ah.competitors.brands.find(x => x.name === 'Ahlibank').branches, 1); assert.equal(zEdge.rivalTotal, 0, 'not counted inside zone 38'); assert.equal(zEdge.near.rivalTotal, 1, 'but reported within 400 m of it'); assert.equal(zEdge.near.client, 0);
+  assert.equal(GT.bundleFor(ah).payload.competitors.top_zones.find(x => x.zone_no === 38).rival_branches_within_400m_outside, 1);
   // the brief says what counts as a rival, what is only a substitute and what is just surroundings
   assert.deepEqual(a.brief.rivals.groups.direct, ['Bank branches']); assert.ok(a.brief.rivals.groups.adjacent.length && a.brief.rivals.groups.context.includes('atm'));
 });

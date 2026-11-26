@@ -122,12 +122,13 @@ const citesOf = ids => (ids || []).length ? `<small class="gx-cite">${ids.slice(
 function resultHtml(r, s, G) {
   const aud = r.audience, cites = citesOf, exp = !!s.exporting;
   const zl = no => (aud.zones.find(z => z.zoneNo === no) || {}).label || 'Zone ' + no, sel = !r.area && s.selZone != null ? aud.zones.find(z => z.zoneNo === s.selZone) : null;
+  const pin = !sel && r.ooh && s.selPin != null ? r.ooh.recommendations.find(x => x.rank === s.selPin) : null;
   const topZ = aud.zones.filter(z => z.displayStatus === 'top'), tab = TABS2.some(t => t[0] === s.view.tab) ? s.view.tab : 'strategy';
   const none = '<div class="gx-card"><p class="gx-fine">Nothing to show here for this brief.</p></div>';
   const panes = { strategy: () => strategyPane(r, s, topZ), audience: () => audiencePane(r, s, topZ), competitors: () => (g => g ? `<div class="gx-card">${g}</div>` : '')(groupsHtml(r.brief)) + competitorsHtml(r, cites) + landscapeHtml(r, cites) || none, channels: () => (r.channels.length ? `<div class="gx-acts" style="margin:0 0 12px"><button class="btn sm" id="gtfeas">${I('list-checks')}Copy feasibility request</button><small>What the media team and vendors must confirm, as text to paste into an email. Nothing is sent.</small></div>` + channelsHtml(r, cites) : '') + oohHtml(r, s) + corridorHtml(r) || none, evidence: () => claimsHtml(r, cites) + appendixHtml(r).replace('<details class="gx-card"', '<details open class="gx-card"') };
   return `${s.opened ? `<div class="notice info">${I('save')}<div><b dir="auto">${esc(s.opened.name)}</b> · saved ${PI.when(s.opened.savedAt)}${s.opened.refreshed ? ' · showing a fresh run; the saved copy is unchanged' : ''}.${s.opened.intact === false ? ' <b>Warning: the saved content does not match its fingerprint.</b>' : ''} <button class="btn xs" id="gtref">${I('refresh-cw')}Refresh and compare</button></div></div>` : ''}
     ${s.delta ? `<div class="notice info"><div>Refreshed: status ${esc(s.delta.statusFrom)} → ${esc(s.delta.statusTo)}. New top zones: ${s.delta.entered.map(zl).map(esc).join(', ') || 'none'}. Dropped: ${s.delta.left.map(zl).map(esc).join(', ') || 'none'}. The saved snapshot is unchanged until you save again.</div></div>` : ''}
-    <div class="gt-stage">${mapCard(r, s, G)}<aside class="gt-ins" aria-label="${r.area ? 'Area profile' : 'Strategy insights'}">${sel ? `<div class="gx-sitec" id="gtzone">${zoneHtml(sel, r, cites)}</div>` : r.area ? areaHtml(r, s) : insightsHtml(r, s, G, topZ)}</aside></div>
+    <div class="gt-stage">${mapCard(r, s, G)}<aside class="gt-ins" aria-label="${r.area ? 'Area profile' : 'Strategy insights'}">${sel ? `<div class="gx-sitec" id="gtzone">${zoneHtml(sel, r, cites)}</div>` : pin ? pinHtml(pin) : r.area ? areaHtml(r, s) : insightsHtml(r, s, G, topZ)}</aside></div>
     ${r.area ? appendixHtml(r).replace('<details class="gx-card"', '<details open class="gx-card"') : exp ? TABS2.map(([k, t]) => `<h2 class="gt-exh">${t}</h2>${panes[k]()}`).join('')
       : `<div class="gt-tabs" role="tablist" id="gttabs" aria-label="Strategy detail">${TABS2.map(([k, t]) => `<button role="tab" aria-selected="${tab === k}" data-gtt="${k}">${t}</button>`).join('')}</div><div class="gt-pane" role="tabpanel">${panes[tab]()}</div>`}`;
 }
@@ -211,6 +212,15 @@ function groupsHtml(b) {
   const g = b && b.rivals && b.rivals.groups; if (!g) return '';
   return `<small class="gx-fine gt-groups"><span><b>Direct competitors:</b> ${g.direct.map(esc).join(', ') || 'none defined'}</span>${g.adjacent.length ? `<span><b>Adjacent, not counted as rivals:</b> ${g.adjacent.map(esc).join(', ')}</span>` : ''}${g.context.length ? `<span><b>Context only:</b> ${g.context.map(esc).join(', ')}</span>` : ''}</small>`;
 }
+// One shortlisted OOH face: its own identity, why it was picked, and what nobody has confirmed yet.
+function pinHtml(x) {
+  return `<div class="gx-sitec" id="gtpin"><div class="gx-sh"><div><h3 dir="auto">#${x.rank} ${esc(x.assetFaceId)}</h3><span>${[x.vendor, x.format, x.circuit ? 'circuit ' + x.circuit : ''].filter(Boolean).map(esc).join(' · ')}</span></div><button class="btn xs" id="gtpx" aria-label="Back to the strategy">${I('x')}</button></div>
+    <div class="gt-kpis gt-k2"><div><small>Placement fit</small><b>${n1(x.placementFit)}</b></div><div><small>Zone</small><b dir="auto">${esc(shortZ(x.zoneLabel || '')) || '–'}</b></div></div>
+    <h5 style="margin:12px 0 4px">Must verify before booking</h5><ul class="gt-ver">${x.verificationActions.map(a => `<li dir="auto">${esc(a)}</li>`).join('')}</ul>
+    <p class="gx-fine">Placement fit ranks this face against the other eligible faces for this audience and zone. Facing, visibility, price, availability and impressions are not known from coordinates.</p><button class="gt-open" data-sec="channels">All shortlisted faces</button></div>`;
+}
+// Branches just across the zone boundary, so an empty zone is not mistaken for a gap.
+const nearTxt = (t, cl) => t && t.near && (t.near.client || t.near.rivalTotal) ? ` <small class="gt-near">within ${t.nearM} m outside: ${[t.near.client ? `${t.near.client} ${cl ? esc(cl.name) : 'yours'}` : '', t.near.rivalTotal ? `${t.near.rivalTotal} rival` : ''].filter(Boolean).join(', ')}</small>` : '';
 // Two or three zones side by side on the same measures.
 function compareHtml(r, s) {
   const zs = (s.cmp || []).map(no => r.audience.zones.find(z => z.zoneNo === no)).filter(Boolean); if (zs.length < 2) return zs.length ? '<p class="gx-fine">Tick one more zone to compare.</p>' : '';
@@ -220,7 +230,7 @@ function compareHtml(r, s) {
     ${row('Audience Fit', z => `<b>${n1(z.score)}</b> · rank ${z.rank || '–'}`)}${row('Opportunity Index', z => { const o = opp(z.zoneNo); return o ? n1(o.opportunityIndex) + ' · rank ' + o.opportunityRank : '–'; })}
     ${row('Residents (census 2020)', z => z.population2020 != null ? z.population2020.toLocaleString('en-US') : '–')}
     ${lenses.map(k => row(esc(k.label), z => { const v = (z.contributions.find(x => x.lens === k.lens) || {}).value; return v == null ? 'n/a' : `<span class="gt-cbar"><i style="width:${v}%"></i></span> ${Math.round(v)}`; })).join('')}
-    ${c ? row('Branches found', z => { const t = c.byZone[z.zoneNo], k = c.topZones.find(x => x.zoneNo === z.zoneNo); return k && k.verdict === 'not known' ? 'not known: search cut off' : t ? `${t.client} yours · ${t.rivalTotal} rival` : 'none found'; }) : ''}
+    ${c ? row('Branches found', z => { const t = c.byZone[z.zoneNo], k = c.topZones.find(x => x.zoneNo === z.zoneNo); return (k && k.verdict === 'not known' ? 'not known: search cut off' : t ? `${t.client} yours · ${t.rivalTotal} rival` : 'none found') + nearTxt(k, null); }) : ''}
     ${row('Why', z => esc((z.why || []).slice(0, 2).join('. ')))}</tbody></table></div><button class="btn xs" id="gtcmpx">Clear comparison</button></div>`;
 }
 function zoneHtml(z, r, cites) {
@@ -248,7 +258,7 @@ function competitorsHtml(r, cites) {
   const rivals = c.brands.filter(b => b.role !== 'client'), cl = c.brands.find(b => b.role === 'client'), V = { contested: ['Contested', 'warn'], 'rivals only': ['Rivals only', 'bad'], 'rivals present': ['Rivals present', 'warn'], 'you only': ['You only', 'ok'], 'none found': ['None found', ''], 'not known': ['Not known: search cut off', 'warn'] };
   return `<div class="gx-card" style="margin-top:14px" id="gtcomp">${head}
     <div class="gx-tiles">${c.brands.map(b => `<div><b><i class="gx-dot" style="background:${brandColor(c, b.name)}"></i>${b.branches}</b><small>${esc(b.name)}${b.role === 'client' ? ' (you)' : ''} branches found${b.atms ? ' · ' + b.atms + ' ATMs kept apart' : ''}${b.coverage === 'partial' ? ' · partial search' : ''}</small></div>`).join('')}</div>
-    <div class="gx-tw"><table class="gx-t"><thead><tr><th>Priority zone</th>${cl ? `<th>${esc(cl.name)}</th>` : ''}${rivals.map(b => `<th>${esc(b.name)}</th>`).join('')}<th>Reading</th></tr></thead><tbody>${c.topZones.map(t => `<tr tabindex="0" data-z="${t.zoneNo}"><td dir="auto">${esc(t.label)}</td>${cl ? `<td><b>${t.client}</b></td>` : ''}${rivals.map(b => `<td>${t.rivals[b.name] || 0}</td>`).join('')}<td><span class="gx-pill ${V[t.verdict][1]}">${V[t.verdict][0]}</span>${t.searchCutOff && t.verdict !== 'not known' ? ' <small>at least</small>' : ''}</td></tr>`).join('')}</tbody></table></div>
+    <div class="gx-tw"><table class="gx-t"><thead><tr><th>Priority zone</th>${cl ? `<th>${esc(cl.name)}</th>` : ''}${rivals.map(b => `<th>${esc(b.name)}</th>`).join('')}<th>Reading</th></tr></thead><tbody>${c.topZones.map(t => `<tr tabindex="0" data-z="${t.zoneNo}"><td dir="auto">${esc(t.label)}</td>${cl ? `<td><b>${t.client}</b></td>` : ''}${rivals.map(b => `<td>${t.rivals[b.name] || 0}</td>`).join('')}<td><span class="gx-pill ${V[t.verdict][1]}">${V[t.verdict][0]}</span>${t.searchCutOff && t.verdict !== 'not known' ? ' <small>at least</small>' : ''}${nearTxt(t, cl)}</td></tr>`).join('')}</tbody></table></div>
     ${c.busiest && c.busiest.length ? `<p class="gx-fine"><b>Where the branches are:</b> ${c.busiest.map(b => `${esc(b.label)}: ${cl ? b.client + ' yours, ' : ''}${b.rivalTotal} rival${b.isTop ? '' : ' (not a priority zone)'}`).join(' · ')}.</p>` : ''}
     ${c.overlap.length && cl ? `<p class="gx-fine"><b>Closeness:</b> ${c.overlap.map(o => `${o.branchesNearby} of ${o.of} ${esc(cl.name)} branches have a ${esc(o.rival)} branch within 1 km`).join(' · ')}.</p>` : ''}
     <p class="gx-fine">${c.limitations.map(esc).join(' ')} The Opportunity Index above now uses these branches. ${c.google.requests ? c.google.requests + ' Google lookups were used.' : 'Read from stored results: no Google lookup was used.'}</p>
@@ -333,11 +343,12 @@ function wireResult(el, G, s) {
   const qf = $('#gtqf'); if (qf) qf.onsubmit = e => { e.preventDefault(); askQ($('#gtqin').value); };
   $$('[data-fq]').forEach(b => b.onclick = () => askQ(b.dataset.fq));
   $$('[data-rg]').forEach(b => b.onclick = () => { s.view.region = b.dataset.rg; T.strategy(el, G); });
-  const pick = no => { s.selZone = no; T.strategy(el, G); setTimeout(() => { const row = document.querySelector(`tr[data-z="${no}"]`); if (row) row.focus({ preventScroll: true }); }, 30); };
+  const pick = no => { s.selZone = no; s.selPin = null; T.strategy(el, G); setTimeout(() => { const row = document.querySelector(`tr[data-z="${no}"]`); if (row) row.focus({ preventScroll: true }); }, 30); };
   s.onZone = pick;
   $$('[data-z]').forEach(x => { x.onclick = () => pick(+x.dataset.z); x.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(+x.dataset.z); } }; });
-  $$('[data-pin]').forEach(x => { const go = () => { s.selPin = +x.dataset.pin; T.strategy(el, G); }; x.onclick = go; x.onkeydown = e => { if (e.key === 'Enter') go(); }; });
+  $$('[data-pin]').forEach(x => { const go = () => { s.selPin = +x.dataset.pin; s.selZone = null; T.strategy(el, G); }; x.onclick = go; x.onkeydown = e => { if (e.key === 'Enter') go(); }; });
   const zx = $('#gtzx'); if (zx) zx.onclick = () => { s.selZone = null; T.strategy(el, G); };
+  const px = $('#gtpx'); if (px) px.onclick = () => { s.selPin = null; T.strategy(el, G); };
   const all = $('#gtall'); if (all) all.onclick = () => { s.showAll = !s.showAll; T.strategy(el, G); };
   $$('[data-ev]').forEach(x => x.onclick = () => { const show = () => { const row = document.getElementById('ev-' + x.dataset.ev.replace(/[^a-z0-9]/gi, '_')); if (row) { row.scrollIntoView({ block: 'center' }); row.classList.add('on'); } }; if (document.getElementById('gtapp')) show(); else goTab('evidence', show); });
   // threshold and lens: recomputed by the local engine on the server (no Google, no AI)
@@ -374,7 +385,7 @@ function paint(G, s, scores, fit) {
   (async () => {
     try { G.v.zoneGeo = G.v.zoneGeo || await PI.api('GET', 'geo/zones/geometry'); } catch (e) { box.innerHTML = `<div class="gx-schem">${esc(e.message)}</div>`; return; }
     G.mapReady(box, ok => {
-      if (ok) { M.objs.forEach(o => o.setMap(null)); M.objs = []; M.zones(zst(G.v.zoneGeo)); M.traffic(!!s.view.traffic); M.gtm({ corridors, pins, branches, zoneMarks: marks, onZone: no => s.onZone && s.onZone(no), selectedPin: s.selPin, onPin: k => { s.selPin = k; T.strategy($('#gxb'), G); } });
+      if (ok) { M.objs.forEach(o => o.setMap(null)); M.objs = []; M.zones(zst(G.v.zoneGeo)); M.traffic(!!s.view.traffic); M.gtm({ corridors, pins, branches, zoneMarks: marks, onZone: no => s.onZone && s.onZone(no), selectedPin: s.selPin, onPin: k => { s.selPin = k; s.selZone = null; T.strategy($('#gxb'), G); } });
         if (fit || s.selZone != null) { const b = s.selZone != null ? M.zoneBounds(s.selZone) : null; if (b) M.fit(b, 60); else if (s.view.region === 'qatar' && !marked) M.fitQatar(); else { const tb = new M.g.LatLngBounds(); (marked || Object.keys(scores).filter(no => scores[no].status === 'top')).forEach(no => { const zb = M.zoneBounds(+no); if (zb) tb.union(zb); }); M.fit(tb.isEmpty() ? new M.g.LatLngBounds({ lat: 25.2, lng: 51.42 }, { lat: 25.42, lng: 51.6 }) : tb, 30); } } }
       else box.innerHTML = svgMap(G.v.zoneGeo, scores, s, corridors, pins, branches, marks, marked);
       box.querySelectorAll('[data-sz]').forEach(p => { p.onclick = () => s.onZone(+p.dataset.sz); p.onkeydown = e => { if (e.key === 'Enter') s.onZone(+p.dataset.sz); }; });
