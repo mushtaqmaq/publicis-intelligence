@@ -2,6 +2,7 @@
 // Turns one OpenStreetMap Overpass export of Qatar's major roads ("way[highway~motorway|trunk|primary|links]; out geom") into a small
 // routable graph: lib/geo/assets/qa-roads-major.json. Road geometry and class only; no traffic, no speeds observed.
 // Usage: node scripts/geo-build-roads.js <overpass-roads.json>
+// Query used: [out:json][timeout:300]; area["ISO3166-1"="QA"][admin_level=2]->.qa; way(area.qa)["highway"~"^(motorway|trunk|primary|motorway_link|trunk_link)$"]; out geom qt;
 const fs = require('fs'), path = require('path');
 const d = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')), ways = d.elements.filter(e => e.type === 'way' && e.nodes && e.geometry);
 const R = 6371008.8, rad = x => x * Math.PI / 180, dist = (a, b) => { const dLat = rad(b[1] - a[1]), dLon = rad(b[0] - a[0]), h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a[1])) * Math.cos(rad(b[1])) * Math.sin(dLon / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };

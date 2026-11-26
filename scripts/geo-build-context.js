@@ -2,6 +2,11 @@
 // Turns one OpenStreetMap Overpass export (JSON, "out center tags") into per-zone place counts: lib/geo/assets/qa-osm-context.json.
 // Only counts per census zone are kept (no names, no points), with the extract date and the ODbL attribution.
 // Usage: node scripts/geo-build-context.js <overpass.json> [extract-date]
+// Query used (one request): [out:json][timeout:180]; area["ISO3166-1"="QA"][admin_level=2]->.qa; ( nwr(area.qa)[amenity~school|kindergarten|university|
+//   college|hospital|clinic|doctors|pharmacy|restaurant|fast_food|cafe|food_court|bank|cinema|fuel|bus_station|embassy|library|marketplace|car_rental];
+//   nwr(area.qa)[shop~mall|supermarket|convenience|car|car_repair|jewelry|department_store|clothes|electronics]; nwr(area.qa)[leisure~park|playground|
+//   fitness_centre|sports_centre|stadium]; nwr(area.qa)[tourism~hotel|attraction|museum|theme_park|apartment]; nwr(area.qa)[office];
+//   nwr(area.qa)[railway=station][station=subway]; nwr(area.qa)[aeroway=aerodrome]; ); out center tags;   (regexes anchored ^...$)
 const fs = require('fs'), path = require('path');
 const Z = require('../lib/geo/zones');
 const CAT = require('../lib/geo/audience').OSM_RULES;
