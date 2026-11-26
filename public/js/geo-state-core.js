@@ -65,6 +65,7 @@ const hash = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 
 // The ranked list a result stands for, whatever its kind: [{ id, name, score }], best first.
 function ranking(kind, result) {
   if (!result) return [];
+  if (kind === 'gtm') return (result.zone_opportunities || []).map(z => ({ id: z.zoneId, name: z.label, score: z.score, rank: z.rank }));
   if (kind === 'plan') return ((result.winner && result.winner.assets) || []).map((a, i) => ({ id: a.id, name: a.name || a.id, score: null, rank: i + 1, status: a.status }));
   if (kind === 'network') return (result.networks || []).map(n => ({ id: n.id, name: n.name, score: n.branches.length, rank: 0 })).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id)).map((x, i) => ({ ...x, rank: i + 1 }));
   return (result.results || []).map(r => ({ id: r.site.id, name: r.site.name || r.site.id, score: r.score ? r.score.value : null })).sort((a, b) => (b.score ?? -1) - (a.score ?? -1) || String(a.id).localeCompare(String(b.id))).map((x, i) => ({ ...x, rank: i + 1 }));
@@ -72,7 +73,7 @@ function ranking(kind, result) {
 function freeze({ kind, name, brief, state, result, ai, client, versions, now }) {
   const rk = ranking(kind, result), evidence = (result && result.evidence) || [];
   return { schema: SCHEMA, kind, name: String(name || '').slice(0, 120), savedAt: now || Date.now(), client: client || '', brief: brief || {}, state: state || {}, result, ai: ai || null, versions: versions || {},
-    evidenceIds: evidence.map(e => e.id), ranking: rk, fingerprint: hash(JSON.stringify([kind, versions || {}, rk.map(x => [x.id, x.score, x.rank]), evidence.map(e => [e.id, e.text])])) };
+    evidenceIds: evidence.map(e => e.id || e.evidenceId), ranking: rk, fingerprint: hash(JSON.stringify([kind, versions || {}, rk.map(x => [x.id, x.score, x.rank]), evidence.map(e => e.evidenceId ? [e.evidenceId, e.value] : [e.id, e.text])])) };   // older kinds hash exactly as before
 }
 // True when a stored snapshot still describes exactly what it stored (nothing was edited or lost).
 const intact = snap => !!snap && snap.schema === SCHEMA && snap.fingerprint === freeze({ ...snap, now: snap.savedAt }).fingerprint;

@@ -109,7 +109,11 @@ test('Google gateway, cache and analysis against a fake Google and a real databa
   const out = await A.run(ctx, { sites: [{ id: 's1', name: 'Site 1', ...near, zone: 'West Bay' }], radius: 1000, recipe: 'families', competitor: 'bank' });
   const one = out.results[0];
   assert.equal(one.features.school.count, 3); assert.equal(one.features.supermarket.count, 41); assert.equal(one.features.supermarket.exact, true); assert.equal(one.features.supermarket.capped, false); assert.ok(one.score.value > 0 && one.score.coverage === 1);
-  assert.equal(one.official.population, 41000); assert.match(out.evidence.find(e => e.id === one.evidenceIds.official).text, /not the 1000 m catchment/);
+  // the zone comes from the 2020 census polygon at the coordinates, not from the typed name "West Bay" (names are labels, never join keys)
+  const Zs = require('../lib/geo/zones'), zn = Zs.zoneNear(near.lat, near.lon).zone;
+  assert.equal(one.official.zoneNumber, String(zn.no)); assert.equal(one.official.population, zn.population2020.total); assert.equal(one.official.year, 2020);
+  assert.match(out.evidence.find(e => e.id === one.evidenceIds.official).text, /not the 1000 m catchment/);
+  assert.equal(one.populationEstimate.method.startsWith('Areal weighting'), true); assert.equal(one.populationEstimate.evidenceClass, 'MODELLED');
   assert.ok(one.pressure && one.pressure.cat === 'bank');
   // asking for the same thing again reuses what was fetched: no new Google request at all
   const again = await A.run(ctx, { sites: [{ id: 's1', name: 'Site 1', ...near, zone: 'West Bay' }], radius: 1000, recipe: 'families', competitor: 'bank' });

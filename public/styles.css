@@ -715,3 +715,14 @@ pre.code{background:#111114;color:#E8E8ED;font:12.5px/1.55 ui-monospace,SFMono-R
 .gx-acts3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.gx-acts3 h5{margin:0 0 4px}
 .gx-seg button[aria-checked=true],.gx-seg button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
 a.agent-b{text-decoration:none}
+
+/* Geo strategy view */
+.gx-ask textarea{width:100%;font:inherit;border:1px solid var(--hair);border-radius:var(--r-m,8px);padding:8px 10px;resize:vertical}
+.gx-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.gx-brief{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.gx-legend{padding:8px 10px;border-top:1px solid var(--hair);font-size:12px;display:grid;gap:4px}.gx-ramp{display:flex;gap:0}.gx-ramp i{width:28px;height:10px;display:block}
+.gx-thr{display:flex;gap:14px;flex-wrap:wrap;align-items:center}.gx-cite{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.gx-evb{font-size:10.5px;border:1px solid var(--hair);background:var(--paper);border-radius:6px;padding:1px 6px;cursor:pointer}
+.gx-t tr.on td{background:var(--paper)}.gx-t tr[data-z],.gx-t tr[data-pin]{cursor:pointer}.gx-t tr:focus{outline:2px solid #2F6BFF;outline-offset:-2px}.gx-tw{overflow-x:auto}
+.gx-claim{border-left:3px solid var(--hair);padding:2px 0 2px 10px;margin:8px 0}.gx-ready{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px}
+.gx-picker{display:grid;gap:4px;max-width:260px}.gx-picker b{font-size:12px}.gx-picker .btn{justify-content:flex-start;text-align:left}
+.gx-tools{margin:8px 0 12px}.gx-tools>summary{cursor:pointer;padding:8px 0}.gx-tools>summary small{color:var(--ink-3,#7C8699);font-weight:400;margin-left:6px}
+.gx-ask .gx-acts{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}.gx-ask .gx-check{flex:1 1 260px}.gx-brief .gx-f select,.gx-brief .gx-f input:not([type=checkbox]){width:100%;min-height:34px}.gx-brief .gx-check{display:flex;gap:6px;align-items:center}.gx-brief .gx-f>span{display:flex;gap:6px;align-items:center}

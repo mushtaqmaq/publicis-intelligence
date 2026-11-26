@@ -65,9 +65,9 @@ test('plan run: only areas with inventory are researched, a large run asks first
   const branches = [{ id: 'n', name: 'North', lat: 25.32, lon: 51.52 }, { id: 's', name: 'South', lat: 25.25, lon: 51.50 }, { id: 'x', name: 'No inventory', lat: 25.60, lon: 51.30 }];
   const assets = [{ id: 'a1', name: 'North screen', lat: 25.321, lon: 51.52, vendor: 'V' }, { id: 'a2', name: 'South screen', lat: 25.251, lon: 51.50, vendor: 'V' }, { id: 'bad', lat: 0, lon: 0 }];
   const r = await PL.run(ctx, { branches, assets, recipe: 'families', objective: 'family' });
-  assert.equal(r.planning.areas, 3); assert.equal(r.planning.researched, 2, 'the area with no inventory is not researched'); assert.equal(google, 2 * 3 + 2);
+  assert.equal(r.planning.areas, 3); assert.equal(r.planning.researched, 2, 'the area with no inventory is not researched'); assert.equal(google, 2 * 3, 'place counts only: the official zone now comes from local polygons, so no reverse-geocode lookups');
   const north = r.areas.find(a => a.branches.includes('n')), south = r.areas.find(a => a.branches.includes('s')), none = r.areas.find(a => a.branches.includes('x'));
-  assert.ok(north.score > south.score); assert.equal(none.score, null); assert.equal(none.hasAssets, false); assert.equal(north.zone, 'West Bay'); assert.ok(north.population > 0 && north.popLevel === 'zone');
+  assert.ok(north.score > south.score); assert.equal(none.score, null); assert.equal(none.hasAssets, false); assert.equal(north.zone, require('../lib/geo/zones').zoneNear(25.32, 51.52).zone.label); assert.ok(north.population > 0 && north.popLevel === 'zone');
   assert.equal(r.winner.assets[0].id, 'a1'); assert.ok(!r.winner.assets.some(a => a.id === 'a2'), 'the weak area fails the audience check'); assert.equal(r.rejected, 1);
   assert.equal(r.branches[0].branch.id, 'n'); assert.ok(r.limits.some(l => /no OOH asset/.test(l)));
   const before = google; await PL.run(ctx, { branches, assets, recipe: 'families', objective: 'family' }); assert.equal(google, before, 'the second run is answered from the database');

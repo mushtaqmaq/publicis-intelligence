@@ -4,13 +4,13 @@
 'use strict';
 const { $, $$, esc, I, S, num } = PI;
 const C = window.PIGeoCore, ST = window.PIGeoState, M = PI.geoMap, BR = window.PIGeoBrain, BUILTIN = 'builtin-qa-2026-09-24';
-const TABS = [['map', 'Map & Analysis'], ['official', 'Official Data'], ['audience', 'Audience Insights'], ['comp', 'Competitors & POIs'], ['compare', 'Site Comparison'], ['opp', 'Opportunity Analysis'], ['saved', 'Saved Analyses'], ['plan', 'Plan']];
+const TABS = [['strategy', 'Strategy'], ['map', 'Map & Analysis'], ['official', 'Official Data'], ['audience', 'Audience Insights'], ['comp', 'Competitors & POIs'], ['compare', 'Site Comparison'], ['opp', 'Opportunity Analysis'], ['saved', 'Saved Analyses'], ['plan', 'Plan']];
 const sel = (id, opts, cur, label) => `<label class="gx-f"><span>${label}</span><select id="${id}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
 const pinRe = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/;
 const STATE = { NOT_CONFIGURED: ['Not configured', 'mut'], CONFIGURED_UNVERIFIED: ['Configured, not verified', 'warn'], VERIFIED: ['Verified', 'ok'], DEGRADED: ['Degraded', 'bad'], DISABLED: ['Disabled', 'mut'], AVAILABLE: ['Available', 'ok'] };
 
 PI.tools.geo = async (box, p, a) => {
-  const v = S.drafts.geo || (S.drafts.geo = { tab: 'map', q: '', site: null, cands: [], radius: 'auto', recipe: 'families', competitor: '', objective: '', brief: '', zone: '', inv: BUILTIN, run: 0, sel: 0, sp: 'overview', view: 'site', weights: null, places: {}, routes: {}, cmp: [], layers: { sites: true, rings: true, places: true, clients: true, inv: true, muni: false, off: {} }, mapType: 'roadmap', invFilter: { vendor: '', format: '', q: '' }, clientLoc: '' });
+  const v = S.drafts.geo || (S.drafts.geo = { tab: 'strategy', q: '', site: null, cands: [], radius: 'auto', recipe: 'families', competitor: '', objective: '', brief: '', zone: '', inv: BUILTIN, run: 0, sel: 0, sp: 'overview', view: 'site', weights: null, places: {}, routes: {}, cmp: [], layers: { sites: true, rings: true, places: true, clients: true, inv: true, muni: false, off: {} }, mapType: 'roadmap', invFilter: { vendor: '', format: '', q: '' }, clientLoc: '' });
   v.mode = v.mode || 'opportunity'; v.bf = v.bf || { client: (PI.client() || {}).name || '', product: '', industry: '', period: '' }; v.comp = v.comp || ST.emptyComp();   // the one brief every tab reads
   v.brief = [v.bf.client, v.bf.product].filter(Boolean).join(', ');
   v.placesFor = r => (v.places[r.site.id + ':' + (r.radius || v.result.radius)] || { list: [] }).list;
@@ -33,11 +33,12 @@ PI.tools.geo = async (box, p, a) => {
   const ranked = () => v.result ? v.result.results.slice().sort((x, y) => (y.score.value ?? -1) - (x.score.value ?? -1)) : [];
   const current = () => { const rs = ranked(); return rs[Math.min(v.sel, rs.length - 1)]; };
   const pr = () => v.st.providers.google, [gl, gc] = STATE[pr().state], ai = S.me && S.me.caps && S.me.caps.ai;
-  const quota = v.st.quota && v.st.quota.used != null ? `<span class="gx-pill" title="Google requests sent this month, and how many times a stored result was reused instead">${num(v.st.quota.used)} / ${num(v.st.quota.cap)}${v.st.quota.reused ? ' · ' + num(v.st.quota.reused) + ' reused' : ''}</span>` : '';
+  const quota = v.st.quota && v.st.quota.used != null ? `<span class="gx-pill" id="gquota" title="Google units used this billing period (server ledger, read ${new Date().toLocaleTimeString()}), and how many times a stored result was reused instead">${num(v.st.quota.used)} / ${num(v.st.quota.cap)}${v.st.quota.reused ? ' · ' + num(v.st.quota.reused) + ' reused' : ''}</span>` : '';
 
   box.innerHTML = `<div class="gx"><div class="gx-head"><div><h2>Geo Intelligence</h2><p>Where to focus in Qatar, and why.</p></div>
       <div class="gx-status"><span class="gx-pill ok" title="State of Qatar Open Data">Qatar Open Data · Available</span><span class="gx-pill ${gc}" title="Google Maps Platform">Google Maps · ${gl}</span><span class="gx-pill ${ai ? 'ok' : 'mut'}" title="AI engine (used only when you ask)">AI · ${ai ? 'Configured' : 'Not configured'}</span>${quota}${S.me && S.me.role === 'admin' ? `<button class="btn xs" id="gusage">${I('gauge')}Usage</button>` : ''}${S.me && S.me.role === 'admin' && pr().serverKey ? `<button class="btn xs" id="gverify" title="Runs one request per Google API (5 of the monthly allowance)">${I('check')}Run Google check</button>` : ''}</div></div>
     ${pr().state === 'NOT_CONFIGURED' ? `<div class="notice info">${I('info')}<div>Google Maps data is not configured. Official Qatar data and first-party analysis remain available.</div></div>` : ''}
+    <details class="gx-tools" ${v.tab === 'strategy' && !v.result && !v.plan && !v.net ? '' : 'open'}><summary><b>Site, OOH and network tools</b> <small>the detailed brief for site analysis, plans and competitor networks</small></summary>
     ${PI.geoBrief.html(v, meta, sel('ginv', [['', 'Single location'], [BUILTIN, 'Qatar OOH assets (24 Sep 2026) · 1,351 sites'], ...(v.found ? [[FOUND, `Search: ${v.found.query} · ${v.found.items.length} found`]] : []), ...oohInvs.map(i => [i.id, `${i.name} · ${i.rows.length} sites${i.version > 1 ? ' · v' + i.version : ''}`])], v.inv, 'OOH inventory: the sites you can buy'), v.industries)}
     ${(() => { const u = BR.usual(v.brain); return u && (u.recipe !== v.recipe || u.radius !== v.radius) ? `<div class="gx-usual"><button class="btn xs" id="gusual">${I('sparkles')}Your usual: ${esc((meta.recipes.find(r => r.id === u.recipe) || {}).label || u.recipe)} · ${typeof u.radius !== 'number' ? 'Auto' : u.radius >= 1000 ? u.radius / 1000 + ' km' : u.radius + ' m'}</button><small>learned from ${u.runs} team analyses</small></div>` : ''; })()}
     <div id="ginvf" class="gx-invf"></div>
@@ -46,6 +47,7 @@ PI.tools.geo = async (box, p, a) => {
       ${sel('gcl', [['', 'None'], ...clientInvs.map(i => [i.id, `${i.name} · ${i.rows.length}`])], v.clientLoc, 'Client locations')}
       <label>Official zone<input id="gz" list="gzl" value="${esc(v.zone)}" placeholder="e.g. Al Dafna"><datalist id="gzl">${(v.zones || []).map(z => `<option value="${esc(z)}">`).join('')}</datalist></label>
       <label>Inventory file: CSV, Excel, or KMZ/KML from Google Earth (only latitude and longitude are required)<input type="file" id="gf" accept=".csv,.xlsx,.xls,.kmz,.kml"></label><label class="gx-check"><input type="checkbox" id="gkind"> These are client locations (branches), not OOH assets</label><div id="gchk"></div></div></details>
+    </details>
     <div id="gopened"></div>
     <div class="gx-tabs" role="tablist">${TABS.map(([k, l]) => `<button role="tab" aria-selected="${v.tab === k}" data-t="${k}">${l}</button>`).join('')}</div>
     <div id="gxb"></div></div>`;
@@ -74,7 +76,7 @@ PI.tools.geo = async (box, p, a) => {
     if (id !== v.run) return;   // a newer analysis replaced this one
     res.selection = opts.selection || null; res.preflight = opts.preflight || null;   // how the sites were chosen and what the run was told beforehand stay with the result
     if (v.opened && v.opened.kind === 'analysis' && v.refreshing) { v.delta = ST.delta(v.opened.snap, res); v.refreshing = false; }
-    v.result = res; v.sites = sites; v.ai = null; v.sel = 0; v.places = {}; v.routes = {}; v.cmp = ranked().slice(0, 5).map(x => x.site.id); v.savedId = opts.savedId || null; if (v.afterRun) { v.tab = v.afterRun; v.afterRun = null; } G.show(); G.loadPlaces(); G.banner();
+    v.result = res; v.sites = sites; v.layers.inv = false; v.layers.zones = v.layers.zones ?? true;   // results first: the 1,351-face catalogue is opt-in v.ai = null; v.sel = 0; v.places = {}; v.routes = {}; v.cmp = ranked().slice(0, 5).map(x => x.site.id); v.savedId = opts.savedId || null; if (v.afterRun) { v.tab = v.afterRun; v.afterRun = null; } G.show(); G.loadPlaces(); G.banner();
     if (!opts.savedId) { const top = ranked()[0]; G.logBrain({ t: 'analysis', q: sites.length === 1 ? v.q : '', sites: sites.map(s => ({ id: s.id, name: s.name, lat: s.lat, lon: s.lon, zone: s.zone, municipality: (res.results.find(r => r.site.id === s.id) || { site: {} }).site.municipality })), recipe: v.recipe, objective: v.objective, radius: v.radius, competitor: v.competitor, top: top && { id: top.site.id, score: top.score.value } }); }
   };
   G.explain = async () => {
@@ -104,6 +106,7 @@ PI.tools.geo = async (box, p, a) => {
   // Opening shows what was saved and asks nobody anything. Google coordinates older than 30 days are dropped, as Google requires.
   G.open = d => {
     const s = d.state || {}, v2 = d.schema === ST.SCHEMA, kind = v2 ? d.kind : 'analysis', old = Date.now() - d.savedAt > 30 * 864e5;
+    if (kind === 'gtm') { PI.geoTabs.openStrategy(G, d); return PI.tools.geo(box, p, a); }   // a strategy snapshot carries its whole result
     Object.assign(v, { radius: s.radius ?? v.radius, recipe: s.recipe || v.recipe, competitor: s.competitor || '', objective: s.objective || '', weights: s.weights || null, sites: s.sites || null, cmp: s.cmp || [], ai: d.ai || null, sel: 0, places: {}, routes: {}, savedId: d.id, pre: null, delta: null, refreshing: false });
     if (v2) { const b = d.brief || {}; v.bf = { client: b.client || '', product: b.product || '', industry: b.industry || '', period: b.period || '' }; v.q = b.where || ''; v.mode = s.mode || v.mode; if (s.comp) v.comp = { ...ST.emptyComp(), ...s.comp }; v.clientLoc = s.clientLoc || ''; v.targets = s.targets ? { q: s.targets.q, items: old ? [] : s.targets.items } : null; if (s.inv != null) { v.inv = s.inv; v.invFilter = s.invFilter || { vendor: '', format: '', q: '' }; } v.recipeSet = v.objSet = true; }
     if (kind === 'plan') { v.plan = d.result; v.tab = 'plan'; }
@@ -164,9 +167,11 @@ PI.tools.geo = async (box, p, a) => {
   };
   G.refreshAll = () => PI.tools.geo(box, p, a);
   PI.geoG = G;
+  // The header counter is read from the server ledger, not kept in the page: re-read whenever this tab comes back into view, so two tabs agree.
+  if (!PI.geoQuotaSync) { PI.geoQuotaSync = true; document.addEventListener('visibilitychange', async () => { if (document.hidden) return; const el = document.getElementById('gquota'); if (!el || !PI.geoG) return; try { const st = await PI.api('GET', 'geo/status'); PI.geoG.v.st = st; if (st.quota && st.quota.used != null) { el.textContent = st.quota.used.toLocaleString('en-US') + ' / ' + st.quota.cap.toLocaleString('en-US') + (st.quota.reused ? ' · ' + st.quota.reused.toLocaleString('en-US') + ' reused' : ''); el.title = 'Google units used this billing period (server ledger, read ' + new Date().toLocaleTimeString() + ')'; } } catch (_) { } }); }
 
   // ---- controls ----
-  $$('[data-t]').forEach(b => b.onclick = () => { v.tab = b.dataset.t; G.show(); });
+  $$('[data-t]').forEach(b => b.onclick = () => { v.tab = b.dataset.t; v.netAsk = null; G.show(); });   // opening a tab never carries a cost prompt: only an explicit Discover click asks
   const invUI = () => {
     const box = $('#ginvf'); if (!box) return; const rows = invRows(v.inv);
     if (!v.inv) { box.innerHTML = ''; return; }
@@ -190,11 +195,12 @@ PI.tools.geo = async (box, p, a) => {
   $$('#grad [data-r]').forEach(b => b.onclick = () => { v.radius = b.dataset.r === 'auto' ? 'auto' : +b.dataset.r; $$('#grad [data-r]').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', String(x === b)); }); const pe = $('#gpre'); if (pe && pe.innerHTML) G.run(); });   // changing the radius re-does the preflight, never a silent re-run
   const ub = $('#gusage'); if (ub) ub.onclick = async () => {
     try {
+      const ai = await PI.api('GET', 'geo/ai/usage').catch(() => null);
       const u = await PI.api('GET', 'geo/usage'), row = (l, a, c, s) => `<tr><td>${esc(l)}</td><td>${num(a)} / ${num(c)}</td><td><span class="gx-pill ${s === 'normal' ? '' : s === 'stop' || s === 'critical' || s === 'emergency' ? 'bad' : 'warn'}">${esc(s)}</span></td></tr>`;
       const m = PI.modal(`<h2>Google usage</h2><p class="gx-fine" style="margin:0 0 10px">Billing period ${esc(u.period.key)} (resets at midnight Pacific, ${esc(u.period.end.slice(0, 10))}). These are the app's own safety counters. Google Cloud billing remains the record.</p>
         <table class="gx-t"><thead><tr><th>Counter</th><th>Units used / limit</th><th>State</th></tr></thead><tbody>${row('All Google lookups', u.used, u.cap, u.state)}${u.skus.map(s => row(s.sku, s.used, s.cap, s.state)).join('')}${row('Map loads (browser)', u.mapInit.used, u.mapInit.cap, u.mapInit.remaining ? 'normal' : 'stop')}</tbody></table>
         <p class="gx-fine">Answered from the database instead of Google: <b>${num(u.reused)}</b> · failed or uncertain attempts: <b>${num(u.failed)}</b> · Qatar reporting month ${esc(u.qatarMonth)}.</p>
-        <p class="gx-fine">Ratings, hours and contact fields: <b>${u.flags.enterpriseFields ? 'enabled' : 'off'}</b>. Switches: Google ${u.flags.enabled ? 'on' : 'OFF'}, maps ${u.flags.maps ? 'on' : 'OFF'}, places ${u.flags.places ? 'on' : 'OFF'}, routes ${u.flags.routes ? 'on' : 'OFF'}.</p>
+        ${ai ? `<p class="gx-fine"><b>AI (OpenAI, separate ledger):</b> ${num(ai.used)} / ${num(ai.cap)} tokens in ${esc(ai.month)} · ${num(ai.perUserDay)} per person per day · at most ${ai.maxCallsPerAnalysis} calls per analysis · ${ai.enabled ? 'on (' + esc(ai.planner || '') + ')' : 'off: ' + esc(ai.why || '')}. Google and AI limits are independent; neither can raise the other.</p>` : ''}<p class="gx-fine">Ratings, hours and contact fields: <b>${u.flags.enterpriseFields ? 'enabled' : 'off'}</b>. Switches: Google ${u.flags.enabled ? 'on' : 'OFF'}, maps ${u.flags.maps ? 'on' : 'OFF'}, places ${u.flags.places ? 'on' : 'OFF'}, routes ${u.flags.routes ? 'on' : 'OFF'}.</p>
         <div class="actions" style="justify-content:flex-end"><button class="btn" id="guStop">Stop all Google lookups</button><button class="btn" id="guGo">Allow Google lookups</button><button class="btn pri" id="guX">Close</button></div>`);
       m.el.querySelector('#guX').onclick = m.close;
       m.el.querySelector('#guStop').onclick = async () => { await PI.api('POST', 'geo/policy', { emergencyStop: true }); PI.toast('All Google lookups are stopped. Saved and cached data still work.'); m.close(); };
