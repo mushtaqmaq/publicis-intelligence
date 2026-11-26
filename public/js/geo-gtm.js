@@ -31,7 +31,7 @@ T.strategy = async (el, G) => {
   $$('[data-ex]').forEach(x => x.onclick = () => { const e = SHORTCUTS[+x.dataset.ex]; s.text = e[2]; s.known = { mode: e[0] }; s.brief = null; T.strategy(el, G); });
   const ai = $('#gtai'); if (ai) ai.onchange = () => { s.ai = ai.checked; };
   $('#gten').onclick = async () => { if (s.text.trim().length < 3) return PI.toast('Write a short brief first'); const bt = $('#gten'); bt.disabled = true; bt.innerHTML = '<span class="spin"></span>';
-    try { const d = await PI.api('POST', 'geo/gtm/enhance', { text: s.text, known: s.known, ai: s.ai && aiOn }); s.brief = d.brief; s.aiEnh = d.ai; s.aiPlan = d.aiPlan || null; s.aiPlanText = s.text; if (d.ai.status === 'unavailable') PI.toast('AI unavailable; the rules engine read the brief. ' + (d.ai.message || '')); } catch (e) { PI.toast(e.message); }
+    try { const d = await PI.api('POST', 'geo/gtm/enhance', { text: s.text, known: s.known, ai: s.ai && aiOn, clientId: PI.S.clientId || '' }); s.brief = d.brief; s.aiEnh = d.ai; s.aiPlan = d.aiPlan || null; s.aiPlanText = s.text; if (d.ai.status === 'unavailable') PI.toast('AI unavailable; the rules engine read the brief. ' + (d.ai.message || '')); } catch (e) { PI.toast(e.message); }
     T.strategy(el, G); };
   $('#gtgo').onclick = () => run(el, G);
   if (b) wireBrief(el, G, s);
@@ -74,16 +74,25 @@ async function run(el, G, keepAi, opts = {}) {
   if (s.brief) s.known = readKnown(s);
   const aiOn = v.st.geoAi && v.st.geoAi.enabled && s.ai && !keepAi;
   s.busy = true; T.strategy(el, G);
-  const reuse = aiOn && s.aiPlan && s.aiPlanText === s.text, t0 = Date.now(), stages = aiOn ? [[0, opts.rivalsConfirm ? 'Searching Google for the named branches' : reuse ? 'Scoring all 91 zones' : 'Reading the brief with AI'], [reuse ? 2 : 8, 'Writing the strategy with AI (usually 20 to 30 seconds)']] : [[0, 'Scoring all 91 zones and the landscape']];
+  const reuse = aiOn && s.aiPlan && s.aiPlanText === s.text, t0 = Date.now(), stages = [[0, opts.rivalsConfirm ? 'Searching Google for the named branches' : aiOn && !reuse ? 'Reading the brief with AI' : 'Scoring all 91 zones and the landscape']];
   const tick = () => { const sec = Math.round((Date.now() - t0) / 1000), a = document.getElementById('gtbusyt'), b2 = document.getElementById('gtbusys'); if (!a) return; a.textContent = stages.filter(x => sec >= x[0]).pop()[1]; b2.textContent = ' · ' + sec + ' s'; };
   const timer = setInterval(tick, 1000); tick(); const bz = document.getElementById('gtbusy'); if (bz) bz.scrollIntoView({ block: 'center', behavior: 'smooth' });
   try {
     const inv = G.v.inv && G.v.inv !== G.BUILTIN && G.v.inv !== G.FOUND ? G.invRows(G.v.inv).map(r => ({ id: r.id, lat: r.lat, lon: r.lon, vendor: r.vendor, format: r.format, circuit: r.circuit, screen_type: r.screen_type })) : null;
-    const d = await PI.api('POST', 'geo/gtm/run', { text: s.text, known: s.known, aiEnhance: aiOn && !reuse, aiPlan: reuse ? s.aiPlan : undefined, aiNarrate: aiOn, rivalsConfirm: opts.rivalsConfirm === true, readiness: s.readiness, inventory: inv, policy: { pct: s.view.pct, min: s.view.min } });
+    const base = { text: s.text, known: s.known, readiness: s.readiness, inventory: inv, policy: { pct: s.view.pct, min: s.view.min }, clientId: PI.S.clientId || '' };
+    const d = await PI.api('POST', 'geo/gtm/run', { ...base, aiEnhance: aiOn && !reuse, aiPlan: reuse ? s.aiPlan : undefined, aiNarrate: false, rivalsConfirm: opts.rivalsConfirm === true });
     if (s.opened && s.refreshing) { s.delta = delta(s.opened.result, d); s.refreshing = false; s.opened.refreshed = true; }
-    s.result = d; s.brief = d.brief; s.selZone = null; s.selPin = null;
+    s.result = d; s.brief = d.brief; s.selZone = null; s.selPin = null; s.fb = null;
     if (d.usage.google.units) PI.api('GET', 'geo/status').then(st => { v.st = st; if (PI.geoQuotaPaint) PI.geoQuotaPaint(st); }).catch(() => { });   // a rival search spent Google lookups: show the new count
     if (d.usage.ai.status === 'unavailable' && aiOn) PI.toast('AI unavailable; calculated evidence and rule-based wording are shown.');
+    // Second step, in the background: the same run again with AI wording. The numbers cannot change; only the sentences do.
+    const token = s.writing = aiOn && d.usage.ai.status !== 'unavailable' && d.zone_opportunities.length ? PI.uid() : null;
+    if (token) PI.api('POST', 'geo/gtm/run', { ...base, aiPlan: d.aiPlanUsed || (reuse ? s.aiPlan : undefined), aiEnhance: false, aiNarrate: true }).then(w => {
+      if (s.writing !== token || s.result !== d) return;   // the planner moved on: drop this wording
+      s.writing = null; const calls = [...((d.usage.ai.calls) || []), ...((w.usage.ai.calls) || [])];
+      s.result = { ...d, executive_recommendation: w.executive_recommendation, claims: w.claims, messaging: w.messaging, risks: w.risks, channel_notes: w.channel_notes, next_actions: w.next_actions, wordingSource: w.wordingSource, usage: { ...d.usage, ai: { ...w.usage.ai, calls } } };
+      if (v.tab === 'strategy' && document.getElementById('gtres')) T.strategy(document.getElementById('gxb'), G);
+    }).catch(() => { if (s.writing === token) { s.writing = null; if (v.tab === 'strategy' && document.getElementById('gtres')) T.strategy(document.getElementById('gxb'), G); } });
   } catch (e) { PI.toast(e.message); }
   clearInterval(timer); s.busy = false; T.strategy(el, G);
   const top = document.querySelector('#gtres .gx-exec'); if (top) top.scrollIntoView({ block: 'start', behavior: 'smooth' });   // the answer, not the form, is what the planner should see next
@@ -97,10 +106,11 @@ function resultHtml(r, s, G) {
   const topZ = aud.zones.filter(z => z.displayStatus === 'top');
   return `${s.opened ? `<div class="notice info">${I('save')}<div><b dir="auto">${esc(s.opened.name)}</b> · saved ${PI.when(s.opened.savedAt)}. ${s.opened.refreshed ? 'You are looking at a fresh run of the same brief; the saved snapshot itself is unchanged.' : 'This is the saved strategy: nothing was recalculated and no Google or AI call was made.'}${s.opened.intact === false ? ' <b>Warning: the saved content does not match its fingerprint.</b>' : ''} <button class="btn xs" id="gtref">${I('refresh-cw')}Refresh and compare</button></div></div>` : ''}
     ${s.delta ? `<div class="notice info"><div>Refreshed: status ${esc(s.delta.statusFrom)} → ${esc(s.delta.statusTo)}. New top zones: ${s.delta.entered.map(zl).map(esc).join(', ') || 'none'}. Dropped: ${s.delta.left.map(zl).map(esc).join(', ') || 'none'}. The saved snapshot is unchanged until you save again.</div></div>` : ''}
-    <div class="gt-split"><div class="gt-report">${navHtml(r)}<section id="gt-s-rec"><div class="gx-card gx-exec"><div class="gx-sh"><div><span class="gx-pill ${sc}">${sl}</span> <span class="gx-pill" title="Who wrote the sentences">Wording: ${esc(r.wordingSource)}</span> <span class="gx-pill">Google: ${r.usage.google.units} units</span> <span class="gx-pill">AI: ${ai.status === 'used' ? ai.calls.reduce((a, c) => a + c.input + c.output, 0).toLocaleString('en-US') + ' tokens' : esc(ai.status)}</span></div>
+    <div class="gt-split"><div class="gt-report">${navHtml(r)}<section id="gt-s-rec"><div class="gx-card gx-exec"><div class="gx-sh"><div><span class="gx-pill ${sc}">${sl}</span> <span class="gx-pill" title="Who wrote the sentences">${s.writing ? '<span class="spin"></span> AI is writing the wording; the rule wording is shown meanwhile' : 'Wording: ' + esc(r.wordingSource === 'ai-validated' ? 'AI, checked against the evidence' : r.wordingSource)}</span> <span class="gx-pill">Google: ${r.usage.google.units} units</span> <span class="gx-pill">AI: ${ai.status === 'used' || (ai.calls || []).length ? (t => t ? t.toLocaleString('en-US') + ' tokens' : 'reused, no tokens')((ai.calls || []).reduce((a, c) => a + c.input + c.output, 0)) : esc(ai.status)}</span></div>
       <div class="gx-acts"><button class="btn xs" id="gtsave">${I('save')}Save</button><button class="btn xs" id="gtexp">${I('download')}Export report</button></div></div>
       <h3 dir="auto" style="margin:10px 0 4px">${esc(ex.headline)}</h3>${ex.why_now ? `<p dir="auto">${esc(ex.why_now)}</p>` : ''}<p dir="auto"><b>First action:</b> ${esc(ex.first_action)}</p>${cites(ex.evidence_ids)}
       ${r.readinessMissing.length ? `<p class="gx-fine">${r.status === 'PLANNING_READY' ? 'Before activation:' : 'Missing:'} ${r.readinessMissing.map(x => esc(typeof x === 'string' ? x : '')).join(' · ')}</p>` : ''}
+      ${r.wordingSource === 'ai-validated' && !s.writing ? `<p class="gx-fine gt-fb">Was this wording useful? <button class="btn xs ${s.fb === 'up' ? 'on' : ''}" data-fb="up">Useful</button> <button class="btn xs ${s.fb === 'down' ? 'on' : ''}" data-fb="down">Not useful</button>${s.fb ? ' <span>Thank you: it is counted in the AI usage report.</span>' : ''}</p>` : ''}
       ${ai.rejected ? `<p class="gx-fine">AI wording was rejected by the evidence validator (${ai.rejected.length} problems, for example: ${esc(ai.rejected[0])}), so the rule-based wording is shown.</p>` : ''}</div>
     </section><section id="gt-s-where">${zonesTable(r, s)}</section><section id="gt-s-comp">${competitorsHtml(r, cites)}${landscapeHtml(r, cites)}</section><section id="gt-s-media">${corridorHtml(r)}${oohHtml(r, s)}${channelsHtml(r, cites)}</section><section id="gt-s-why">${claimsHtml(r, cites)}${timingHtml(r)}</section><section id="gt-s-act">${planHtml(r, s)}</section>${appendixHtml(r)}</div>
     <aside class="gt-side" aria-label="Map and selected zone"><div class="gx-map card"><div class="gx-mapbox" id="gtmap"></div>
@@ -224,6 +234,7 @@ function wireResult(el, G, s) {
   const mn = $('#gtmin'); if (mn) mn.onchange = () => { s.view.min = +mn.value; relens(); };
   const ln = $('#gtlens'); if (ln) ln.onchange = relens;
   $$('[data-rd]').forEach(c => c.onchange = () => { s.readiness[c.dataset.rd] = c.checked; });
+  $$('[data-fb]').forEach(b => b.onclick = async () => { try { await PI.api('POST', 'geo/ai/feedback', { strategyId: r.strategy_id, rating: b.dataset.fb, clientId: PI.S.clientId || '', model: ((r.usage.ai.calls || []).find(c => c.pass === 'B') || {}).model }); s.fb = b.dataset.fb; T.strategy(el, G); } catch (e) { PI.toast(e.message); } });
   // Readiness is the planner's own confirmation, so it changes the status here without re-running (and without losing the AI wording).
   const rd = $('#gtready'); if (rd) rd.onclick = () => { const miss = READY.filter(([k]) => !s.readiness[k]).map(([, l]) => l); if (r.status !== 'DRAFT_INSUFFICIENT_EVIDENCE') { r.status = miss.length ? 'PLANNING_READY' : 'ACTIVATION_READY'; r.readinessMissing = miss; } T.strategy(el, G); };
   const s2 = $('#gtsave2'); if (s2) s2.onclick = () => save(G, s); const e2 = $('#gtexp2'); if (e2) e2.onclick = () => exportReport(r);
