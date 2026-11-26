@@ -14,13 +14,9 @@ Only items that code alone cannot close, plus the parts not built.
 
 ## Not built (honest gaps)
 
-- G47: bounded catchment expansion (500 m → 1 km → 3 km) with re-normalisation.
-- Union-based population for overlapping circles (the network overlap share exists; a population union does not).
 - An iterative function-calling loop. AI is two structured calls whose enums select from the registries; the server executes everything.
-- Google TrafficLayer as a visual-only layer.
 - Mall-tenant and campus de-duplication beyond log damping.
-- Mobile layout and screen-reader pass of the new tab.
-- XLSX import re-test and import client-isolation test.
+- A real screen-reader session (names, keyboard path and phone width were checked).
 - Facing and direction fields in the OOH catalogue (the vendor must supply them).
 
 ## Data refresh

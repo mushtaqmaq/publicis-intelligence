@@ -36,7 +36,10 @@ Branch `feat/geo-gtm-v2`. **Production was not deployed.** No production data wa
 | Planning-ready vs activation-ready rules | `gtm.status` | FIXTURE VERIFIED |
 | Save, reopen with zero calls, refresh with delta, fingerprint | `geo-gtm.js`, `geo-state-core.js` | STAGING + FIXTURE VERIFIED |
 | Client-safe export | `geo-gtm.js` `exportReport` | STAGING VERIFIED |
-| Bounded catchment expansion (G47) | – | NOT IMPLEMENTED |
+| Bounded catchment expansion (G47), opt-in, budgeted, area-normalised | `analyze.js`, cost check in `geo.js` | FIXTURE VERIFIED (mock Google) |
+| People counted once across overlapping catchments (G48) | `zones.union`, `plan.js`, Site Comparison | FIXTURE VERIFIED |
+| Live traffic layer, visual only | `geo-map.js` `M.traffic`, Strategy layers | IMPLEMENTED; not seen on a Google map |
+| Small-zone damping (1 km² floor), recipe version `audience-zones-2` | `audience.js` | FIXTURE VERIFIED |
 
 ## Build and test
 

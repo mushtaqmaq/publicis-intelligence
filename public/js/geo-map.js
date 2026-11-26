@@ -170,6 +170,8 @@ M.zones = st => {
   M.zoneLayer.setStyle(f => { const no = +f.getProperty('no'), x = (st.scores || {})[no], on = st.selected === no, show = x && x.score != null && (st.mode === 'all' || x.status === 'top');
     return { fillColor: show ? M.rampOf(x.score) : '#000', fillOpacity: show ? 0.62 : 0, strokeColor: on ? '#12121A' : show ? '#7A2E0E' : '#5B6577', strokeOpacity: on ? 1 : show ? 0.8 : st.mode === 'outline' || st.outline ? 0.35 : 0.12, strokeWeight: on ? 3 : show ? 1 : 0.6, zIndex: on ? 3 : show ? 2 : 1, clickable: true }; });
 };
+// Google's live traffic tiles: a picture of now, tier CURRENT_TRAFFIC_VISUAL_ONLY. Never read, stored or exported as data.
+M.traffic = on => { if (!M.map) return; if (on && !M.trafficLayer) M.trafficLayer = new M.g.TrafficLayer(); if (M.trafficLayer) M.trafficLayer.setMap(on ? M.map : null); };
 M.zoneBounds = no => { if (!M.zoneLayer) return null; const f = M.zoneLayer.getFeatureById(no); if (!f) return null; const b = new M.g.LatLngBounds(); f.getGeometry().forEachLatLng(ll => b.extend(ll)); return b; };
 // Overlays for the strategy view: corridors (truth-tiered polylines), numbered OOH pins, rival markers. Cleared and redrawn together.
 M.gtmObjs = [];
