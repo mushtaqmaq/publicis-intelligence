@@ -18,6 +18,8 @@ Produced by `lib/geo/gtm.js` `run()` and returned by `POST /api/geo/gtm/run`.
 | `channels[]` | `channel_id, label, role, funnel_stage, target_audience_context, geographic_scope, supported_targetability (UNVERIFIED), evidence_ids, activation_assets, kpis, tracking_requirements, feasibility_status PROPOSED_UNVERIFIED, dependencies, recommended_test, asked` | rules |
 | `evidence[]` | EvidenceItems that any sentence may cite | deterministic |
 | `executive_recommendation` | `headline, why_now, first_action, evidence_ids` | rules, or AI once validated |
+| `strategic_idea`, `audience_insight` | one sentence each | rules, or AI once validated |
+| `action_plan[]` | `when` (now / next / later = 0 to 30, 31 to 60, 61 to 90 days), `action`, `owner` (Planner, Client, Media team, Creative), `measure` (a metric name or a completion state, never a target number) | rules, or AI once validated (the rule plan is kept if the AI returns fewer than three actions) |
 | `claims[]` | `signal, pattern, implication, action, evidence_ids, claim_class` | rules, or AI once validated |
 | `messaging[]`, `risks[]`, `channel_notes[]` | wording | rules, or AI once validated |
 | `wordingSource` | `rules`, `ai-validated`, or `rules (AI wording rejected by the validator)` | server |

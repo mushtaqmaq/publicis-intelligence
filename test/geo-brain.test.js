@@ -34,7 +34,7 @@ test('G57 G69 brain: ledger, budget, call cap, timeout, malformed and refused ou
   wording = () => ({ executive: { headline: 'Win zone 7.', why_now: '', first_action: 'Act.', evidence_ids: ['ev:not-real'] }, claims: [], channel_notes: [], messaging: [], risks: [] });
   sent.length = 0; const r2 = await GT.run(ctx(), { text: 'families in qatar', aiNarrate: true, user: 'u1', inventory: [] });
   assert.equal(sent.length, 2, 'one retry with the problems, then stop'); assert.match(JSON.stringify(sent[1].b.input), /not in the evidence bundle/);
-  assert.match(r2.wordingSource, /rejected/); assert.ok(r2.usage.ai.rejected.length); assert.match(r2.executive_recommendation.headline, /^Prioritise/);
+  assert.match(r2.wordingSource, /rejected/); assert.ok(r2.usage.ai.rejected.length); assert.match(r2.executive_recommendation.headline, /^(Focus|Reach) /);
   // valid wording is accepted and keeps the deterministic numbers and status
   wording = txt => { const bun = JSON.parse(txt).bundle, z = bun.top_zones[0]; return { executive: { headline: `Lead with ${z.label}.`, why_now: 'Family weekends.', first_action: 'Confirm geo-targeting.', evidence_ids: z.evidence_ids.slice(0, 1) }, claims: [{ signal: 'Strong family context', pattern: 'Residential and education lenses lead', implication: 'Good place to start', action: 'Prioritise', evidence_ids: z.evidence_ids.slice(0, 1), claim_class: 'CALCULATED' }], channel_notes: [], messaging: [{ pillar: 'Local', line: 'Name the area.', evidence_ids: [] }], risks: ['Targeting may not match zones.'] }; };
   sent.length = 0; const r3 = await GT.run(ctx(), { text: 'families in qatar', aiNarrate: true, user: 'u1', inventory: [] });

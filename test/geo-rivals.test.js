@@ -12,9 +12,12 @@ test('strategy competitors: cost check first, branches by zone, real rival count
   const P = (id, name, no, k = 0) => { const p = inside(no); return { id, displayName: { text: name }, formattedAddress: 'Demo', location: { latitude: p.latitude + k * 1e-4, longitude: p.longitude } }; };
   const DATA = { 'qnb': [P('q1', 'QNB Al Sadd Branch', 38), P('q2', 'QNB Al Sadd Plaza Branch', 38, 3), P('q3', 'QNB City Center Branch', 61), P('q4', 'QNB ATM', 61, 2)],
     'commercial bank': [P('c1', 'Commercial Bank Al Sadd Branch', 38, 6), P('c2', 'Commercial Bank Branch', 38, 9), P('c3', 'Commercial Bank West Bay Branch', 63)], 'doha bank': [P('d1', 'Doha Bank West Bay Branch', 63, 4), P('x1', 'Some Other Exchange', 63, 8)] };
+  const QIB = [P('qb1', 'QIB West Bay Branch', 63, 12), P('qb2', 'QIB Al Sadd Branch', 38, 12), P('qb3', 'QIB ATM', 38, 14)];
   let calls = 0;
   const fetchImpl = async (url, init) => { if (!/places:searchText/.test(url)) return { ok: false, status: 404, json: async () => ({}) }; calls++;
     const b = JSON.parse(init.body), first = Math.abs(b.locationRestriction.rectangle.low.latitude - 25.20) < 1e-6 && Math.abs(b.locationRestriction.rectangle.low.longitude - 51.40) < 1e-6;
+    // the second pass: "qib branch" in the four quarters of the central area returns the two branches the ATMs had crowded out
+    if (b.textQuery === 'qib branch') { const q = b.locationRestriction.rectangle, inQ = p => p.location.latitude >= q.low.latitude && p.location.latitude < q.high.latitude && p.location.longitude >= q.low.longitude && p.location.longitude < q.high.longitude; return { ok: true, status: 200, json: async () => ({ places: QIB.filter(inQ) }) }; }
     // "qib" fills the central area to Google's cap of 60 with ATMs, the way a real bank search does
     if (first && b.textQuery === 'qib') return { ok: true, status: 200, json: async () => ({ nextPageToken: 't', places: Array.from({ length: 20 }, (_, i) => ({ id: 'atm' + calls + '_' + i, displayName: { text: 'QIB ATM' }, formattedAddress: 'Demo', location: { latitude: 25.3 + i * 1e-4, longitude: 51.5 + calls * 1e-4 } })) }) };
     return { ok: true, status: 200, json: async () => ({ places: first ? DATA[b.textQuery] || [] : [] }) }; };
@@ -54,7 +57,16 @@ test('strategy competitors: cost check first, branches by zone, real rival count
   const capped = await run({ known: { audiences: ['office_professionals'], objective: 'banking', confirmedRivals: ['QIB'] }, rivalsConfirm: true }); const q = capped.competitors;
   assert.equal(q.brands.find(x => x.name === 'QIB').coverage, 'partial'); assert.equal(q.topZones.find(x => x.zoneNo === 63).verdict, 'not known'); assert.equal(q.topZones.find(x => x.zoneNo === 38).searchCutOff, true);
   const o63 = capped.opportunity.rows.find(r => r.zoneNo === 63); assert.equal(o63.competitorStrategicFit, null); assert.equal(o63.opportunityIndex, o63.audienceFit, 'where the search was cut off, rival presence is unknown and does not move the index');
-  assert.ok(q.cutOffZones > 0); assert.match(q.limitations.join(' '), /at most 60 places/); assert.ok(!q.topZones.some(x => x.searchCutOff && x.verdict === 'none found'));
+  assert.ok(q.cutOffZones > 0);
+  // 6. the second pass: offered with its cost, run only when asked, then free; the cut-off zones get real readings
+  assert.deepEqual([q.refine.available, q.refine.minUnits, q.refine.maxUnits], [true, 4, 12]); assert.deepEqual(q.refine.areas, [{ brand: 'QIB', area: 1 }]);
+  const before = calls, known = { audiences: ['office_professionals'], objective: 'banking', confirmedRivals: ['QIB'] };
+  const same = await run({ known }); assert.equal(calls, before, 'nothing is searched again without the request'); assert.equal(same.competitors.refine.available, true);
+  const fine = await run({ known, rivalsRefine: true }), f = fine.competitors; assert.equal(calls, before + 4, 'four quarters, one page each'); assert.equal(fine.usage.google.units, 4);
+  assert.equal(f.refine.available, false); assert.equal(f.refine.done, 1); const qib = f.brands.find(x => x.name === 'QIB'); assert.equal(qib.branches, 2); assert.equal(qib.coverage, 'complete-as-observed'); assert.equal(qib.atms, 61, 'ATMs stay apart');
+  assert.equal(f.cutOffZones, 0); assert.deepEqual([f.topZones.find(x => x.zoneNo === 63).verdict, f.topZones.find(x => x.zoneNo === 38).verdict], ['rivals only', 'contested']);
+  assert.ok(fine.opportunity.rows.find(r => r.zoneNo === 63).competitorStrategicFit != null, 'rival presence is known again, so it counts');
+  const free = await run({ known }); assert.equal(calls, before + 4, 'the stored second pass is applied for free'); assert.equal(free.competitors.refine.done, 1); assert.equal(free.competitors.brands.find(x => x.name === 'QIB').branches, 2); assert.match(q.limitations.join(' '), /at most 60 places/); assert.ok(!q.topZones.some(x => x.searchCutOff && x.verdict === 'none found'));
 });
 
 test('without Google the strategy still runs and says named branches are unavailable', async () => {
