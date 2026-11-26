@@ -120,3 +120,22 @@ Google and AI calls are 0 / 0 for every row unless stated. A PASS cites an execu
 | Of which with a LIVE check | 7 (G16, G17, G19, G44, G55, G58, G60) |
 
 G61 and G63 reuse the assertions of G05 and G07. PASS on MOCK-GOOGLE rows means the existing tests still pass on this branch, not that the provider was exercised live.
+
+## Product brief §17: the ten release journeys, run on the live site (26 November 2026, main `2dce164`)
+
+Run in a signed-in browser against production. "Google" is the change in the server's monthly unit ledger during the journey.
+
+| # | Journey | Result | What was seen | Google |
+|---|---|---|---|---|
+| 1 | Office professionals + Qatar, no seed or OOH | PASS | Planning ready; 12 of 78 scored zones highlighted; top: Al Sadd 82.5, West Bay 82.4, Fereej Bin Mahmoud 81.4; recipe workplace 0.44, dining 0.22, mobility 0.22, premium 0.11; 6 channel roles; no OOH | 0 |
+| 2 | Families and Tourists give different recipes and maps | PASS | Families: residential 0.3, education 0.2, leisure 0.2, shopping 0.2, healthcare 0.1; top Al Sadd (39), Fereej Al Asiri, The Pearl. Tourists: tourism 0.5, shopping 0.25, dining 0.125, leisure 0.125; top The Pearl, Slata, Al Sadd, Souq Waqif | 0 |
+| 3 | Custom combined audience + product objective | PASS, one note | "Premium fitness membership for young professionals and students near universities" blended five audiences into a nine-lens recipe, shown with its weights. Note: "professionals" also pulled in Office professionals and "premium" pulled in the Premium audience; the planner can untick them | 0 |
+| 4 | QNB and named banking rivals | PASS | QNB 58, Commercial Bank 29, Doha Bank 22 branches found, all complete as observed after the deeper central Doha search (17 lookups earlier the same day); ATMs kept apart | 0 on repeat |
+| 5 | Restaurant networks | PASS | McDonald's 76, KFC 67, Burger King 23 branches found; 49 of 76 McDonald's branches have a KFC within 1 km, 23 a Burger King; category count (196 mapped fast-food places) kept apart from named brands; direct, adjacent and context groups shown; cost shown first (18 to 54) | 22 |
+| 6 | Area-only research | PASS | "Najma" from Explore > Official data: area profile with census 2020 residents 43,695, 1.1 km², mapped places and contexts; no ranking, plan or channels | 0 |
+| 7 | One OOH face at an overlap | NOT RUN LIVE | The overlap picker is covered by local tests only; clicking stacked markers on the live map was not automated | – |
+| 8 | GTM end to end | PASS | QNB premium card: zones, competitors, channels, 90-day roadmap with DO NOW / TEST / WATCH, AI wording checked against the evidence | 0 |
+| 9 | Same frozen snapshot, same values, no calls on reopen | PASS | Opened by share link: identical zone scores, ranks, headline and branch counts; fingerprint intact; no strategy, Places or AI request was made | 0 |
+| 10 | Quota exhaustion, poor coverage, missing data | PASS, tests only | Covered by the billing, fallback and area tests; not forced on the live ledger | – |
+
+Not covered by these journeys: a real phone, and the named-brand reading of central zones against the banks' own branch lists.
