@@ -42,6 +42,18 @@ M.fitMinZoom = () => {
   M.minZ = Math.max(6, Math.floor(Math.min(zx, zy))); M.map.setOptions({ minZoom: M.minZ }); if (M.map.getZoom() < M.minZ) M.map.setZoom(M.minZ);
 };
 M.fitQatar = () => { if (M.map) M.map.fitBounds(M.BOUNDS, 0); };
+// Fit with a contextual zoom cap: one point (or two faces at the same spot) would otherwise zoom to 22 and lose the roads around it.
+M.MAXZ = 17;
+M.fit = (b, pad) => { if (!M.map || !b || b.isEmpty()) return; M.map.fitBounds(b, pad); M.g.event.addListenerOnce(M.map, 'idle', () => { if (M.map.getZoom() > M.MAXZ) M.map.setZoom(M.MAXZ); }); };
+// Everything within ~14 px of a click, so stacked markers get a picker instead of the top one silently winning. items: [{lat, lon, label, act}]
+M.near = (items, lat, lon, px = 14) => { const z = M.map.getZoom(), mpp = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z), lim = px * mpp;
+  return items.filter(it => { const dy = (it.lat - lat) * 110574, dx = (it.lon - lon) * 111320 * Math.cos(lat * Math.PI / 180); return Math.hypot(dx, dy) <= lim; }); };
+M.picker = (items, lat, lon) => {
+  if (items.length === 1) return items[0].act();
+  if (M.iw) M.iw.close(); const box = document.createElement('div'); box.className = 'gx-picker'; box.setAttribute('role', 'listbox'); box.setAttribute('aria-label', items.length + ' items at this spot');
+  box.innerHTML = `<b>${items.length} items here. Choose one:</b>`; items.slice(0, 12).forEach(it => { const b = document.createElement('button'); b.className = 'btn xs'; b.setAttribute('role', 'option'); b.textContent = it.label; b.onclick = () => { M.iw.close(); it.act(); }; box.appendChild(b); });
+  M.iw = new M.g.InfoWindow({ content: box, position: { lat, lng: lon } }); M.iw.open({ map: M.map }); setTimeout(() => { const f = box.querySelector('button'); if (f) f.focus(); }, 80);
+};
 M.setType = t => { M.mapType = t; if (M.map) M.map.setMapTypeId(t); };
 
 // st = { res, r (selected result), sites: [results to show], places, layers, fit, onSelect }. Redraws overlays only; the map itself is kept.
@@ -51,16 +63,29 @@ M.update = st => {
   const L = st.layers, sel = st.r, pos = x => ({ lat: x.site.lat, lng: x.site.lon });
   if (L.rings) { const c = new g.Circle({ map: M.map, center: pos(sel), radius: sel.radius || st.res.radius, strokeColor: '#2F6BFF', strokeWeight: 2, fillColor: '#2F6BFF', fillOpacity: 0.1, clickable: false }); M.objs.push(c); }
   if (L.places) for (const p of st.places || []) if (!L.off[p.c]) M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, clickable: false, icon: { path: g.SymbolPath.CIRCLE, scale: 4.5, fillColor: M.color(st.res, p.c), fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1 } }));
-  const sq = (p, fill, sc = 5.5) => M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: p.name, clickable: false, icon: { path: g.SymbolPath.CIRCLE, scale: sc, fillColor: fill, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 } }));
+  const sq = (p, fill, sc = 5.5) => M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, clickable: false, zIndex: -1, icon: { path: g.SymbolPath.CIRCLE, scale: sc, fillColor: fill, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 } }));
   if (L.clients) (st.clients || []).forEach(p => sq(p, '#1FA971', 6));
-  if (L.inv) (st.inv || []).forEach(p => { if (p.id === (sel.site && sel.site.id)) return; const mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: (p.name || p.id) + (p.format ? ' · ' + p.format : ''), icon: { path: g.SymbolPath.CIRCLE, scale: 3.5, fillColor: '#98A2B3', fillOpacity: 0.85, strokeColor: '#fff', strokeWeight: 1 } }); mk.addListener('click', () => st.onPickAsset && st.onPickAsset(p.id)); M.objs.push(mk); });
-  (st.near || []).forEach(p => { const mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: (p.name || p.id) + ' · inside the catchment', zIndex: 5, icon: { path: g.SymbolPath.CIRCLE, scale: 6, fillColor: '#2F6BFF', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 } }); mk.addListener('click', () => st.onPickAsset && st.onPickAsset(p.id)); M.objs.push(mk); });
+  // Pick list for any click: ranked results first, then catchment assets, then catalogue faces. Labels carry ID and circuit.
+  const tag = p => [p.id, p.circuit ? 'circuit ' + p.circuit : '', p.vendor].filter(Boolean).join(' · ');
+  const pool = [...(L.sites ? st.sites.map((x, i) => ({ lat: x.site.lat, lon: x.site.lon, label: `#${i + 1} ranked: ${tag(x.site)}`, act: () => st.onSelect && st.onSelect(x.site.id) })) : []),
+    ...(st.near || []).map(p => ({ lat: p.lat, lon: p.lon, label: 'In catchment: ' + tag(p), act: () => st.onPickAsset && st.onPickAsset(p.id) })),
+    ...(L.inv ? (st.inv || []).map(p => ({ lat: p.lat, lon: p.lon, label: 'Catalogue: ' + tag(p), act: () => st.onPickAsset && st.onPickAsset(p.id) })) : [])];
+  const click = (lat, lon, own) => { const hit = M.near(pool, lat, lon); M.picker(hit.length ? hit : [own], lat, lon); };
+  // The full catalogue is clustered by zoom: below street level, one count marker per cell; click to zoom in.
+  if (L.inv) { const z = M.map.getZoom(), inv = (st.inv || []).filter(p => p.id !== (sel.site && sel.site.id));
+    if (z < 14) { const step = 0.5 / Math.pow(2, z - 7), cells = new Map(); inv.forEach(p => { const k = Math.floor(p.lat / step) + ':' + Math.floor(p.lon / step); (cells.get(k) || cells.set(k, []).get(k)).push(p); });
+      cells.forEach(m => { const c = { lat: m.reduce((a, p) => a + p.lat, 0) / m.length, lng: m.reduce((a, p) => a + p.lon, 0) / m.length }, mk = new g.Marker({ map: M.map, position: c, zIndex: 0, title: m.length + ' catalogue faces: zoom in', label: m.length > 1 ? { text: String(m.length), color: '#fff', fontSize: '10px', fontWeight: '700' } : undefined, icon: { path: g.SymbolPath.CIRCLE, scale: m.length > 1 ? 8 + Math.min(8, Math.log2(m.length) * 2) : 3.5, fillColor: '#98A2B3', fillOpacity: 0.8, strokeColor: '#fff', strokeWeight: 1 } });
+        mk.addListener('click', () => { if (m.length === 1) return click(m[0].lat, m[0].lon, { label: tag(m[0]), act: () => st.onPickAsset && st.onPickAsset(m[0].id) }); M.map.panTo(c); M.map.setZoom(Math.min(M.MAXZ, z + 2)); }); M.objs.push(mk); }); }
+    else inv.forEach(p => { const mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, zIndex: 0, title: tag(p) + (p.format ? ' · ' + p.format : ''), icon: { path: g.SymbolPath.CIRCLE, scale: 3.5, fillColor: '#98A2B3', fillOpacity: 0.85, strokeColor: '#fff', strokeWeight: 1 } }); mk.addListener('click', () => click(p.lat, p.lon, { label: tag(p), act: () => st.onPickAsset && st.onPickAsset(p.id) })); M.objs.push(mk); });
+    if (!M.reclust) { M.reclust = M.map.addListener('zoom_changed', () => { clearTimeout(M.rct); M.rct = setTimeout(() => { if (M.last && M.last.layers.inv) M.update({ ...M.last, fit: null }); }, 200); }); } }
+  M.last = st;
+  (st.near || []).forEach(p => { const mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: (p.name || p.id) + ' · inside the catchment', zIndex: 5, icon: { path: g.SymbolPath.CIRCLE, scale: 6, fillColor: '#2F6BFF', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 } }); mk.addListener('click', () => click(p.lat, p.lon, { label: tag(p), act: () => st.onPickAsset && st.onPickAsset(p.id) })); M.objs.push(mk); });
   (st.ctx || []).forEach(p => M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, clickable: false, icon: { path: g.SymbolPath.CIRCLE, scale: 4, fillColor: p.color, fillOpacity: 0.9, strokeColor: '#fff', strokeWeight: 1 } })));
-  if (L.sites) st.sites.forEach(x => { const on = x === sel, mk = new g.Marker({ map: M.map, position: pos(x), title: x.site.name || x.site.id, zIndex: on ? 9 : 1, icon: { path: g.SymbolPath.CIRCLE, scale: on ? 9 : 6.5, fillColor: on ? '#E5392B' : x.score.value == null ? '#12121A' : x.score.value >= 70 ? '#1FA971' : x.score.value >= 40 ? '#D99A12' : '#7C8699', fillOpacity: 1, strokeColor: on ? '#fff' : '#12121A', strokeWeight: on ? 3 : 1.5 } }); mk.addListener('click', () => st.onSelect && st.onSelect(x.site.id)); M.objs.push(mk); });
+  if (L.sites) st.sites.forEach(x => { const on = x === sel, mk = new g.Marker({ map: M.map, position: pos(x), title: x.site.name || x.site.id, zIndex: on ? 9 : 1, icon: { path: g.SymbolPath.CIRCLE, scale: on ? 9 : 6.5, fillColor: on ? '#E5392B' : x.score.value == null ? '#12121A' : x.score.value >= 70 ? '#1FA971' : x.score.value >= 40 ? '#D99A12' : '#7C8699', fillOpacity: 1, strokeColor: on ? '#fff' : '#12121A', strokeWeight: on ? 3 : 1.5 } }); mk.addListener('click', () => click(x.site.lat, x.site.lon, { label: tag(x.site), act: () => st.onSelect && st.onSelect(x.site.id) })); M.objs.push(mk); });
   if (st.fit) {
     const b = new g.LatLngBounds();
     if (st.fit === 'all') st.sites.forEach(x => b.extend(pos(x))); else { b.union(M.objs[0] && L.rings ? M.objs[0].getBounds() : new g.Circle({ center: pos(sel), radius: st.res.radius }).getBounds()); }
-    if (!b.isEmpty()) M.map.fitBounds(b, 40);
+    if (!b.isEmpty()) M.fit(b, 40);
   }
 };
 
@@ -72,7 +97,7 @@ M.plan = st => {
   (st.rest || []).forEach(p => M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, clickable: false, icon: { path: g.SymbolPath.CIRCLE, scale: 2.5, fillColor: '#98A2B3', fillOpacity: 0.6, strokeWeight: 0 } })));
   st.branches.forEach(p => M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: p.name, clickable: false, zIndex: 4, icon: { path: g.SymbolPath.BACKWARD_CLOSED_ARROW, scale: 4.5, fillColor: '#12121A', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 } })));
   st.chosen.forEach(p => { const mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: p.name + ' · ' + p.status, zIndex: 8, icon: { path: g.SymbolPath.CIRCLE, scale: 7.5, fillColor: '#2F6BFF', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5 } }); mk.addListener('click', () => st.onPick && st.onPick(p.id)); M.objs.push(mk); });
-  if (st.fit && !b.isEmpty()) M.map.fitBounds(b, 50);
+  if (st.fit && !b.isEmpty()) M.fit(b, 50);
 };
 
 // Browsing an inventory before any analysis. One dot per spot: faces that share coordinates are a single, larger dot whose name lists
@@ -85,7 +110,7 @@ M.browse = st => {
       icon: { path: g.SymbolPath.CIRCLE, scale: on ? 9 : n > 1 ? 7.5 : 4, fillColor: on ? '#E5392B' : '#2F6BFF', fillOpacity: on || n > 1 ? 1 : 0.75, strokeColor: '#fff', strokeWeight: on ? 3 : 1 } });
     mk.addListener('click', () => st.onSelect && st.onSelect(stack)); M.objs.push(mk); });
   (st.clients || []).forEach(p => M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: p.name, clickable: false, icon: { path: g.SymbolPath.CIRCLE, scale: 6, fillColor: '#1FA971', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 } })));
-  if (st.fit && all.length) { const b = new g.LatLngBounds(); all.forEach(p => b.extend({ lat: p.lat, lng: p.lon })); M.map.fitBounds(b, 40); }
+  if (st.fit && all.length) { const b = new g.LatLngBounds(); all.forEach(p => b.extend({ lat: p.lat, lng: p.lon })); M.fit(b, 40); }
 };
 // Competitor networks: one colour per business, the client in black, coverage gaps as amber rings, OOH near rivals in blue.
 M.network = st => {
@@ -94,7 +119,7 @@ M.network = st => {
   (st.ooh || []).forEach(p => { const mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: `${p.id} · ${p.rivalsWithin} rival locations nearby`, zIndex: 2, icon: { path: g.SymbolPath.CIRCLE, scale: 4, fillColor: '#2F6BFF', fillOpacity: 0.9, strokeColor: '#fff', strokeWeight: 1 } }); mk.addListener('click', () => st.onPick && st.onPick(p.id)); M.objs.push(mk); });
   st.networks.forEach(n => n.points.forEach(p => { const own = n.role === 'client'; b.extend({ lat: p.lat, lng: p.lon });
     M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: n.name + (own ? ' (your network)' : ''), clickable: false, zIndex: own ? 6 : 4, icon: own ? { path: g.SymbolPath.BACKWARD_CLOSED_ARROW, scale: 4.5, fillColor: n.color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 } : { path: g.SymbolPath.CIRCLE, scale: 5.5, fillColor: n.color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 } })); }));
-  if (st.fit && !b.isEmpty()) M.map.fitBounds(b, 50);
+  if (st.fit && !b.isEmpty()) M.fit(b, 50);
 };
 // Municipality choropleth from the Qatar Open Data boundaries, shaded by census 2020 population.
 M.BOUNDS = { north: 26.3, south: 24.4, west: 50.6, east: 51.8 };   // Qatar and its waters
@@ -131,5 +156,31 @@ M.schematic = (res, r, v, many, all) => {
   if (L.places) for (const p of v.placesFor(r)) if (!L.off[p.c]) { const [x, y] = P(p.lat, p.lon); s += `<circle cx="${X(x)}" cy="${Y(y)}" r="4" fill="${M.color(res, p.c)}" stroke="#fff"/>`; }
   if (L.sites) res.results.forEach((x, i) => { const [px, py] = pts[i], on = x === r; if (Math.abs(px) > ext || Math.abs(py) > ext) return; s += `<g data-site="${PI.esc(x.site.id)}" style="cursor:pointer"><circle cx="${X(px)}" cy="${Y(py)}" r="${on ? 9 : 6}" fill="${on ? '#E5392B' : '#12121A'}" stroke="#fff" stroke-width="2"/>${on || !many ? `<text x="${X(px) + 14}" y="${Y(py) + 4}" font-size="13" font-weight="600" fill="#12121A" paint-order="stroke" stroke="#fff" stroke-width="3">${PI.esc(x.site.name || x.site.id)}</text>` : ''}</g>`; });
   return s + `<text x="${W - 20}" y="22" font-size="11" fill="#7C8699" text-anchor="end">N ↑</text></svg>`;
+};
+// ---- Official census zones (2020) as a Google Maps Data layer: loaded once, restyled locally. Zone fills come from stored scores. ----
+// st = { gj, scores: {zoneNo: {score, status}}, mode: 'top'|'all'|'outline', selected, onZone(no) }
+M.RAMP = ['#FFF3D6', '#FFD98A', '#FDB44B', '#F0802C', '#D4521A', '#A33A12'];   // light to strong, ordered; checked for colour-blind separation by lightness
+M.rampOf = v => M.RAMP[Math.max(0, Math.min(M.RAMP.length - 1, Math.floor((v - 50) / 50 * M.RAMP.length)))];
+M.zones = st => {
+  if (!M.map) return; const g = M.g;
+  if (!M.zoneLayer) { M.zoneLayer = new g.Data({ map: null }); M.zoneLayer.addGeoJson(st.gj, { idPropertyName: 'no' });
+    M.zoneLayer.addListener('click', e => M.zoneSt && M.zoneSt.onZone && M.zoneSt.onZone(+e.feature.getProperty('no')));
+    M.zoneLayer.addListener('mouseover', e => { M.zoneLayer.overrideStyle(e.feature, { strokeWeight: 2.5 }); }); M.zoneLayer.addListener('mouseout', () => M.zoneLayer.revertStyle()); }
+  M.zoneSt = st; M.zoneLayer.setMap(st.off ? null : M.map);
+  M.zoneLayer.setStyle(f => { const no = +f.getProperty('no'), x = (st.scores || {})[no], on = st.selected === no, show = x && x.score != null && (st.mode === 'all' || x.status === 'top');
+    return { fillColor: show ? M.rampOf(x.score) : '#000', fillOpacity: show ? 0.62 : 0, strokeColor: on ? '#12121A' : show ? '#7A2E0E' : '#5B6577', strokeOpacity: on ? 1 : show ? 0.8 : st.mode === 'outline' || st.outline ? 0.35 : 0.12, strokeWeight: on ? 3 : show ? 1 : 0.6, zIndex: on ? 3 : show ? 2 : 1, clickable: true }; });
+};
+M.zoneBounds = no => { if (!M.zoneLayer) return null; const f = M.zoneLayer.getFeatureById(no); if (!f) return null; const b = new M.g.LatLngBounds(); f.getGeometry().forEachLatLng(ll => b.extend(ll)); return b; };
+// Overlays for the strategy view: corridors (truth-tiered polylines), numbered OOH pins, rival markers. Cleared and redrawn together.
+M.gtmObjs = [];
+M.gtm = st => {
+  if (!M.map) return; const g = M.g; M.gtmObjs.forEach(o => o.setMap(null)); M.gtmObjs = [];
+  (st.corridors || []).forEach(c => { const line = new g.Polyline({ map: M.map, path: c.path.map(([lng, lat]) => ({ lat, lng })), strokeColor: c.direction === 'inbound' ? '#2F6BFF' : '#7A5AF8', strokeOpacity: 0, zIndex: 4,
+    icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.9, strokeWeight: 4, scale: 3 }, offset: '0', repeat: '14px' }] });   // dashed = modelled, never solid like measured data
+    line.addListener('click', () => st.onCorridor && st.onCorridor(c.corridorId)); M.gtmObjs.push(line); });
+  (st.rivals || []).forEach(p => M.gtmObjs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, clickable: false, zIndex: 5, icon: { path: g.SymbolPath.BACKWARD_CLOSED_ARROW, scale: 4, fillColor: p.color || '#8E3BE0', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1 } })));
+  (st.pins || []).forEach(p => { const mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, zIndex: 20 - Math.min(19, p.rank), title: `#${p.rank} ${p.assetFaceId}${p.circuit ? ' · circuit ' + p.circuit : ''}`, label: { text: String(p.rank), color: '#fff', fontSize: '11px', fontWeight: '700' },
+    icon: { path: g.SymbolPath.CIRCLE, scale: 10, fillColor: p.rank === st.selectedPin ? '#E5392B' : '#12121A', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 } });
+    mk.addListener('click', () => { const hit = M.near(st.pins.map(q => ({ lat: q.lat, lon: q.lon, label: `#${q.rank} ${q.assetFaceId}${q.circuit ? ' · circuit ' + q.circuit : ''}`, act: () => st.onPin && st.onPin(q.rank) })), p.lat, p.lon); M.picker(hit, p.lat, p.lon); }); M.gtmObjs.push(mk); });
 };
 })();

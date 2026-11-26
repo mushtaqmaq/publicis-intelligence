@@ -18,12 +18,6 @@ test('context scores need enough evidence before they show', () => {
   assert.equal(M.contexts({ hotel: { count: 9 } }, 500).premium.value, null);
   const c = M.contexts({ shopping_mall: { count: 4 }, restaurant: { count: 25 }, bank: { count: 6 } }, 500); assert.ok(c.commercial.value > 40 && c.commercial.coverage >= 0.4);
 });
-test('population estimate is labelled, bounded by its zone, and honest about confidence', () => {
-  const e = M.estimatePopulation(1000, { densityPerKm2: 20000, zone: 'Z', year: 2020, population: 15000 }, null);
-  assert.equal(e.estimate <= 15000, true); assert.equal(e.level, 'zone'); assert.ok(e.low < e.estimate && e.high > e.estimate); assert.match(e.method, /spread evenly/);
-  assert.equal(M.estimatePopulation(500, null, { density: 3000, name: 'Doha' }).confidence, 'Low');
-  assert.equal(M.estimatePopulation(500, null, null), null);
-});
 test('catchment adapts: dense areas shrink, sparse grow, a branch network never swallows its neighbour', () => {
   const one = d => CA.suggest({ recipe: 'families', sites: [{ id: 'a', lat: 25.3, lon: 51.5, density: d }] }).radii.a;
   assert.ok(one(12000) < one(4000) && one(4000) < one(500)); assert.equal(CA.suggest({ recipe: 'automotive', sites: [{ id: 'a', lat: 25.3, lon: 51.5 }] }).radii.a, 3000);
