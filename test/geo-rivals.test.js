@@ -53,6 +53,7 @@ test('strategy competitors: cost check first, branches by zone, real rival count
   // 5. a search that hit Google's cap: a priority zone inside that area with nothing found is "not known", never "none found"
   const capped = await run({ known: { audiences: ['office_professionals'], objective: 'banking', confirmedRivals: ['QIB'] }, rivalsConfirm: true }); const q = capped.competitors;
   assert.equal(q.brands.find(x => x.name === 'QIB').coverage, 'partial'); assert.equal(q.topZones.find(x => x.zoneNo === 63).verdict, 'not known'); assert.equal(q.topZones.find(x => x.zoneNo === 38).searchCutOff, true);
+  const o63 = capped.opportunity.rows.find(r => r.zoneNo === 63); assert.equal(o63.competitorStrategicFit, null); assert.equal(o63.opportunityIndex, o63.audienceFit, 'where the search was cut off, rival presence is unknown and does not move the index');
   assert.ok(q.cutOffZones > 0); assert.match(q.limitations.join(' '), /at most 60 places/); assert.ok(!q.topZones.some(x => x.searchCutOff && x.verdict === 'none found'));
 });
 
