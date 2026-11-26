@@ -29,7 +29,7 @@ Sources: "Geo Intelligence Audit" (earlier, 21 pages) and "Geo Intelligence Post
 | §3 Entry: campaign brief | Done | Strategy tab; rules reader, AI reader when ticked. |
 | §3 Entry: audience finder, no seed or OOH | Done | Zone heatmap and ranks from the brief alone (`audience_opportunities`). |
 | §3 Entry: industry or market | Done | Mapped places by category, unbranded; named brands need a search. |
-| §3 Entry: client against rivals | Done, one gap | Google Places by name, cost shown first. A quarter that is still full after the second pass can be split once more as a separately priced step; this has not yet been run live for QNB. |
+| §3 Entry: client against rivals | Done, one gap | Google Places by name, cost shown first. A quarter that is still full after the second pass can be split once more as a separately priced step. Run live for QNB on 26 November 2026: 17 lookups, QNB complete as observed, no priority zone left unknown. |
 | §3 Entry: network comparison | Partly | Explore > Competitors. Trade-area overlap is not shown inside Strategy. |
 | §3 Entry: area or place | Done (new) | `area_research`: official figures, mapped places and context, no ranking, no plan. |
 | §3 Entry: single OOH site | Done | Explore > Site analysis. |
@@ -38,7 +38,7 @@ Sources: "Geo Intelligence Audit" (earlier, 21 pages) and "Geo Intelligence Post
 | §4 AI: direct, adjacent and context competitors labelled apart | Done | Shown in the brief and on the Competitors tab from the industry registry; only direct rivals are searched and counted. |
 | §4 AI: bounded evidence tools | Done, by design | The engine decides which evidence to fetch; the AI cannot call tools or spend Google lookups itself. |
 | §4 AI: evidence checker, synthesis | Done | Rule validator on every AI sentence; Pass B writes the strategy. |
-| §4 AI: answers exploratory questions | Done (new) | Follow-up analyst (`/api/geo/gtm/ask`), same validator, cheaper model, cached. |
+| §4 AI: answers exploratory questions | Done | Follow-up analyst (`/api/geo/gtm/ask`), same validator, cheaper model, cached. Verified live: answered with citations and declined to estimate reach. |
 | §5 Universal audiences | Done | 16 audiences × 14 objectives, 12 lenses. A free-text audience is mapped to these; a wholly new audience is not invented. |
 | §6 Zone heatmap, items 1 to 7, 9, 10 | Done | Polygons, threshold, legend, evidence per zone, overlays, table alternative. |
 | §6 item 8: residential, workplace, destination views | Done (new) | Map view switch; relative 0 to 100 per context. |
@@ -52,10 +52,12 @@ Sources: "Geo Intelligence Audit" (earlier, 21 pages) and "Geo Intelligence Post
 | §14 Layout: ask first, map centre, insights panel, detail tabs | Done (new) | Layer tabs on the map, numbered priority zones, insights beside it, five tabs below. |
 | §14 Eight-item left navigation | Not built | Kept to Strategy / Explore / Saved, as asked earlier; the app already has a left navigation. |
 | §14 Compare alternatives | Done | Tick two or three zones on the Audience tab for a side-by-side table. |
-| §14 Request feasibility, send zones from Explore to Strategy, time switching | Not built | |
+| §14 Request feasibility validation | Done | Channels tab: a plain-text request (channels, zones, tests, OOH faces, open readiness items) copied for an email. Nothing is sent by the tool. |
+| §14 Explore to Strategy | Done | Explore > Official data opens an area profile in Strategy for any official zone name. |
+| §14 Time switching | Not built | No time-varying evidence exists to switch between; the seasonal calendar is rule-based text only. |
 | §14 Phone and tablet layout | Checked locally | At 375 px the Strategy screen stacks with no sideways scroll (mock preview). Not checked on a real phone. |
 | §16 Places Aggregate for counts | Not built | Counts come from OpenStreetMap and named Places searches. |
 | §17 Journeys 1, 2, 3, 6, 8, 9, 10 | Pass | Covered by `test/geo-gtm.test.js`, `test/geo-brain.test.js`, `test/geo-state.test.js`. |
 | §17 Journey 4 (QNB and rivals) | Pass, one gap | Live; QNB central Doha partial. |
-| §17 Journey 5 (QSR networks) | Not re-checked | Works through Explore; not run this round. |
+| §17 Journey 5 (QSR networks) | Pass locally | Category count kept apart from named brands; direct, adjacent and context groups shown. The named search for McDonald's and KFC was not run on live Google (it costs lookups). |
 | §17 Journey 7 (one OOH face at an overlap) | Partly | Picker tested locally; not seen on live Google. |

@@ -136,16 +136,18 @@ T.official = async (el, G) => {
   const kpi = (label, val, sub) => `<div class="gx-kpi"><small>${label}</small><b>${val}</b><span>${sub}</span></div>`;
   const kpis = [
     ok(o.age) && kpi('Population (estimate)', num(sum(o.age.female) + sum(o.age.male)), 'Qatar · ' + yr),
-    ok(o.municipalities) && kpi('Largest municipality', esc(o.municipalities.rows[0].name), num(o.municipalities.rows[0]['2020'].population) + ' · census 2020'),
+    ok(o.municipalities) && o.municipalities.rows[0] && kpi('Largest municipality', esc(o.municipalities.rows[0].name), num(o.municipalities.rows[0]['2020'].population) + ' · census 2020'),
     ok(o.employment) && kpi('Economically active', num(sum(o.employment.y2020)), 'Qatar · census 2020'),
     ok(o.employment) && o.employment.nationality && kpi('Qatari share of workforce', o.employment.nationality.qatariShare + '%', 'Qatar · census ' + o.employment.nationality.year + ' · economically active, national only') ,
     ok(o.housing) && kpi('Housing units', num(sum(o.housing.y2020)), 'Qatar · census 2020'),
-    ok(o.zones) && kpi('Densest large zone', esc(o.zones.rows[0].label), num(o.zones.rows[0].density) + ' per km² · observed ' + o.zones.year),
+    ok(o.zones) && o.zones.rows[0] && kpi('Densest large zone', esc(o.zones.rows[0].label), num(o.zones.rows[0].density) + ' per km² · observed ' + o.zones.year),
     v.result && G.current().official && kpi('Selected site zone', esc(G.current().official.zone.split('/')[0]), num(G.current().official.population) + ' · ' + G.current().official.year)].filter(Boolean);
   const card = (id, title, d, note, topics) => (topic === 'all' || topics.includes(topic)) ? `<div class="gx-card"><h4>${title}</h4><p class="gx-fine" style="margin:0 0 6px">${note}</p><div id="${id}">${ok(d) ? '' : '<div class="gx-empty small">Not available right now.</div>'}</div>${src(d)}</div>` : '';
+  setTimeout(() => { const f = document.getElementById('qarea'); if (f) f.onsubmit = e => { e.preventDefault(); const z = document.getElementById('qaz').value.trim(); if (z.length < 3) return PI.toast('Type a zone name first.'); T.strategySeed(G, 'Understand the commercial context around ' + z, { mode: 'area_research' }); }; }, 0);
   el.innerHTML = `<div class="gx-oh"><div><b>${v.result ? esc(G.current().site.name || 'Selected site') : 'Qatar'}</b><small>${reg.length} official datasets · latest published periods shown on each chart</small></div>
       <div class="gx-seg" id="gtopic">${[['all', 'All'], ['Population', 'Population'], ['Employment', 'Employment'], ['Housing', 'Housing']].map(([k, l]) => `<button data-tp="${k}" class="${topic === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
     <div class="notice info">${I('info')}<div>Official figures cover whole zones, municipalities or the country, never a radius around a site. They are context, not a count inside the catchment.</div></div>
+    <form class="gx-card gx-inline" id="qarea" style="margin-bottom:14px"><label for="qaz"><b>Profile one area</b></label><input id="qaz" list="gzl" value="${esc(v.zone || '')}" placeholder="Zone name, for example Najma"><button class="btn sm" type="submit">${I('map-pin')}Open area profile in Strategy</button></form>
     <div class="gx-kpis">${kpis.join('')}</div>
     <div class="gx-grid2">${card('qd1', 'Population by municipality', o.municipalities, 'Census 2010 and 2020 · municipality', ['Population'])}${card('qd2', 'Largest zones by population', o.zones, (ok(o.zones) ? o.zones.year + ' observations' : 'Latest observations') + ' · by official zone', ['Population'])}${card('qd3', 'Age profile', o.age, 'Estimated population by age group and gender · national', ['Population'])}${card('qd5', 'Employment by employer sector', o.employment, 'Economically active population, census 2010 and 2020 · national', ['Employment'])}${card('qd4', 'Housing units by type', o.housing, 'Census 2010 and 2020 · national', ['Housing'])}</div>
     ${cmpAreas(o, v)}
