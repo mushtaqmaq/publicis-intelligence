@@ -25,6 +25,9 @@ test('G57 G69 brain: ledger, budget, call cap, timeout, malformed and refused ou
   assert.equal(r1.usage.ai.status, 'used'); assert.equal(r1.brief.industry_id, 'retail_banking'); assert.equal(r1.brief.provenance.industry_id, 'AI_INFERRED'); assert.deepEqual(r1.brief.suggested_rivals, ['QIB'], 'a rival not in the registry is dropped');
   const used = await db.prepare("SELECT used FROM geo_ai_billing WHERE scope='all'").get(); assert.equal(used.used, 1200, 'the ledger keeps the actual tokens, not the reservation');
 
+  // the reading from Enhance is handed back and reused: no second Pass A call, and it is re-validated against the registries
+  sent.length = 0; const r1b = await GT.run(ctx(), { text: 'premium card for office workers in west bay', aiPlan: { ...plan, audiences: ['office_professionals', 'admin'] }, user: 'u1', inventory: [] });
+  assert.equal(sent.length, 0); assert.equal(r1b.usage.ai.status, 'reused'); assert.deepEqual(r1b.brief.audiences, ['office_professionals']); assert.equal(r1b.brief.industry_id, 'retail_banking');
   // Pass B: wording that cites a made-up id is rejected twice, so the rule wording stays
   wording = () => ({ executive: { headline: 'Win zone 7.', why_now: '', first_action: 'Act.', evidence_ids: ['ev:not-real'] }, claims: [], channel_notes: [], messaging: [], risks: [] });
   sent.length = 0; const r2 = await GT.run(ctx(), { text: 'families in qatar', aiNarrate: true, user: 'u1', inventory: [] });
