@@ -35,6 +35,9 @@ PI.tools.geo = async (box, p, a) => {
   const pr = () => v.st.providers.google, [gl, gc] = STATE[pr().state], ai = S.me && S.me.caps && S.me.caps.ai;
   const quota = v.st.quota && v.st.quota.used != null ? `<span class="gx-pill" id="gquota" title="Google units used this billing period (server ledger, read ${new Date().toLocaleTimeString()}), and how many times a stored result was reused instead">${num(v.st.quota.used)} / ${num(v.st.quota.cap)}${v.st.quota.reused ? ' · ' + num(v.st.quota.reused) + ' reused' : ''}</span>` : '';
 
+  // Five groups instead of nine tabs in a row; the tools inside a group sit on a second, smaller row.
+  const GROUPS = [['Strategy', ['strategy']], ['Sites and OOH', ['map', 'compare', 'opp', 'plan']], ['Competitors', ['comp']], ['Data', ['official', 'audience']], ['Saved', ['saved']]], TABL = Object.fromEntries(TABS);
+  const tabsHtml = () => { const g = GROUPS.find(x => x[1].includes(v.tab)) || GROUPS[0]; return `<div class="gx-tabs" role="tablist" aria-label="Geo Intelligence sections">${GROUPS.map(([l, ks]) => `<button role="tab" aria-selected="${ks.includes(v.tab)}" data-t="${ks.includes(v.tab) ? v.tab : ks[0]}">${l}</button>`).join('')}</div>${g[1].length > 1 ? `<div class="gx-tabs2" role="tablist" aria-label="${g[0]} tools">${g[1].map(k => `<button role="tab" aria-selected="${v.tab === k}" data-t="${k}">${TABL[k]}</button>`).join('')}</div>` : ''}`; };
   box.innerHTML = `<div class="gx"><div class="gx-head"><div><h2>Geo Intelligence</h2><p>Where to focus in Qatar, and why.</p></div>
       <div class="gx-status"><span class="gx-pill ok" title="State of Qatar Open Data">Qatar Open Data · Available</span><span class="gx-pill ${gc}" title="Google Maps Platform">Google Maps · ${gl}</span><span class="gx-pill ${ai ? 'ok' : 'mut'}" title="AI engine (used only when you ask)">AI · ${ai ? 'Configured' : 'Not configured'}</span>${quota}${S.me && S.me.role === 'admin' ? `<button class="btn xs" id="gusage">${I('gauge')}Usage</button>` : ''}${S.me && S.me.role === 'admin' && pr().serverKey ? `<button class="btn xs" id="gverify" title="Runs one request per Google API (5 of the monthly allowance)">${I('check')}Run Google check</button>` : ''}</div></div>
     ${pr().state === 'NOT_CONFIGURED' ? `<div class="notice info">${I('info')}<div>Google Maps data is not configured. Official Qatar data and first-party analysis remain available.</div></div>` : ''}
@@ -49,14 +52,14 @@ PI.tools.geo = async (box, p, a) => {
       <label>Inventory file: CSV, Excel, or KMZ/KML from Google Earth (only latitude and longitude are required)<input type="file" id="gf" accept=".csv,.xlsx,.xls,.kmz,.kml"></label><label class="gx-check"><input type="checkbox" id="gkind"> These are client locations (branches), not OOH assets</label><label class="gx-check"><input type="checkbox" id="gexp" ${v.expand ? 'checked' : ''}> Widen sparse catchments (one step at a time, up to 3 km; the extra lookups are shown before anything runs)</label><div id="gchk"></div></div></details>
     </details>
     <div id="gopened"></div>
-    <div class="gx-tabs" role="tablist">${TABS.map(([k, l]) => `<button role="tab" aria-selected="${v.tab === k}" data-t="${k}">${l}</button>`).join('')}</div>
+    <div id="gtabs">${tabsHtml()}</div>
     <div id="gxb"></div></div>`;
 
   // ---- shared actions, handed to every tab ----
   const G = { v, meta, ranked, current, C, M, sel, STATE, BR, filtered, clients, invRows, BUILTIN, FOUND };
   G.logBrain = async ev => { try { let fresh; try { fresh = await PI.api('GET', 'db/geobrain/' + brainId); } catch (_) { fresh = v.brain; } v.brain = BR.record(fresh, ev); await PI.saveDoc('geobrain', brainId, v.brain); } catch (_) { } };
   G.brainLabels = () => ({ ...Object.fromEntries(meta.recipes.map(r => [r.id, r.label])), ...meta.categories });
-  G.show = () => { const el = $('#gxb'); if (!el) return; $$('[data-t]').forEach(b => b.setAttribute('aria-selected', b.dataset.t === v.tab)); const T = PI.geoTabs[v.tab]; if (T) T(el, G); };
+  G.show = () => { const el = $('#gxb'); if (!el) return; const tb = $('#gtabs'); if (tb) { tb.innerHTML = tabsHtml(); bindTabs(); } const T = PI.geoTabs[v.tab]; if (T) T(el, G); };
   G.select = id => { const i = ranked().findIndex(x => x.site.id === id); if (i >= 0) { if (v.sel !== i) G.logBrain({ t: 'pick', site: ranked()[i].site }); v.sel = i; G.loadPlaces(); G.show(); } };
   G.loadPlaces = async () => {
     const r = current(); if (!r || !v.st.google) return; const rr = r.radius || v.result.radius, key = r.site.id + ':' + rr; if (v.places[key]) return;
@@ -173,7 +176,8 @@ PI.tools.geo = async (box, p, a) => {
   PI.geoQuotaSync = PI.geoQuotaSync || (document.addEventListener('visibilitychange', async () => { if (document.hidden || !document.getElementById('gquota') || !PI.geoG) return; try { PI.geoG.v.st = await PI.api('GET', 'geo/status'); PI.geoQuotaPaint(PI.geoG.v.st); } catch (_) { } }), true);
 
   // ---- controls ----
-  $$('[data-t]').forEach(b => b.onclick = () => { v.tab = b.dataset.t; v.netAsk = null; G.show(); });   // opening a tab never carries a cost prompt: only an explicit Discover click asks
+  function bindTabs() { $$('#gtabs [data-t]').forEach(b => b.onclick = () => { v.tab = b.dataset.t; v.netAsk = null; G.show(); }); }
+  bindTabs();   // opening a tab never carries a cost prompt: only an explicit Discover click asks
   const invUI = () => {
     const box = $('#ginvf'); if (!box) return; const rows = invRows(v.inv);
     if (!v.inv) { box.innerHTML = ''; return; }

@@ -15,6 +15,8 @@ test('strategy competitors: cost check first, branches by zone, real rival count
   let calls = 0;
   const fetchImpl = async (url, init) => { if (!/places:searchText/.test(url)) return { ok: false, status: 404, json: async () => ({}) }; calls++;
     const b = JSON.parse(init.body), first = Math.abs(b.locationRestriction.rectangle.low.latitude - 25.20) < 1e-6 && Math.abs(b.locationRestriction.rectangle.low.longitude - 51.40) < 1e-6;
+    // "qib" fills the central area to Google's cap of 60 with ATMs, the way a real bank search does
+    if (first && b.textQuery === 'qib') return { ok: true, status: 200, json: async () => ({ nextPageToken: 't', places: Array.from({ length: 20 }, (_, i) => ({ id: 'atm' + calls + '_' + i, displayName: { text: 'QIB ATM' }, formattedAddress: 'Demo', location: { latitude: 25.3 + i * 1e-4, longitude: 51.5 + calls * 1e-4 } })) }) };
     return { ok: true, status: 200, json: async () => ({ places: first ? DATA[b.textQuery] || [] : [] }) }; };
   const ctx = { db, fetchImpl }, text = 'QNB premium credit cards for office professionals', run = extra => GT.run(ctx, { text, known: { audiences: ['office_professionals'], objective: 'banking' }, inventory: [], ...extra });
 
@@ -48,6 +50,10 @@ test('strategy competitors: cost check first, branches by zone, real rival count
   const one = await run({ known: { audiences: ['office_professionals'], objective: 'banking', confirmedRivals: ['Doha Bank'] } }); assert.deepEqual(one.competitors.names, ['QNB', 'Doha Bank']); assert.equal(one.competitors.status, 'OK'); assert.equal(one.brief.rivals.source, 'USER_PROVIDED');
   const none = await run({ known: { competitorNone: true } }); assert.equal(none.competitors.status, 'NONE_SELECTED'); assert.equal(calls, 18);
   const more = await run({ known: { confirmedRivals: ['Doha Bank', 'QIB'] } }); assert.equal(more.competitors.status, 'NEEDS_APPROVAL'); assert.equal(more.competitors.forecast.brandsToSearch, 1); assert.equal(calls, 18);
+  // 5. a search that hit Google's cap: a priority zone inside that area with nothing found is "not known", never "none found"
+  const capped = await run({ known: { audiences: ['office_professionals'], objective: 'banking', confirmedRivals: ['QIB'] }, rivalsConfirm: true }); const q = capped.competitors;
+  assert.equal(q.brands.find(x => x.name === 'QIB').coverage, 'partial'); assert.equal(q.topZones.find(x => x.zoneNo === 63).verdict, 'not known'); assert.equal(q.topZones.find(x => x.zoneNo === 38).searchCutOff, true);
+  assert.ok(q.cutOffZones > 0); assert.match(q.limitations.join(' '), /at most 60 places/); assert.ok(!q.topZones.some(x => x.searchCutOff && x.verdict === 'none found'));
 });
 
 test('without Google the strategy still runs and says named branches are unavailable', async () => {

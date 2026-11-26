@@ -735,3 +735,13 @@ a.agent-b{text-decoration:none}
 
 .gx-dot{display:inline-block;width:9px;height:9px;border-radius:99px;margin-right:6px;vertical-align:middle;border:1.5px solid #fff;box-shadow:0 0 0 1px var(--hair)}
 .gx-lg{display:block;font-size:12px;padding-left:22px;color:var(--ink-2)}.gx-rv{grid-column:1/-1}.gx-rvl{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}.gx-rvl input:not([type=checkbox]){width:200px!important}
+
+/* Geo strategy: split view */
+.gt-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(380px,42%);gap:14px;align-items:start}.gt-report{min-width:0}.gt-report section{scroll-margin-top:118px}.gt-report details{scroll-margin-top:118px}
+.gt-side{position:sticky;top:64px;display:grid;gap:10px;max-height:calc(100vh - 76px);overflow:auto;align-self:start}.gt-side .gx-mapbox{height:46vh;min-height:300px}.gt-side #gtzone{max-height:none}
+.gt-nav{position:sticky;top:56px;z-index:5;display:flex;gap:6px;flex-wrap:wrap;padding:8px 0;margin-bottom:6px;background:var(--bg)}.gt-chip{border:1px solid var(--hair);background:var(--bg);border-radius:99px;padding:5px 12px;font-size:12.5px;cursor:pointer;color:var(--ink-2)}.gt-chip:hover,.gt-chip:focus-visible{background:var(--paper);color:var(--ink)}
+.gt-layers>summary{cursor:pointer;list-style:none}.gt-layers>summary::-webkit-details-marker{display:none}.gt-layers>summary::after{content:' ▾';color:var(--ink-3,#98A2B3)}.gt-layers:not([open]){width:auto;padding:6px 10px}
+.gt-method{margin-top:4px}.gt-method>summary{cursor:pointer;font-size:12px;color:var(--ink-2)}
+.gx-tabs2{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px}.gx-tabs2 button{border:1px solid var(--hair);background:var(--bg);border-radius:99px;padding:5px 12px;font-size:12.5px;cursor:pointer;color:var(--ink-2)}.gx-tabs2 button[aria-selected=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+@media (max-width:1100px){.gt-split{grid-template-columns:1fr}.gt-side{position:static;max-height:none;order:-1}.gt-nav{position:static}}
+#gtzone .gx-li>span:first-child{display:block!important;flex:1;min-width:0;text-align:left}#gtzone .gx-li>span:first-child>b{display:block}#gtzone .gx-li .gx-why2{text-align:left!important}
