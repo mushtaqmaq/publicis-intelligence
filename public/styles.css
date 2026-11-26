@@ -732,3 +732,6 @@ a.agent-b{text-decoration:none}
 .gx-why2{display:block;font-weight:400;color:var(--ink-3,#667085);font-size:12px;margin-top:2px;white-space:normal;text-align:left}#gtzone .gx-li{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
 #gtbusy{display:flex;gap:8px;align-items:center;justify-content:center;padding:28px}
 #gtzone .gx-li>span:first-child{flex:1;min-width:0}#gtzone .gx-li .gx-pill{flex:none}
+
+.gx-dot{display:inline-block;width:9px;height:9px;border-radius:99px;margin-right:6px;vertical-align:middle;border:1.5px solid #fff;box-shadow:0 0 0 1px var(--hair)}
+.gx-lg{display:block;font-size:12px;padding-left:22px;color:var(--ink-2)}.gx-rv{grid-column:1/-1}.gx-rvl{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}.gx-rvl input:not([type=checkbox]){width:200px!important}

@@ -11,6 +11,8 @@ const PROV = { USER_PROVIDED: ['You said', 'ok'], INFERRED: ['Inferred', 'warn']
 const SHORTCUTS = [['gtm_strategy', 'Build go-to-market strategy', 'Launch a premium credit card for QNB to office professionals in Qatar; compare competitors and recommend channels.'],
   ['competitor_landscape', 'Analyze competitors & landscape', 'Competitive landscape for supermarkets in Qatar.'], ['audience_opportunities', 'Find audience opportunities', 'Where are the best zones for families in Qatar?'],
   ['gtm_strategy', 'Commuter / DOOH', 'Reach office professionals commuting to West Bay with a premium banking offer on DOOH.'], ['ooh_find_compare', 'Find / compare OOH', 'Find the best OOH sites for tourists and luxury shopping during the holiday season.']];
+const BRAND_COL = ['#E5486F', '#7A5AF8', '#17A2B8', '#D99A12', '#1FA971'];
+const brandColor = (comp, name) => { const b = comp.brands.find(x => x.name === name); return !b ? '#98A2B3' : b.role === 'client' ? '#12121A' : BRAND_COL[comp.brands.filter(x => x.role !== 'client').indexOf(b) % BRAND_COL.length]; };
 const STATUS = { PLANNING_READY: ['Planning ready', 'ok'], ACTIVATION_READY: ['Activation ready', 'ok'], DRAFT_INSUFFICIENT_EVIDENCE: ['Draft: not enough evidence', 'bad'] };
 const READY = [['budgetApproved', 'Budget approved'], ['inventoryConfirmed', 'Media inventory confirmed'], ['pricesConfirmed', 'Prices confirmed'], ['creativeReady', 'Creative ready'], ['trackingReady', 'Tracking and permissions set up'], ['vendorValidated', 'Vendor validation done']];
 
@@ -51,6 +53,7 @@ function briefHtml(b, s) {
       <label class="gx-f"><span>Product ${tag('product')}</span><input id="gtpr" value="${esc(b.product || '')}"></label>
       <div class="gx-f"><span>Channels and layers</span><label class="gx-check"><input type="checkbox" id="gtooh" ${b.wants_ooh ? 'checked' : ''}> Include OOH / DOOH (optional)</label><label class="gx-check"><input type="checkbox" id="gtcor" ${b.wants_corridor ? 'checked' : ''}> Commuter corridors</label><label class="gx-check"><input type="checkbox" id="gtnone" ${b.competitor_mode === 'none' ? 'checked' : ''}> No competitor analysis</label></div>
     </div>
+    ${b.rivals && (b.rivals.suggested.length || b.rivals.chosen.length) ? `<div class="gx-f gx-rv"><span>Rivals to map ${b.rivals.source === 'AI_INFERRED' ? AI_ICON() : b.rivals.source === 'USER_PROVIDED' ? '<span class="gx-pill ok">You said</span>' : '<span class="gx-pill warn">Suggested</span>'}</span><div class="gx-rvl">${[...new Set([...b.rivals.chosen, ...b.rivals.suggested])].slice(0, 10).map(n => `<label class="gx-check"><input type="checkbox" data-rv="${esc(n)}" ${b.rivals.chosen.includes(n) ? 'checked' : ''}> ${esc(n)}</label>`).join('')}<input id="gtrvadd" aria-label="Add a rival by name" placeholder="Add a rival by name"></div><small class="gx-fine">Up to 5. A name searched before is free; a new one takes 6 to 18 Google lookups, shown before anything runs.</small></div>` : ''}
     ${b.destination_zones.length ? `<p class="gx-fine">Destination zones from the brief: ${b.place_mentions.map(esc).join(', ')} → zone ${b.destination_zones.join(', ')}</p>` : ''}
     ${b.assumptions.length ? `<p class="gx-fine"><b>Assumptions:</b> ${b.assumptions.map(esc).join(' · ')}</p>` : ''}${b.missing_material_inputs.length ? `<p class="gx-fine"><b>Would help:</b> ${b.missing_material_inputs.map(esc).join(' · ')}</p>` : ''}
     ${s.aiEnh && s.aiEnh.status === 'used' ? `<p class="gx-fine">${AI_ICON()} marks what the AI suggested. AI read this brief (${esc(s.aiEnh.model)}, ${s.aiEnh.input + s.aiEnh.output} tokens). Its choices were limited to the registries above.</p>` : ''}</div>`;
@@ -60,24 +63,26 @@ function readKnown(s) {
   if (aud.length && aud.join() !== b.audiences.join()) known.audiences = aud; else if (b.provenance.audiences === 'USER_PROVIDED') known.audiences = b.audiences;
   if (val('gtobj') && val('gtobj') !== b.objective) known.objective = val('gtobj'); else if (b.provenance.objective === 'USER_PROVIDED') known.objective = b.objective;
   for (const [id, k, cur] of [['gtind', 'industryId', b.industry_id], ['gtcl', 'client', b.client], ['gtpr', 'product', b.product]]) { const x = (val(id) || '').trim(); if (x && x !== (cur || '')) known[k] = x; }
+  if (b.rivals) { const add = (val('gtrvadd') || '').trim(), pick = [...$$('[data-rv]')].filter(c => c.checked).map(c => c.dataset.rv).concat(add ? [add] : []).slice(0, 5); if (pick.join('|') !== b.rivals.chosen.join('|') || b.rivals.source === 'USER_PROVIDED') known.confirmedRivals = pick; }
   const ck = id => ($('#' + id) || {}).checked; known.wantsOoh = ck('gtooh'); known.wantsCorridor = ck('gtcor'); known.competitorNone = ck('gtnone');
   return known;
 }
-function wireBrief(el, G, s) { ['gtaud', 'gtobj', 'gtind', 'gtcl', 'gtpr', 'gtooh', 'gtcor', 'gtnone'].forEach(id => { const x = $('#' + id); if (x) x.onchange = () => { s.known = readKnown(s); }; }); }
+function wireBrief(el, G, s) { ['gtaud', 'gtobj', 'gtind', 'gtcl', 'gtpr', 'gtooh', 'gtcor', 'gtnone', 'gtrvadd'].forEach(id => { const x = $('#' + id); if (x) x.onchange = () => { s.known = readKnown(s); }; }); $$('[data-rv]').forEach(c => c.onchange = () => { s.known = readKnown(s); }); }
 
-async function run(el, G, keepAi) {
+async function run(el, G, keepAi, opts = {}) {
   const v = G.v, s = v.gtm; if (s.text.trim().length < 3) return PI.toast('Write a short brief first');
   if (s.brief) s.known = readKnown(s);
   const aiOn = v.st.geoAi && v.st.geoAi.enabled && s.ai && !keepAi;
   s.busy = true; T.strategy(el, G);
-  const reuse = aiOn && s.aiPlan && s.aiPlanText === s.text, t0 = Date.now(), stages = aiOn ? [[0, reuse ? 'Scoring all 91 zones' : 'Reading the brief with AI'], [reuse ? 2 : 8, 'Writing the strategy with AI (usually 20 to 30 seconds)']] : [[0, 'Scoring all 91 zones and the landscape']];
+  const reuse = aiOn && s.aiPlan && s.aiPlanText === s.text, t0 = Date.now(), stages = aiOn ? [[0, opts.rivalsConfirm ? 'Searching Google for the named branches' : reuse ? 'Scoring all 91 zones' : 'Reading the brief with AI'], [reuse ? 2 : 8, 'Writing the strategy with AI (usually 20 to 30 seconds)']] : [[0, 'Scoring all 91 zones and the landscape']];
   const tick = () => { const sec = Math.round((Date.now() - t0) / 1000), a = document.getElementById('gtbusyt'), b2 = document.getElementById('gtbusys'); if (!a) return; a.textContent = stages.filter(x => sec >= x[0]).pop()[1]; b2.textContent = ' · ' + sec + ' s'; };
   const timer = setInterval(tick, 1000); tick(); const bz = document.getElementById('gtbusy'); if (bz) bz.scrollIntoView({ block: 'center', behavior: 'smooth' });
   try {
     const inv = G.v.inv && G.v.inv !== G.BUILTIN && G.v.inv !== G.FOUND ? G.invRows(G.v.inv).map(r => ({ id: r.id, lat: r.lat, lon: r.lon, vendor: r.vendor, format: r.format, circuit: r.circuit, screen_type: r.screen_type })) : null;
-    const d = await PI.api('POST', 'geo/gtm/run', { text: s.text, known: s.known, aiEnhance: aiOn && !reuse, aiPlan: reuse ? s.aiPlan : undefined, aiNarrate: aiOn, readiness: s.readiness, inventory: inv, policy: { pct: s.view.pct, min: s.view.min } });
+    const d = await PI.api('POST', 'geo/gtm/run', { text: s.text, known: s.known, aiEnhance: aiOn && !reuse, aiPlan: reuse ? s.aiPlan : undefined, aiNarrate: aiOn, rivalsConfirm: opts.rivalsConfirm === true, readiness: s.readiness, inventory: inv, policy: { pct: s.view.pct, min: s.view.min } });
     if (s.opened && s.refreshing) { s.delta = delta(s.opened.result, d); s.refreshing = false; s.opened.refreshed = true; }
     s.result = d; s.brief = d.brief; s.selZone = null; s.selPin = null;
+    if (d.usage.google.units) PI.api('GET', 'geo/status').then(st => { v.st = st; if (PI.geoQuotaPaint) PI.geoQuotaPaint(st); }).catch(() => { });   // a rival search spent Google lookups: show the new count
     if (d.usage.ai.status === 'unavailable' && aiOn) PI.toast('AI unavailable; calculated evidence and rule-based wording are shown.');
   } catch (e) { PI.toast(e.message); }
   clearInterval(timer); s.busy = false; T.strategy(el, G);
@@ -99,10 +104,10 @@ function resultHtml(r, s, G) {
       ${ai.rejected ? `<p class="gx-fine">AI wording was rejected by the evidence validator (${ai.rejected.length} problems, for example: ${esc(ai.rejected[0])}), so the rule-based wording is shown.</p>` : ''}</div>
     <div class="gx-top"><div class="gx-map card"><div class="gx-mapbox" id="gtmap"></div>
       <div class="gx-ctl"><div class="gx-seg" role="group" aria-label="Zoom"><button data-rg="doha" class="${s.view.region === 'doha' ? 'on' : ''}">Doha</button><button data-rg="qatar" class="${s.view.region === 'qatar' ? 'on' : ''}">Qatar</button></div></div>
-      <div class="gx-layers"><b>Layers</b><label><input type="checkbox" data-gl="heat" ${s.view.heat ? 'checked' : ''}> Audience heatmap (top zones)</label><label><input type="checkbox" data-gl="all" ${s.view.all ? 'checked' : ''}> All scored zones</label>${r.corridors && r.corridors.corridors ? `<label><input type="checkbox" data-gl="corridors" ${s.view.corridors ? 'checked' : ''}> Corridor evidence (modelled)</label>` : ''}${r.ooh ? `<label><input type="checkbox" data-gl="pins" ${s.view.pins ? 'checked' : ''}> Recommended OOH (${r.ooh.recommendations.length})</label>` : ''}${G && G.v.st.browserKey ? `<label title="Google's live traffic picture. Visual only: not measured volume, not stored, not exported."><input type="checkbox" data-gl="traffic" ${s.view.traffic ? 'checked' : ''}> Live traffic (visual only)</label>` : ''}</div>
+      <div class="gx-layers"><b>Layers</b><label><input type="checkbox" data-gl="heat" ${s.view.heat ? 'checked' : ''}> Audience heatmap (top zones)</label><label><input type="checkbox" data-gl="all" ${s.view.all ? 'checked' : ''}> All scored zones</label>${r.corridors && r.corridors.corridors ? `<label><input type="checkbox" data-gl="corridors" ${s.view.corridors ? 'checked' : ''}> Corridor evidence (modelled)</label>` : ''}${r.competitors && r.competitors.status === 'OK' ? `<label><input type="checkbox" data-gl="branches" ${s.view.branches !== false ? 'checked' : ''}> Branches found (${r.competitors.points.length})</label>${r.competitors.brands.map(b => `<span class="gx-lg"><i class="gx-dot" style="background:${brandColor(r.competitors, b.name)}"></i>${esc(b.name)} ${b.branches}</span>`).join('')}` : ''}${r.ooh ? `<label><input type="checkbox" data-gl="pins" ${s.view.pins ? 'checked' : ''}> Recommended OOH (${r.ooh.recommendations.length})</label>` : ''}${G && G.v.st.browserKey ? `<label title="Google's live traffic picture. Visual only: not measured volume, not stored, not exported."><input type="checkbox" data-gl="traffic" ${s.view.traffic ? 'checked' : ''}> Live traffic (visual only)</label>` : ''}</div>
       ${legend(r, s)}</div>
       <div class="gx-card gx-sitec" id="gtzone">${sel ? zoneHtml(sel, r, cites) : `<h4>Top zones <small>${aud.recipe.label}</small></h4><p class="gx-fine">Choose a zone on the map or in the table to see its evidence.</p>${topZ.slice(0, 6).map(z => `<button class="gx-li" data-z="${z.zoneNo}" style="width:100%;text-align:left"><span><b>#${z.rank} ${esc(z.label)}</b><small class="gx-why2">${esc((z.why || []).join(' · '))}</small></span> <span class="gx-pill">Fit ${n1(z.score)}</span></button>`).join('')}`}</div></div>
-    ${zonesTable(r, s)}${landscapeHtml(r, cites)}${corridorHtml(r)}${oohHtml(r, s)}${channelsHtml(r, cites)}${claimsHtml(r, cites)}${timingHtml(r)}${planHtml(r, s)}${appendixHtml(r)}`;
+    ${zonesTable(r, s)}${competitorsHtml(r, cites)}${landscapeHtml(r, cites)}${corridorHtml(r)}${oohHtml(r, s)}${channelsHtml(r, cites)}${claimsHtml(r, cites)}${timingHtml(r)}${planHtml(r, s)}${appendixHtml(r)}`;
 }
 function legend(r, s) {
   const a = r.audience; return `<div class="gx-legend" role="note"><b>Audience Fit Index</b> <small>0–100 relative model index, not people or reach</small><div class="gx-ramp">${M.RAMP.map(c => `<i style="background:${c}"></i>`).join('')}</div><small>50 → 100 · ${esc(a.recipe.label)} · ${esc(a.recipe.version)} · cohort ${a.cohort.scored} scored of ${a.cohort.zones} census zones (2020) · ${a.cohort.top} highlighted</small>
@@ -119,6 +124,7 @@ function zoneHtml(z, r, cites) {
     <p class="gx-fine">Status: ${esc(z.displayStatus.replace(/_/g, ' '))} · geometry ${esc(z.geometryVersion)} · recipe ${esc(z.recipeVersion)}</p>
     ${rows.map(c => `<div class="gx-bar2"><span>${esc(c.label)} <small>weight ${c.weight}</small></span><div><i style="width:${c.value == null ? 0 : c.value}%"></i></div><b>${c.value == null ? 'n/a' : n1(c.value)}</b></div>`).join('')}
     <details><summary>Indicators behind each lens</summary>${Object.values(z.lenses).map(l => `<p class="gx-fine"><b>${esc(l.label)}</b>: ${l.parts.map(p => `${esc(p.label)} ${p.raw == null ? 'unknown' : typeof p.raw === 'number' && p.raw < 1 && p.raw > 0 ? Math.round(p.raw * 100) + '%' : Math.round(p.raw * 10) / 10} (p${p.percentile == null ? '–' : Math.round(p.percentile)})`).join(' · ')}</p>`).join('')}</details>
+    ${r.competitors && r.competitors.status === 'OK' ? (t => `<p class="gx-fine"><b>Branches found here:</b> ${t && (t.client || t.rivalTotal) ? [t.client ? `${esc(r.brief.client || 'you')} ${t.client}` : '', ...Object.entries(t.rivals).map(([b, n]) => `${esc(b)} ${n}`)].filter(Boolean).join(' · ') : 'none'}.</p>`)(r.competitors.byZone[z.zoneNo]) : ''}
     ${land.category ? `<p class="gx-fine">Mapped ${esc((land.categoryLabel || '').toLowerCase())} in this zone: ${comp ? comp.count : 'none mapped or not among the top concentrations'}.</p>` : ''}${cites(z.evidenceIds)}`;
 }
 function zonesTable(r, s) {
@@ -127,10 +133,24 @@ function zonesTable(r, s) {
     ${rows.map(z => { const o = opp.get(z.zoneNo); return `<tr tabindex="0" data-z="${z.zoneNo}" class="${s.selZone === z.zoneNo ? 'on' : ''}" aria-selected="${s.selZone === z.zoneNo}"><td>${z.rank || '–'}</td><td dir="auto">${esc(z.label)}</td><td>${esc(z.municipality)}</td><td><b>${n1(z.score)}</b></td><td>${o ? n1(o.opportunityIndex) + ' (' + o.opportunityRank + ')' : '–'}</td><td>${Math.round(z.coverage * 100)}%</td><td>${esc(z.confidence)}</td><td>${esc(z.displayStatus.replace(/_/g, ' '))}</td></tr>`; }).join('')}</tbody></table></div>
     <button class="btn xs" id="gtall">${s.showAll ? 'Show top 15' : 'Show all scored zones'}</button><p class="gx-fine">${esc(r.opportunity.note)}</p></div>`;
 }
+function competitorsHtml(r, cites) {
+  const c = r.competitors; if (!c || c.status === 'NONE_SELECTED') return '';
+  const head = `<h4>Competitors <small>named branches from Google Places</small></h4>`;
+  if (c.status === 'NEEDS_APPROVAL') return `<div class="gx-card" style="margin-top:14px" id="gtcomp">${head}<p dir="auto"><b>${c.names.map(esc).join(', ')}</b> have not been searched yet, so this strategy uses mapped-place counts for rivals for now.</p><p class="gx-fine">${esc(c.message)}</p><div class="gx-acts"><button class="btn sm pri" id="gtrvgo">${I('search')}Search and add to this strategy (${c.forecast.minUnits} to ${c.forecast.maxUnits} lookups)</button><small>Change the names in "Rivals to map" above first if they are wrong.</small></div></div>`;
+  if (c.status !== 'OK') return `<div class="gx-card" style="margin-top:14px" id="gtcomp">${head}<p class="gx-fine">${esc(c.note || '')}</p></div>`;
+  const rivals = c.brands.filter(b => b.role !== 'client'), cl = c.brands.find(b => b.role === 'client'), V = { contested: ['Contested', 'warn'], 'rivals only': ['Rivals only', 'bad'], 'rivals present': ['Rivals present', 'warn'], 'you only': ['You only', 'ok'], 'none found': ['None found', ''] };
+  return `<div class="gx-card" style="margin-top:14px" id="gtcomp">${head}
+    <div class="gx-tiles">${c.brands.map(b => `<div><b><i class="gx-dot" style="background:${brandColor(c, b.name)}"></i>${b.branches}</b><small>${esc(b.name)}${b.role === 'client' ? ' (you)' : ''} branches found${b.atms ? ' · ' + b.atms + ' ATMs kept apart' : ''}${b.coverage === 'partial' ? ' · partial search' : ''}</small></div>`).join('')}</div>
+    <div class="gx-tw"><table class="gx-t"><thead><tr><th>Priority zone</th>${cl ? `<th>${esc(cl.name)}</th>` : ''}${rivals.map(b => `<th>${esc(b.name)}</th>`).join('')}<th>Reading</th></tr></thead><tbody>${c.topZones.map(t => `<tr tabindex="0" data-z="${t.zoneNo}"><td dir="auto">${esc(t.label)}</td>${cl ? `<td><b>${t.client}</b></td>` : ''}${rivals.map(b => `<td>${t.rivals[b.name] || 0}</td>`).join('')}<td><span class="gx-pill ${V[t.verdict][1]}">${V[t.verdict][0]}</span></td></tr>`).join('')}</tbody></table></div>
+    ${c.busiest && c.busiest.length ? `<p class="gx-fine"><b>Where the branches are:</b> ${c.busiest.map(b => `${esc(b.label)}: ${cl ? b.client + ' yours, ' : ''}${b.rivalTotal} rival${b.isTop ? '' : ' (not a priority zone)'}`).join(' · ')}.</p>` : ''}
+    ${c.overlap.length && cl ? `<p class="gx-fine"><b>Closeness:</b> ${c.overlap.map(o => `${o.branchesNearby} of ${o.of} ${esc(cl.name)} branches have a ${esc(o.rival)} branch within 1 km`).join(' · ')}.</p>` : ''}
+    <p class="gx-fine">${c.limitations.map(esc).join(' ')} The Opportunity Index above now uses these branches. ${c.google.requests ? c.google.requests + ' Google lookups were used.' : 'Read from stored results: no Google lookup was used.'}</p>
+    <div class="gx-acts"><button class="btn sm" id="gtrivals">${I('search')}Open the full competitor view (names, gaps, nearest rivals)</button></div></div>`;
+}
 function landscapeHtml(r, cites) {
   const l = r.landscape;
   if (l.status !== 'OSM_CONTEXT') return `<div class="gx-card" style="margin-top:14px"><h4>Competitive landscape</h4><p class="gx-fine">${esc(l.note || '')} Named rival discovery on Google is in the Competitors & POIs tab, after a cost check you confirm.</p></div>`;
-  return `<div class="gx-card" style="margin-top:14px"><h4>Competitive landscape <small>${esc(l.categoryLabel)} · OpenStreetMap context, not a verified roster</small></h4>
+  return `<div class="gx-card" style="margin-top:14px"><h4>Category landscape <small>all ${esc(l.categoryLabel.toLowerCase())} mapped in OpenStreetMap, whatever the brand</small></h4>
     <div class="gx-tiles"><div><b>${l.mappedTotal.toLocaleString('en-US')}</b><small>Mapped ${esc(l.categoryLabel.toLowerCase())}</small></div><div><b>${l.zonesWithAny}</b><small>Zones with any</small></div><div><b>${l.top5SharePct ?? '–'}%</b><small>Share in the top 5 zones</small></div><div><b>${l.hhi.toLocaleString('en-US')}</b><small>Concentration (HHI across zones)</small></div></div>
     <p class="gx-fine"><b>Hotspots:</b> ${l.hotspots.map(h => `${esc(h.label)} (${h.count})`).join(' · ') || 'none mapped'}</p>
     ${l.whitespace.length ? `<p class="gx-fine"><b>Whitespace hypotheses</b> (strong audience zones with no mapped ${esc(l.categoryLabel.toLowerCase())}): ${l.whitespace.map(w => esc(w.label)).join(' · ')}. Verify with named discovery before acting.</p>` : '<p class="gx-fine">No whitespace hypothesis: every top audience zone has mapped rivals or unknown mapping.</p>'}
@@ -150,7 +170,7 @@ function oohHtml(r, s) {
 }
 function channelsHtml(r, cites) {
   return `<div class="gx-card" style="margin-top:14px"><h4>Channel plan <small>audience × geography × channel × funnel · all PROPOSED, targeting unverified</small></h4><div class="gx-tw"><table class="gx-t"><thead><tr><th>Channel</th><th>Role</th><th>Funnel</th><th>Where</th><th>KPIs</th><th>Test</th><th>Feasibility</th></tr></thead><tbody>
-    ${r.channels.map(c => { const note = (r.channel_notes || []).find(n => n.channel_id === c.channel_id); return `<tr><td><b>${esc(c.label)}</b>${c.asked ? ' <small>(in your brief)</small>' : c.aiSuggested ? ' ' + AI_ICON() : ''}${note ? `<br><small dir="auto">${esc(note.message_pillar)}: ${esc(note.rationale)}</small>` : ''}</td><td>${esc(c.role)}</td><td>${esc(c.funnel_stage)}</td><td dir="auto"><small>${c.geographic_scope.slice(0, 3).map(esc).join(', ')}</small></td><td><small>${c.kpis.map(esc).join(', ')}</small></td><td><small>${esc(c.recommended_test)}</small></td><td><span class="gx-pill warn">${esc(c.feasibility_status.replace(/_/g, ' ').toLowerCase())}</span></td></tr>`; }).join('')}</tbody></table></div>
+    ${r.channels.map(c => { const note = (r.channel_notes || []).find(n => n.channel_id === c.channel_id); return `<tr><td><b>${esc(c.label)}</b>${c.asked ? ' <small>(in your brief)</small>' : c.aiSuggested ? ' ' + AI_ICON() : ''}${note ? `<br><small dir="auto">${esc(note.message_pillar)}: ${esc(note.rationale)}</small>` : ''}</td><td>${esc(c.role)}</td><td>${esc(c.funnel_stage)}</td><td dir="auto"><small>${c.geographic_scope.slice(0, 3).map(esc).join(', ')}${c.scope_reason ? `<br><i>${esc(c.scope_reason)}</i>` : ''}</small></td><td><small>${c.kpis.map(esc).join(', ')}</small></td><td><small>${esc(c.recommended_test)}</small></td><td><span class="gx-pill warn">${esc(c.feasibility_status.replace(/_/g, ' ').toLowerCase())}</span></td></tr>`; }).join('')}</tbody></table></div>
     <p class="gx-fine">No campaign is created and no media price is assumed. Each channel needs its platform's geographic targeting checked for Qatar zones before buying.</p></div>`;
 }
 function claimsHtml(r, cites) {
@@ -166,7 +186,7 @@ function planHtml(r, s) {
     <p class="gx-fine"><b>KPIs:</b> ${r.measurement_plan.business_kpis.map(esc).join(' · ')} · <b>Tracking:</b> ${r.measurement_plan.tracking.map(esc).join(' · ')} · ${r.measurement_plan.gaps.map(esc).join(' ')}</p>
     ${r.budget_scenarios.length ? `<p class="gx-fine"><b>Budget scenario:</b> ${r.budget_scenarios[0].split.map(x => `${esc(x.channel_id)} ${x.sharePct}%`).join(' · ')}. ${esc(r.budget_scenarios[0].note)}</p>` : '<p class="gx-fine">No budget was given: channels are sequenced by role and costs need validation.</p>'}
     <h4 style="margin-top:10px">Next actions</h4>${r.next_actions.map(a => `<p><span class="gx-pill">${esc(a.priority)}</span> ${esc(a.action)}</p>`).join('')}
-    <div class="gx-acts" style="margin-top:8px">${r.brief.industry_id && r.brief.competitor_mode !== 'none' ? `<button class="btn sm pri" id="gtrivals">${I('search')}Find named rivals and branches (cost shown first)</button>` : ''}${!r.ooh ? `<button class="btn sm" id="gtaddooh">${I('map-pin')}Add OOH picks to this plan</button>` : ''}<button class="btn sm" id="gtsave2">${I('save')}Save</button><button class="btn sm" id="gtexp2">${I('download')}Export report</button></div>
+    <div class="gx-acts" style="margin-top:8px">${r.competitors && r.competitors.status === 'NEEDS_APPROVAL' ? `<button class="btn sm pri" id="gtrvgo2">${I('search')}Search for named rivals (${r.competitors.forecast.minUnits} to ${r.competitors.forecast.maxUnits} lookups)</button>` : ''}${!r.ooh ? `<button class="btn sm" id="gtaddooh">${I('map-pin')}Add OOH picks to this plan</button>` : ''}<button class="btn sm" id="gtsave2">${I('save')}Save</button><button class="btn sm" id="gtexp2">${I('download')}Export report</button></div>
     <h4 style="margin-top:10px">Activation readiness <small>only confirmed facts move the status; AI cannot</small></h4><div class="gx-ready">${READY.map(([k, l]) => `<label class="gx-check"><input type="checkbox" data-rd="${k}" ${s.readiness[k] ? 'checked' : ''}> ${l}</label>`).join('')}</div><button class="btn xs" id="gtready">Recheck status</button></div>`;
 }
 function appendixHtml(r) {
@@ -200,6 +220,7 @@ function wireResult(el, G, s) {
   const rd = $('#gtready'); if (rd) rd.onclick = () => { const miss = READY.filter(([k]) => !s.readiness[k]).map(([, l]) => l); if (r.status !== 'DRAFT_INSUFFICIENT_EVIDENCE') { r.status = miss.length ? 'PLANNING_READY' : 'ACTIVATION_READY'; r.readinessMissing = miss; } T.strategy(el, G); };
   const s2 = $('#gtsave2'); if (s2) s2.onclick = () => save(G, s); const e2 = $('#gtexp2'); if (e2) e2.onclick = () => exportReport(r);
   const ao = $('#gtaddooh'); if (ao) ao.onclick = () => { s.known = { ...readKnown(s), wantsOoh: true }; const c = $('#gtooh'); if (c) c.checked = true; run(el, G); };
+  for (const id of ['gtrvgo', 'gtrvgo2']) { const b = $('#' + id); if (b) b.onclick = () => { if (s.brief && $('#gtaud')) s.known = readKnown(s); run(el, G, false, { rivalsConfirm: true }); }; }
   const rv = $('#gtrivals'); if (rv) rv.onclick = async () => { v.bf.client = v.bf.client || r.brief.client || ''; v.bf.industry = v.bf.industry || r.brief.industry_id || ''; v.bf.product = v.bf.product || r.brief.product || ''; v.tab = 'comp'; v.netAsk = null; await G.refreshAll(); if (PI.geoG) { PI.geoBrief.resolve(PI.geoG, true); const t = document.querySelector('.gx-tabs'); if (t) t.scrollIntoView({ block: 'start' }); } };
   $('#gtsave').onclick = () => save(G, s);
   $('#gtexp').onclick = () => exportReport(r);
@@ -210,18 +231,19 @@ function wireResult(el, G, s) {
 function paint(G, s, scores, fit) {
   const r = s.result, box = $('#gtmap'); if (!box) return;
   const corridors = s.view.corridors && r.corridors && r.corridors.corridors ? r.corridors.corridors : [], pins = s.view.pins && r.ooh ? r.ooh.recommendations : [];
+  const comp = r.competitors && r.competitors.status === 'OK' ? r.competitors : null, branches = comp && s.view.branches !== false ? comp.points.filter(p => p.lat != null).map(p => ({ ...p, color: brandColor(comp, p.brand) })) : [];
   const zst = gj => ({ gj, scores, mode: s.view.all ? 'all' : 'top', off: !s.view.heat && !s.view.all, outline: true, selected: s.selZone, onZone: no => s.onZone && s.onZone(no) });
   (async () => {
     try { G.v.zoneGeo = G.v.zoneGeo || await PI.api('GET', 'geo/zones/geometry'); } catch (e) { box.innerHTML = `<div class="gx-schem">${esc(e.message)}</div>`; return; }
     G.mapReady(box, ok => {
-      if (ok) { M.objs.forEach(o => o.setMap(null)); M.objs = []; M.zones(zst(G.v.zoneGeo)); M.traffic(!!s.view.traffic); M.gtm({ corridors, pins, selectedPin: s.selPin, onPin: k => { s.selPin = k; T.strategy($('#gxb'), G); } });
+      if (ok) { M.objs.forEach(o => o.setMap(null)); M.objs = []; M.zones(zst(G.v.zoneGeo)); M.traffic(!!s.view.traffic); M.gtm({ corridors, pins, branches, selectedPin: s.selPin, onPin: k => { s.selPin = k; T.strategy($('#gxb'), G); } });
         if (fit || s.selZone != null) { const b = s.selZone != null ? M.zoneBounds(s.selZone) : null; if (b) M.fit(b, 60); else if (s.view.region === 'qatar') M.fitQatar(); else { const tb = new M.g.LatLngBounds(); Object.keys(scores).filter(no => scores[no].status === 'top').forEach(no => { const zb = M.zoneBounds(+no); if (zb) tb.union(zb); }); M.fit(tb.isEmpty() ? new M.g.LatLngBounds({ lat: 25.2, lng: 51.42 }, { lat: 25.42, lng: 51.6 }) : tb, 30); } } }
-      else box.innerHTML = svgMap(G.v.zoneGeo, scores, s, corridors, pins);
+      else box.innerHTML = svgMap(G.v.zoneGeo, scores, s, corridors, pins, branches);
       box.querySelectorAll('[data-sz]').forEach(p => { p.onclick = () => s.onZone(+p.dataset.sz); p.onkeydown = e => { if (e.key === 'Enter') s.onZone(+p.dataset.sz); }; });
     });
   })();
 }
-function svgMap(gj, scores, s, corridors, pins) {
+function svgMap(gj, scores, s, corridors, pins, branches = []) {
   const bb = s.view.region === 'qatar' ? [50.72, 24.45, 51.68, 26.2] : [51.38, 25.18, 51.62, 25.43], W = 760, H = Math.round(W * (bb[3] - bb[1]) / ((bb[2] - bb[0]) * Math.cos(25.3 * Math.PI / 180)));
   const X = lon => ((lon - bb[0]) / (bb[2] - bb[0]) * W).toFixed(1), Y = lat => ((bb[3] - lat) / (bb[3] - bb[1]) * H).toFixed(1);
   const path = g => (g.type === 'Polygon' ? [g.coordinates] : g.coordinates).map(p => p.map(ring => 'M' + ring.map(([x, y]) => X(x) + ',' + Y(y)).join('L') + 'Z').join('')).join('');
@@ -229,6 +251,7 @@ function svgMap(gj, scores, s, corridors, pins) {
   for (const f of gj.features) { const no = f.properties.no, x = scores[no], show = x && x.score != null && (s.view.all || x.status === 'top') && (s.view.heat || s.view.all), on = s.selZone === no;
     out += `<path d="${path(f.geometry)}" data-sz="${no}" tabindex="${show ? 0 : -1}" role="button" aria-label="${esc(f.properties.label)}${x && x.score != null ? ', Audience Fit ' + x.score : ''}" fill="${show ? M.rampOf(x.score) : '#F7F8FA'}" fill-opacity="${show ? 0.85 : 1}" stroke="${on ? '#12121A' : '#9AA3B2'}" stroke-width="${on ? 2.5 : 0.6}" style="cursor:pointer"><title>${esc(f.properties.label)}${x && x.score != null ? ' · Audience Fit ' + x.score + ' · ' + x.status.replace(/_/g, ' ') : ''}</title></path>`; }
   for (const c of corridors) out += `<polyline points="${c.path.map(([x, y]) => X(x) + ',' + Y(y)).join(' ')}" fill="none" stroke="${c.direction === 'inbound' ? '#2F6BFF' : '#7A5AF8'}" stroke-width="2.2" stroke-dasharray="6 4"><title>${esc(c.originLabel)} → ${esc(c.destinationLabel)} (${c.direction}, modelled)</title></polyline>`;
+  for (const p of branches) out += `<circle cx="${X(p.lon)}" cy="${Y(p.lat)}" r="${p.role === 'client' ? 5 : 4}" fill="${p.color}" stroke="#fff" stroke-width="${p.role === 'client' ? 2 : 1}"><title>${esc(p.brand)}</title></circle>`;
   for (const p of pins) out += `<g><circle cx="${X(p.lon)}" cy="${Y(p.lat)}" r="8" fill="${s.selPin === p.rank ? '#E5392B' : '#12121A'}" stroke="#fff" stroke-width="1.5"/><text x="${X(p.lon)}" y="${+Y(p.lat) + 3.5}" font-size="9" font-weight="700" text-anchor="middle" fill="#fff">${p.rank}</text><title>#${p.rank} ${esc(p.assetFaceId)}</title></g>`;
   return out + `<text x="${W - 8}" y="${H - 8}" font-size="10" fill="#5B6577" text-anchor="end">Census zones 2020 (Qatar GIS) · roads © OpenStreetMap contributors · schematic view, no basemap</text></svg>`;
 }
@@ -240,7 +263,8 @@ async function save(G, s) {
   try { await PI.saveDoc('geosaved', id, snap); s.savedId = id; s.opened = { id, name, savedAt: snap.savedAt, intact: true, result: r, text: s.text }; PI.toast('Saved. It reopens exactly as it is now, with no Google or AI call.'); T.strategy($('#gxb'), G); } catch (e) { PI.toast(e.message); }
 }
 // Reopen: the frozen result as saved, nothing recalculated.
-T.openStrategy = (G, d) => { const v = G.v, s = v.gtm || (v.gtm = { readiness: {}, view: { heat: true, all: false, corridors: true, pins: true, pct: 0.15, min: 60, region: 'doha' } });
+T.openStrategy = (G, d) => { if (Date.now() - d.savedAt > 30 * 864e5 && d.result.competitors && d.result.competitors.points) d = { ...d, result: { ...d.result, competitors: { ...d.result.competitors, points: [], expired: true } } };   // counts stay; locations from Google are not kept past 30 days
+  const v = G.v, s = v.gtm || (v.gtm = { readiness: {}, view: { heat: true, all: false, corridors: true, pins: true, pct: 0.15, min: 60, region: 'doha' } });
   Object.assign(s, { text: (d.brief || {}).text || '', known: (d.brief || {}).known || {}, result: d.result, brief: d.result.brief, savedId: d.id, delta: null, selZone: (d.state || {}).selZone ?? null, readiness: (d.state || {}).readiness || {}, opened: { id: d.id, name: d.name, savedAt: d.savedAt, intact: window.PIGeoState.intact(d), result: d.result, text: (d.brief || {}).text } });
   if (d.state && d.state.view) s.view = { ...s.view, ...d.state.view }; v.tab = 'strategy'; };
 
