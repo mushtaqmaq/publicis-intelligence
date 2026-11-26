@@ -26,8 +26,8 @@ M.mount = (box) => {
   box.appendChild(M.el);
   // Country lock: zooming out stops where the whole of Qatar is in view (worked out from the box's size), so it never reaches the globe.
   // A strict bounds restriction was not used: Qatar is taller than a wide map is, so it would crop the country at the lowest zoom.
-  if (!M.map) M.map = new M.g.Map(M.el, { center: { lat: 25.2854, lng: 51.531 }, zoom: 11, minZoom: 7, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'greedy' });
-  else M.g.event.trigger(M.map, 'resize');
+  if (!M.map) M.map = new M.g.Map(M.el, { center: { lat: 25.2854, lng: 51.531 }, zoom: 11, minZoom: 7, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'cooperative' });
+  else { M.g.event.trigger(M.map, 'resize'); clearTimeout(M.rf); M.rf = setTimeout(M.refresh, 700); }
   setTimeout(() => M.fitMinZoom(), 60);
   if (!M.locked) { M.locked = true;
     const clamp = () => { const b = M.BOUNDS, c = M.map.getCenter(), z = M.map.getZoom(); if (z < M.minZ) M.map.setZoom(M.minZ); const lat = Math.min(b.north, Math.max(b.south, c.lat())), lng = Math.min(b.east, Math.max(b.west, c.lng())); if (lat !== c.lat() || lng !== c.lng()) M.map.panTo({ lat, lng }); };
@@ -41,6 +41,10 @@ M.fitMinZoom = () => {
   const zx = Math.log2(W * 360 / (256 * (b.east - b.west))), zy = Math.log2(H * 2 * Math.PI / (256 * (y(b.north) - y(b.south))));
   M.minZ = Math.max(6, Math.floor(Math.min(zx, zy))); M.map.setOptions({ minZoom: M.minZ }); if (M.map.getZoom() < M.minZ) M.map.setZoom(M.minZ);
 };
+// Moved between tabs without a change of view, the map can come back with no basemap tiles. If none are present, nudge the zoom so Google reloads them.
+M.refresh = () => { if (!M.map || !M.el || !M.el.isConnected || M.el.querySelector('img[src*="/vt"]')) return; const z = M.map.getZoom(); M.map.setZoom(z + 1); M.g.event.addListenerOnce(M.map, 'idle', () => M.map.setZoom(z)); };
+// Layers that belong to one tab (zone shading, corridors, pins, traffic, an open pick list) never leak into the next.
+M.clearExtras = () => { if (M.zoneLayer) M.zoneLayer.setMap(null); (M.gtmObjs || []).forEach(o => o.setMap(null)); M.gtmObjs = []; if (M.trafficLayer) M.trafficLayer.setMap(null); if (M.iw) M.iw.close(); };
 M.fitQatar = () => { if (M.map) M.map.fitBounds(M.BOUNDS, 0); };
 // Fit with a contextual zoom cap: one point (or two faces at the same spot) would otherwise zoom to 22 and lose the roads around it.
 M.MAXZ = 17;
@@ -58,7 +62,7 @@ M.setType = t => { M.mapType = t; if (M.map) M.map.setMapTypeId(t); };
 
 // st = { res, r (selected result), sites: [results to show], places, layers, fit, onSelect }. Redraws overlays only; the map itself is kept.
 M.update = st => {
-  if (!M.map) return;
+  if (!M.map) return; M.clearExtras();
   const g = M.g; M.objs.forEach(o => o.setMap(null)); M.objs = [];
   const L = st.layers, sel = st.r, pos = x => ({ lat: x.site.lat, lng: x.site.lon });
   if (L.rings) { const c = new g.Circle({ map: M.map, center: pos(sel), radius: sel.radius || st.res.radius, strokeColor: '#2F6BFF', strokeWeight: 2, fillColor: '#2F6BFF', fillOpacity: 0.1, clickable: false }); M.objs.push(c); }
@@ -91,7 +95,7 @@ M.update = st => {
 
 // The network plan: audience areas shaded by their score, branches, the chosen screens, and the rest of the inventory in grey.
 M.plan = st => {
-  if (!M.map) return; const g = M.g; M.objs.forEach(o => o.setMap(null)); M.objs = [];
+  if (!M.map) return; M.clearExtras(); const g = M.g; M.objs.forEach(o => o.setMap(null)); M.objs = [];
   const col = s => s == null ? '#98A2B3' : s >= 70 ? '#1FA971' : s >= 40 ? '#D99A12' : '#E5486F', b = new g.LatLngBounds();
   st.areas.forEach(a => { M.objs.push(new g.Circle({ map: M.map, center: { lat: a.lat, lng: a.lon }, radius: a.radius, strokeColor: col(a.score), strokeWeight: 1.5, fillColor: col(a.score), fillOpacity: a.score == null ? 0.05 : 0.08 + 0.22 * a.score / 100, clickable: false })); b.extend({ lat: a.lat, lng: a.lon }); });
   (st.rest || []).forEach(p => M.objs.push(new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, clickable: false, icon: { path: g.SymbolPath.CIRCLE, scale: 2.5, fillColor: '#98A2B3', fillOpacity: 0.6, strokeWeight: 0 } })));
@@ -103,7 +107,7 @@ M.plan = st => {
 // Browsing an inventory before any analysis. One dot per spot: faces that share coordinates are a single, larger dot whose name lists
 // them, and choosing it hands back the whole stack so the list can offer each face. st.stacks: [[row, ...], ...].
 M.browse = st => {
-  if (!M.map) return; const g = M.g; M.objs.forEach(o => o.setMap(null)); M.objs = [];
+  if (!M.map) return; M.clearExtras(); const g = M.g; M.objs.forEach(o => o.setMap(null)); M.objs = [];
   const all = [];
   st.stacks.forEach(stack => { const p = stack[0], n = stack.length, on = st.sel && stack.some(x => x.id === st.sel.id); all.push(p);
     const mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: n > 1 ? `${n} faces at this spot: ${stack.map(x => x.id).join(', ')}. Choose one from the list.` : st.name(p), zIndex: on ? 9 : n > 1 ? 3 : 1, label: n > 1 ? { text: String(n), color: '#fff', fontSize: '10px', fontWeight: '700' } : undefined,
@@ -114,7 +118,7 @@ M.browse = st => {
 };
 // Competitor networks: one colour per business, the client in black, coverage gaps as amber rings, OOH near rivals in blue.
 M.network = st => {
-  if (!M.map) return; const g = M.g; M.objs.forEach(o => o.setMap(null)); M.objs = []; const b = new g.LatLngBounds();
+  if (!M.map) return; M.clearExtras(); const g = M.g; M.objs.forEach(o => o.setMap(null)); M.objs = []; const b = new g.LatLngBounds();
   (st.gaps || []).forEach(x => M.objs.push(new g.Circle({ map: M.map, center: { lat: x.lat, lng: x.lon }, radius: st.radius * 2, strokeColor: '#D99A12', strokeWeight: 2, strokeOpacity: 0.9, fillColor: '#D99A12', fillOpacity: 0.08, clickable: false })));
   (st.ooh || []).forEach(p => { const mk = new g.Marker({ map: M.map, position: { lat: p.lat, lng: p.lon }, title: `${p.id} · ${p.rivalsWithin} rival locations nearby`, zIndex: 2, icon: { path: g.SymbolPath.CIRCLE, scale: 4, fillColor: '#2F6BFF', fillOpacity: 0.9, strokeColor: '#fff', strokeWeight: 1 } }); mk.addListener('click', () => st.onPick && st.onPick(p.id)); M.objs.push(mk); });
   st.networks.forEach(n => n.points.forEach(p => { const own = n.role === 'client'; b.extend({ lat: p.lat, lng: p.lon });

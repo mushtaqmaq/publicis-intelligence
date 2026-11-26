@@ -13,8 +13,8 @@ Branch `feat/geo-gtm-v2`. **Production was not deployed.** No production data wa
 |---|---|---|
 | "Ask Geo Intelligence" entry, mode shortcuts, Strategy tab first, detailed tools collapsed | `public/js/geo-gtm.js`, `public/js/geo.js` | STAGING VERIFIED |
 | Rule-based brief reading with provenance; editable chips; user edits win | `lib/geo/gtm.js` `readBrief`, `geo-gtm.js` | FIXTURE + STAGING VERIFIED |
-| AI brief enhancement (Pass A), strict schema, registry enums | `lib/geo/brain.js` `enhance`, `gtm.mergeAi` | FIXTURE VERIFIED (mock); live BLOCKED on key and model |
-| AI strategy wording (Pass B) with claim validator and one retry | `brain.narrate`, `brain.validate` | FIXTURE VERIFIED (mock); live BLOCKED |
+| AI brief enhancement (Pass A), strict schema, registry enums | `lib/geo/brain.js` `enhance`, `gtm.mergeAi` | FIXTURE + LIVE VERIFIED (`gpt-6.2-sol`) |
+| AI strategy wording (Pass B) with claim validator and one retry | `brain.narrate`, `brain.validate` | FIXTURE + LIVE VERIFIED |
 | OpenAI token ledger, caps, call cap, kill switch, log | `brain.js`, `geo_ai_billing`, `geo_ai_log` | FIXTURE VERIFIED |
 | Census zone polygons 2020 + 2020 population (same vintage) | `lib/geo/zones.js`, `assets/qa-census-zones-2020.json`, `scripts/geo-build-zones.js` | FIXTURE VERIFIED |
 | Zone from coordinates by polygon (replaces name match and Google reverse geocode) | `analyze.js`, `plan.js` | FIXTURE VERIFIED |
@@ -22,7 +22,7 @@ Branch `feat/geo-gtm-v2`. **Production was not deployed.** No production data wa
 | 2019 rows joined only with an agreeing area | `geo-build-zones.js` crosswalk | FIXTURE VERIFIED |
 | Universal audience engine: 16 audiences, 14 objectives, 12 lenses, combinations | `lib/geo/audience.js` | FIXTURE VERIFIED |
 | OSM place counts per zone (snapshot, ODbL) | `assets/qa-osm-context.json`, `scripts/geo-build-context.js` | IMPLEMENTED (data extract 31 May 2026) |
-| Zone-only heatmap: top-only default, threshold, all-scored view, legend, statuses | `geo-gtm.js`, `geo-map.js` `M.zones` | STAGING VERIFIED (SVG); Google Data layer IMPLEMENTED, unverified |
+| Zone-only heatmap: top-only default, threshold, all-scored view, legend, statuses | `geo-gtm.js`, `geo-map.js` `M.zones` | STAGING VERIFIED (SVG); LIVE VERIFIED on Google Maps |
 | Lens switch with zero paid calls | `/api/geo/audience/zones` | STAGING VERIFIED |
 | Free competitive landscape (category concentration, hotspots, whitespace hypotheses) | `gtm.landscape` | FIXTURE VERIFIED |
 | Named rival discovery, own-network exclusion, dedupe | existing `network.js` | FIXTURE VERIFIED (existing mock tests); live UNVERIFIED |
@@ -38,7 +38,7 @@ Branch `feat/geo-gtm-v2`. **Production was not deployed.** No production data wa
 | Client-safe export | `geo-gtm.js` `exportReport` | STAGING VERIFIED |
 | Bounded catchment expansion (G47), opt-in, budgeted, area-normalised | `analyze.js`, cost check in `geo.js` | FIXTURE VERIFIED (mock Google) |
 | People counted once across overlapping catchments (G48) | `zones.union`, `plan.js`, Site Comparison | FIXTURE VERIFIED |
-| Live traffic layer, visual only | `geo-map.js` `M.traffic`, Strategy layers | IMPLEMENTED; not seen on a Google map |
+| Live traffic layer, visual only | `geo-map.js` `M.traffic`, Strategy layers | LIVE VERIFIED |
 | Small-zone damping (1 km² floor), recipe version `audience-zones-2` | `audience.js` | FIXTURE VERIFIED |
 
 ## Build and test

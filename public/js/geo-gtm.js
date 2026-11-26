@@ -5,7 +5,9 @@
 'use strict';
 const { $, $$, esc, I } = PI;
 const T = PI.geoTabs, M = PI.geoMap, n1 = x => x == null ? '–' : (Math.round(x * 10) / 10).toLocaleString('en-US');
-const PROV = { USER_PROVIDED: ['You said', 'ok'], INFERRED: ['Inferred', 'warn'], AI_INFERRED: ['AI suggested', 'warn'], DEFAULT_ASSUMPTION: ['Assumed', 'bad'], UNCONFIRMED: ['Unconfirmed', 'bad'], NONE: ['Not given', ''] };
+const AI_ICON = () => `<span class="gx-ai" role="img" title="Suggested by AI: check it" aria-label="Suggested by AI">${I('sparkles')}</span>`;
+const evLabel = id => { const z = (id.match(/:z(\d+)$/) || [])[1]; return id.startsWith('ev:census2020') ? 'Census 2020 · zone ' + z : id === 'ev:osm:roads' ? 'Road map' : id.startsWith('ev:osm') ? 'Mapped places · zone ' + z : id.startsWith('ev:calc:aud') ? 'Audience Fit · zone ' + z : id.startsWith('ev:calc:ooh') ? 'OOH fit · ' + id.split(':').pop() : id.startsWith('ev:calc:white') ? 'Gap check · zone ' + z : id.startsWith('ev:rule:channel') ? 'Channel rule' : id.replace(/^ev:/, ''); };
+const PROV = { USER_PROVIDED: ['You said', 'ok'], INFERRED: ['Inferred', 'warn'], DEFAULT_ASSUMPTION: ['Assumed', 'bad'], UNCONFIRMED: ['Unconfirmed', 'bad'], NONE: ['Not given', ''] };
 const SHORTCUTS = [['gtm_strategy', 'Build go-to-market strategy', 'Launch a premium credit card for QNB to office professionals in Qatar; compare competitors and recommend channels.'],
   ['competitor_landscape', 'Analyze competitors & landscape', 'Competitive landscape for supermarkets in Qatar.'], ['audience_opportunities', 'Find audience opportunities', 'Where are the best zones for families in Qatar?'],
   ['gtm_strategy', 'Commuter / DOOH', 'Reach office professionals commuting to West Bay with a premium banking offer on DOOH.'], ['ooh_find_compare', 'Find / compare OOH', 'Find the best OOH sites for tourists and luxury shopping during the holiday season.']];
@@ -15,19 +17,19 @@ const READY = [['budgetApproved', 'Budget approved'], ['inventoryConfirmed', 'Me
 T.strategy = async (el, G) => {
   const v = G.v, s = v.gtm || (v.gtm = { text: '', known: {}, ai: false, readiness: {}, view: { heat: true, all: false, corridors: true, pins: true, pct: 0.15, min: 60, region: 'doha' } });
   if (!s.reg) { try { s.reg = await PI.api('GET', 'geo/audience/registry'); } catch (e) { el.innerHTML = `<div class="notice err">${I('circle-alert')}<div>${esc(e.message)}</div></div>`; return; } }
-  const aiOn = v.st.geoAi && v.st.geoAi.enabled, r = s.result, b = s.brief;
+  G_REG = s.reg; const aiOn = v.st.geoAi && v.st.geoAi.enabled, r = s.result, b = s.brief;
   el.innerHTML = `<div class="gx-card gx-ask"><h3 style="margin:0 0 4px">Ask Geo Intelligence</h3><p class="gx-fine" style="margin:0 0 8px">Describe the brand, audience, objective or question in plain words (English or Arabic). Only what you write is needed: no OOH inventory, seed location or client record.</p>
       <label class="sr" for="gtq">Brief</label><textarea id="gtq" rows="3" dir="auto" placeholder="Reach office professionals commuting to West Bay with a premium banking offer; compare competitors and recommend channels.">${esc(s.text)}</textarea>
       <div class="gx-chips" role="group" aria-label="Examples">${SHORTCUTS.map((x, i) => `<button class="btn xs" data-ex="${i}">${esc(x[1])}</button>`).join('')}</div>
       <div class="gx-acts" style="margin-top:8px"><button class="btn sm" id="gten">${I('sparkles')}Enhance brief</button><button class="btn sm pri" id="gtgo">${I('play')}Analyze</button>
         <label class="gx-check"><input type="checkbox" id="gtai" ${s.ai && aiOn ? 'checked' : ''} ${aiOn ? '' : 'disabled'}> Use AI to read the brief and word the strategy${aiOn ? '' : ` <small>(${esc((v.st.geoAi && v.st.geoAi.why) || 'not configured')}; the rules engine is used)</small>`}</label>
         <small class="gx-fine" id="gtwhy">Uses local official, mapped-place and first-party data: no Google lookup. ${aiOn ? 'AI calls are counted against a separate monthly token limit.' : ''}</small></div></div>
-    <div id="gtbrief">${b ? briefHtml(b, s) : ''}</div><div id="gtres">${s.busy ? '<div class="gx-empty"><span class="spin"></span> Working out the strategy…</div>' : r ? resultHtml(r, s, G) : emptyHtml()}</div>`;
+    <div id="gtbrief">${b ? briefHtml(b, s) : ''}</div><div id="gtres">${s.busy ? '<div class="gx-empty" id="gtbusy" role="status" aria-live="polite"><span class="spin"></span> <b id="gtbusyt">Working out the strategy</b><span id="gtbusys"></span></div>' : r ? resultHtml(r, s, G) : emptyHtml()}</div>`;
   const ta = $('#gtq'); ta.oninput = () => { s.text = ta.value; };
   $$('[data-ex]').forEach(x => x.onclick = () => { const e = SHORTCUTS[+x.dataset.ex]; s.text = e[2]; s.known = { mode: e[0] }; s.brief = null; T.strategy(el, G); });
   const ai = $('#gtai'); if (ai) ai.onchange = () => { s.ai = ai.checked; };
   $('#gten').onclick = async () => { if (s.text.trim().length < 3) return PI.toast('Write a short brief first'); const bt = $('#gten'); bt.disabled = true; bt.innerHTML = '<span class="spin"></span>';
-    try { const d = await PI.api('POST', 'geo/gtm/enhance', { text: s.text, known: s.known, ai: s.ai && aiOn }); s.brief = d.brief; s.aiEnh = d.ai; if (d.ai.status === 'unavailable') PI.toast('AI unavailable; the rules engine read the brief. ' + (d.ai.message || '')); } catch (e) { PI.toast(e.message); }
+    try { const d = await PI.api('POST', 'geo/gtm/enhance', { text: s.text, known: s.known, ai: s.ai && aiOn }); s.brief = d.brief; s.aiEnh = d.ai; s.aiPlan = d.aiPlan || null; s.aiPlanText = s.text; if (d.ai.status === 'unavailable') PI.toast('AI unavailable; the rules engine read the brief. ' + (d.ai.message || '')); } catch (e) { PI.toast(e.message); }
     T.strategy(el, G); };
   $('#gtgo').onclick = () => run(el, G);
   if (b) wireBrief(el, G, s);
@@ -37,7 +39,7 @@ const emptyHtml = () => `<div class="gx-card gx-empty-s"><b>Results appear here 
 
 // The enhanced brief as editable chips; each shows where it came from.
 function briefHtml(b, s) {
-  const tag = k => { const [l, c] = PROV[b.provenance[k]] || ['', '']; return l ? `<span class="gx-pill ${c}" title="Where this value came from">${l}</span>` : ''; };
+  const tag = k => { if (b.provenance[k] === 'AI_INFERRED') return AI_ICON(); const [l, c] = PROV[b.provenance[k]] || ['', '']; return l ? `<span class="gx-pill ${c}" title="Where this value came from">${l}</span>` : ''; };
   const auds = s.reg.audiences, objs = s.reg.objectives;
   return `<div class="gx-card"><h4>Brief as understood <small>edit anything; your edits win over any inference</small></h4>
     <p class="gx-fine" dir="auto">Original: “${esc(b.raw_text)}”</p>
@@ -51,7 +53,7 @@ function briefHtml(b, s) {
     </div>
     ${b.destination_zones.length ? `<p class="gx-fine">Destination zones from the brief: ${b.place_mentions.map(esc).join(', ')} → zone ${b.destination_zones.join(', ')}</p>` : ''}
     ${b.assumptions.length ? `<p class="gx-fine"><b>Assumptions:</b> ${b.assumptions.map(esc).join(' · ')}</p>` : ''}${b.missing_material_inputs.length ? `<p class="gx-fine"><b>Would help:</b> ${b.missing_material_inputs.map(esc).join(' · ')}</p>` : ''}
-    ${s.aiEnh && s.aiEnh.status === 'used' ? `<p class="gx-fine">${I('sparkles')} AI read this brief (${esc(s.aiEnh.model)}, ${s.aiEnh.input + s.aiEnh.output} tokens). Its choices were limited to the registries above.</p>` : ''}</div>`;
+    ${s.aiEnh && s.aiEnh.status === 'used' ? `<p class="gx-fine">${AI_ICON()} marks what the AI suggested. AI read this brief (${esc(s.aiEnh.model)}, ${s.aiEnh.input + s.aiEnh.output} tokens). Its choices were limited to the registries above.</p>` : ''}</div>`;
 }
 function readKnown(s) {
   const b = s.brief, known = { ...s.known }, val = id => ($('#' + id) || {}).value, aud = [...($('#gtaud') || { selectedOptions: [] }).selectedOptions].map(o => o.value);
@@ -68,21 +70,25 @@ async function run(el, G, keepAi) {
   if (s.brief) s.known = readKnown(s);
   const aiOn = v.st.geoAi && v.st.geoAi.enabled && s.ai && !keepAi;
   s.busy = true; T.strategy(el, G);
+  const reuse = aiOn && s.aiPlan && s.aiPlanText === s.text, t0 = Date.now(), stages = aiOn ? [[0, reuse ? 'Scoring all 91 zones' : 'Reading the brief with AI'], [reuse ? 2 : 8, 'Writing the strategy with AI (usually 20 to 30 seconds)']] : [[0, 'Scoring all 91 zones and the landscape']];
+  const tick = () => { const sec = Math.round((Date.now() - t0) / 1000), a = document.getElementById('gtbusyt'), b2 = document.getElementById('gtbusys'); if (!a) return; a.textContent = stages.filter(x => sec >= x[0]).pop()[1]; b2.textContent = ' · ' + sec + ' s'; };
+  const timer = setInterval(tick, 1000); tick(); const bz = document.getElementById('gtbusy'); if (bz) bz.scrollIntoView({ block: 'center', behavior: 'smooth' });
   try {
     const inv = G.v.inv && G.v.inv !== G.BUILTIN && G.v.inv !== G.FOUND ? G.invRows(G.v.inv).map(r => ({ id: r.id, lat: r.lat, lon: r.lon, vendor: r.vendor, format: r.format, circuit: r.circuit, screen_type: r.screen_type })) : null;
-    const d = await PI.api('POST', 'geo/gtm/run', { text: s.text, known: s.known, aiEnhance: aiOn, aiNarrate: aiOn, readiness: s.readiness, inventory: inv, policy: { pct: s.view.pct, min: s.view.min } });
+    const d = await PI.api('POST', 'geo/gtm/run', { text: s.text, known: s.known, aiEnhance: aiOn && !reuse, aiPlan: reuse ? s.aiPlan : undefined, aiNarrate: aiOn, readiness: s.readiness, inventory: inv, policy: { pct: s.view.pct, min: s.view.min } });
     if (s.opened && s.refreshing) { s.delta = delta(s.opened.result, d); s.refreshing = false; s.opened.refreshed = true; }
     s.result = d; s.brief = d.brief; s.selZone = null; s.selPin = null;
     if (d.usage.ai.status === 'unavailable' && aiOn) PI.toast('AI unavailable; calculated evidence and rule-based wording are shown.');
   } catch (e) { PI.toast(e.message); }
-  s.busy = false; T.strategy(el, G);
+  clearInterval(timer); s.busy = false; T.strategy(el, G);
+  const top = document.querySelector('#gtres .gx-exec'); if (top) top.scrollIntoView({ block: 'start', behavior: 'smooth' });   // the answer, not the form, is what the planner should see next
 }
 const delta = (a, b) => { const top = r => r.zone_opportunities.map(z => z.zoneNo); const A = top(a), B = top(b); return { statusFrom: a.status, statusTo: b.status, entered: B.filter(x => !A.includes(x)), left: A.filter(x => !B.includes(x)), generatedFrom: a.generated_at, generatedTo: b.generated_at }; };
 
 function resultHtml(r, s, G) {
   const [sl, sc] = STATUS[r.status] || [r.status, ''], ex = r.executive_recommendation, aud = r.audience, ai = r.usage.ai;
   const zl = no => (aud.zones.find(z => z.zoneNo === no) || {}).label || 'Zone ' + no, sel = s.selZone != null ? aud.zones.find(z => z.zoneNo === s.selZone) : null;
-  const cites = ids => (ids || []).length ? `<small class="gx-cite">${ids.slice(0, 4).map(id => `<button class="gx-evb" data-ev="${esc(id)}" title="Show the evidence">${esc(id.replace(/^ev:/, ''))}</button>`).join('')}</small>` : '';
+  const cites = ids => (ids || []).length ? `<small class="gx-cite">${ids.slice(0, 4).map(id => `<button class="gx-evb" data-ev="${esc(id)}" title="Show this evidence in the list below">${esc(evLabel(id))}</button>`).join('')}</small>` : '';
   const topZ = aud.zones.filter(z => z.displayStatus === 'top');
   return `${s.opened ? `<div class="notice info">${I('save')}<div><b dir="auto">${esc(s.opened.name)}</b> · saved ${PI.when(s.opened.savedAt)}. ${s.opened.refreshed ? 'You are looking at a fresh run of the same brief; the saved snapshot itself is unchanged.' : 'This is the saved strategy: nothing was recalculated and no Google or AI call was made.'}${s.opened.intact === false ? ' <b>Warning: the saved content does not match its fingerprint.</b>' : ''} <button class="btn xs" id="gtref">${I('refresh-cw')}Refresh and compare</button></div></div>` : ''}
     ${s.delta ? `<div class="notice info"><div>Refreshed: status ${esc(s.delta.statusFrom)} → ${esc(s.delta.statusTo)}. New top zones: ${s.delta.entered.map(zl).map(esc).join(', ') || 'none'}. Dropped: ${s.delta.left.map(zl).map(esc).join(', ') || 'none'}. The saved snapshot is unchanged until you save again.</div></div>` : ''}
@@ -95,7 +101,7 @@ function resultHtml(r, s, G) {
       <div class="gx-ctl"><div class="gx-seg" role="group" aria-label="Zoom"><button data-rg="doha" class="${s.view.region === 'doha' ? 'on' : ''}">Doha</button><button data-rg="qatar" class="${s.view.region === 'qatar' ? 'on' : ''}">Qatar</button></div></div>
       <div class="gx-layers"><b>Layers</b><label><input type="checkbox" data-gl="heat" ${s.view.heat ? 'checked' : ''}> Audience heatmap (top zones)</label><label><input type="checkbox" data-gl="all" ${s.view.all ? 'checked' : ''}> All scored zones</label>${r.corridors && r.corridors.corridors ? `<label><input type="checkbox" data-gl="corridors" ${s.view.corridors ? 'checked' : ''}> Corridor evidence (modelled)</label>` : ''}${r.ooh ? `<label><input type="checkbox" data-gl="pins" ${s.view.pins ? 'checked' : ''}> Recommended OOH (${r.ooh.recommendations.length})</label>` : ''}${G && G.v.st.browserKey ? `<label title="Google's live traffic picture. Visual only: not measured volume, not stored, not exported."><input type="checkbox" data-gl="traffic" ${s.view.traffic ? 'checked' : ''}> Live traffic (visual only)</label>` : ''}</div>
       ${legend(r, s)}</div>
-      <div class="gx-card gx-sitec" id="gtzone">${sel ? zoneHtml(sel, r, cites) : `<h4>Top zones <small>${aud.recipe.label}</small></h4><p class="gx-fine">Choose a zone on the map or in the table to see its evidence.</p>${topZ.slice(0, 6).map(z => `<button class="gx-li" data-z="${z.zoneNo}" style="width:100%;text-align:left"><b>#${z.rank} ${esc(z.label)}</b> <span class="gx-pill">Fit ${n1(z.score)}</span> <small>${esc(z.confidence)} confidence</small></button>`).join('')}`}</div></div>
+      <div class="gx-card gx-sitec" id="gtzone">${sel ? zoneHtml(sel, r, cites) : `<h4>Top zones <small>${aud.recipe.label}</small></h4><p class="gx-fine">Choose a zone on the map or in the table to see its evidence.</p>${topZ.slice(0, 6).map(z => `<button class="gx-li" data-z="${z.zoneNo}" style="width:100%;text-align:left"><span><b>#${z.rank} ${esc(z.label)}</b><small class="gx-why2">${esc((z.why || []).join(' · '))}</small></span> <span class="gx-pill">Fit ${n1(z.score)}</span></button>`).join('')}`}</div></div>
     ${zonesTable(r, s)}${landscapeHtml(r, cites)}${corridorHtml(r)}${oohHtml(r, s)}${channelsHtml(r, cites)}${claimsHtml(r, cites)}${timingHtml(r)}${planHtml(r, s)}${appendixHtml(r)}`;
 }
 function legend(r, s) {
@@ -109,6 +115,7 @@ function zoneHtml(z, r, cites) {
   const rows = z.contributions.filter(c => c.weight > 0).sort((a, b) => (b.points ?? -1) - (a.points ?? -1)), opp = r.opportunity.rows.find(x => x.zoneNo === z.zoneNo), land = r.landscape, comp = land.category && land.hotspots ? (land.hotspots.find(h => h.zoneNo === z.zoneNo) || null) : null;
   return `<div class="gx-sh"><div><h3 dir="auto">${esc(z.label)}</h3><span>${esc(z.municipality)} · ${n1(z.areaKm2)} km² · ${z.population2020 != null ? z.population2020.toLocaleString('en-US') + ' residents (census 2020, whole zone)' : 'no 2020 population published'}</span></div><button class="btn xs" id="gtzx" aria-label="Back to top zones">${I('x')}</button></div>
     <div class="gx-tiles"><div><b>${n1(z.score)}</b><small>Audience Fit${z.rank ? ' · rank ' + z.rank : ''}</small></div><div><b>${opp ? n1(opp.opportunityIndex) : '–'}</b><small>Opportunity Index${opp ? ' · rank ' + opp.opportunityRank : ''}</small></div><div><b>${Math.round(z.coverage * 100)}%</b><small>Evidence coverage</small></div><div><b>${esc(z.confidence)}</b><small>Confidence</small></div></div>
+    ${z.why && z.why.length ? `<p dir="auto"><b>Why here:</b> ${z.why.map(esc).join('. ')}.</p><p class="gx-fine">Counts are places mapped in OpenStreetMap, so real numbers are higher. Bars below show how this zone compares with the other zones, 0 to 100.</p>` : ''}
     <p class="gx-fine">Status: ${esc(z.displayStatus.replace(/_/g, ' '))} · geometry ${esc(z.geometryVersion)} · recipe ${esc(z.recipeVersion)}</p>
     ${rows.map(c => `<div class="gx-bar2"><span>${esc(c.label)} <small>weight ${c.weight}</small></span><div><i style="width:${c.value == null ? 0 : c.value}%"></i></div><b>${c.value == null ? 'n/a' : n1(c.value)}</b></div>`).join('')}
     <details><summary>Indicators behind each lens</summary>${Object.values(z.lenses).map(l => `<p class="gx-fine"><b>${esc(l.label)}</b>: ${l.parts.map(p => `${esc(p.label)} ${p.raw == null ? 'unknown' : typeof p.raw === 'number' && p.raw < 1 && p.raw > 0 ? Math.round(p.raw * 100) + '%' : Math.round(p.raw * 10) / 10} (p${p.percentile == null ? '–' : Math.round(p.percentile)})`).join(' · ')}</p>`).join('')}</details>
@@ -143,7 +150,7 @@ function oohHtml(r, s) {
 }
 function channelsHtml(r, cites) {
   return `<div class="gx-card" style="margin-top:14px"><h4>Channel plan <small>audience × geography × channel × funnel · all PROPOSED, targeting unverified</small></h4><div class="gx-tw"><table class="gx-t"><thead><tr><th>Channel</th><th>Role</th><th>Funnel</th><th>Where</th><th>KPIs</th><th>Test</th><th>Feasibility</th></tr></thead><tbody>
-    ${r.channels.map(c => { const note = (r.channel_notes || []).find(n => n.channel_id === c.channel_id); return `<tr><td><b>${esc(c.label)}</b>${c.asked ? ' <small>(asked)</small>' : ''}${note ? `<br><small dir="auto">${esc(note.message_pillar)}: ${esc(note.rationale)}</small>` : ''}</td><td>${esc(c.role)}</td><td>${esc(c.funnel_stage)}</td><td dir="auto"><small>${c.geographic_scope.slice(0, 3).map(esc).join(', ')}</small></td><td><small>${c.kpis.map(esc).join(', ')}</small></td><td><small>${esc(c.recommended_test)}</small></td><td><span class="gx-pill warn">${esc(c.feasibility_status.replace(/_/g, ' ').toLowerCase())}</span></td></tr>`; }).join('')}</tbody></table></div>
+    ${r.channels.map(c => { const note = (r.channel_notes || []).find(n => n.channel_id === c.channel_id); return `<tr><td><b>${esc(c.label)}</b>${c.asked ? ' <small>(in your brief)</small>' : c.aiSuggested ? ' ' + AI_ICON() : ''}${note ? `<br><small dir="auto">${esc(note.message_pillar)}: ${esc(note.rationale)}</small>` : ''}</td><td>${esc(c.role)}</td><td>${esc(c.funnel_stage)}</td><td dir="auto"><small>${c.geographic_scope.slice(0, 3).map(esc).join(', ')}</small></td><td><small>${c.kpis.map(esc).join(', ')}</small></td><td><small>${esc(c.recommended_test)}</small></td><td><span class="gx-pill warn">${esc(c.feasibility_status.replace(/_/g, ' ').toLowerCase())}</span></td></tr>`; }).join('')}</tbody></table></div>
     <p class="gx-fine">No campaign is created and no media price is assumed. Each channel needs its platform's geographic targeting checked for Qatar zones before buying.</p></div>`;
 }
 function claimsHtml(r, cites) {
@@ -159,6 +166,7 @@ function planHtml(r, s) {
     <p class="gx-fine"><b>KPIs:</b> ${r.measurement_plan.business_kpis.map(esc).join(' · ')} · <b>Tracking:</b> ${r.measurement_plan.tracking.map(esc).join(' · ')} · ${r.measurement_plan.gaps.map(esc).join(' ')}</p>
     ${r.budget_scenarios.length ? `<p class="gx-fine"><b>Budget scenario:</b> ${r.budget_scenarios[0].split.map(x => `${esc(x.channel_id)} ${x.sharePct}%`).join(' · ')}. ${esc(r.budget_scenarios[0].note)}</p>` : '<p class="gx-fine">No budget was given: channels are sequenced by role and costs need validation.</p>'}
     <h4 style="margin-top:10px">Next actions</h4>${r.next_actions.map(a => `<p><span class="gx-pill">${esc(a.priority)}</span> ${esc(a.action)}</p>`).join('')}
+    <div class="gx-acts" style="margin-top:8px">${r.brief.industry_id && r.brief.competitor_mode !== 'none' ? `<button class="btn sm pri" id="gtrivals">${I('search')}Find named rivals and branches (cost shown first)</button>` : ''}${!r.ooh ? `<button class="btn sm" id="gtaddooh">${I('map-pin')}Add OOH picks to this plan</button>` : ''}<button class="btn sm" id="gtsave2">${I('save')}Save</button><button class="btn sm" id="gtexp2">${I('download')}Export report</button></div>
     <h4 style="margin-top:10px">Activation readiness <small>only confirmed facts move the status; AI cannot</small></h4><div class="gx-ready">${READY.map(([k, l]) => `<label class="gx-check"><input type="checkbox" data-rd="${k}" ${s.readiness[k] ? 'checked' : ''}> ${l}</label>`).join('')}</div><button class="btn xs" id="gtready">Recheck status</button></div>`;
 }
 function appendixHtml(r) {
@@ -175,7 +183,7 @@ function wireResult(el, G, s) {
   draw(true);
   $$('[data-gl]').forEach(c => c.onchange = () => { s.view[c.dataset.gl] = c.checked; draw(false); });
   $$('[data-rg]').forEach(b => b.onclick = () => { s.view.region = b.dataset.rg; T.strategy(el, G); });
-  const pick = no => { s.selZone = no; T.strategy(el, G); setTimeout(() => { const row = document.querySelector(`tr[data-z="${no}"]`); if (row) row.focus(); }, 30); };
+  const pick = no => { s.selZone = no; T.strategy(el, G); setTimeout(() => { const row = document.querySelector(`tr[data-z="${no}"]`); if (row) row.focus({ preventScroll: true }); }, 30); };
   s.onZone = pick;
   $$('[data-z]').forEach(x => { x.onclick = () => pick(+x.dataset.z); x.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(+x.dataset.z); } }; });
   $$('[data-pin]').forEach(x => { const go = () => { s.selPin = +x.dataset.pin; T.strategy(el, G); }; x.onclick = go; x.onkeydown = e => { if (e.key === 'Enter') go(); }; });
@@ -188,7 +196,11 @@ function wireResult(el, G, s) {
   const mn = $('#gtmin'); if (mn) mn.onchange = () => { s.view.min = +mn.value; relens(); };
   const ln = $('#gtlens'); if (ln) ln.onchange = relens;
   $$('[data-rd]').forEach(c => c.onchange = () => { s.readiness[c.dataset.rd] = c.checked; });
-  const rd = $('#gtready'); if (rd) rd.onclick = () => run(el, G, true);
+  // Readiness is the planner's own confirmation, so it changes the status here without re-running (and without losing the AI wording).
+  const rd = $('#gtready'); if (rd) rd.onclick = () => { const miss = READY.filter(([k]) => !s.readiness[k]).map(([, l]) => l); if (r.status !== 'DRAFT_INSUFFICIENT_EVIDENCE') { r.status = miss.length ? 'PLANNING_READY' : 'ACTIVATION_READY'; r.readinessMissing = miss; } T.strategy(el, G); };
+  const s2 = $('#gtsave2'); if (s2) s2.onclick = () => save(G, s); const e2 = $('#gtexp2'); if (e2) e2.onclick = () => exportReport(r);
+  const ao = $('#gtaddooh'); if (ao) ao.onclick = () => { s.known = { ...readKnown(s), wantsOoh: true }; const c = $('#gtooh'); if (c) c.checked = true; run(el, G); };
+  const rv = $('#gtrivals'); if (rv) rv.onclick = async () => { v.bf.client = v.bf.client || r.brief.client || ''; v.bf.industry = v.bf.industry || r.brief.industry_id || ''; v.bf.product = v.bf.product || r.brief.product || ''; v.tab = 'comp'; v.netAsk = null; await G.refreshAll(); if (PI.geoG) { PI.geoBrief.resolve(PI.geoG, true); const t = document.querySelector('.gx-tabs'); if (t) t.scrollIntoView({ block: 'start' }); } };
   $('#gtsave').onclick = () => save(G, s);
   $('#gtexp').onclick = () => exportReport(r);
   const rf = $('#gtref'); if (rf) rf.onclick = () => { s.refreshing = true; s.text = s.opened.text || s.text; run(el, G, true); };
@@ -203,7 +215,7 @@ function paint(G, s, scores, fit) {
     try { G.v.zoneGeo = G.v.zoneGeo || await PI.api('GET', 'geo/zones/geometry'); } catch (e) { box.innerHTML = `<div class="gx-schem">${esc(e.message)}</div>`; return; }
     G.mapReady(box, ok => {
       if (ok) { M.objs.forEach(o => o.setMap(null)); M.objs = []; M.zones(zst(G.v.zoneGeo)); M.traffic(!!s.view.traffic); M.gtm({ corridors, pins, selectedPin: s.selPin, onPin: k => { s.selPin = k; T.strategy($('#gxb'), G); } });
-        if (fit || s.selZone != null) { const b = s.selZone != null ? M.zoneBounds(s.selZone) : null; if (b) M.fit(b, 60); else if (s.view.region === 'qatar') M.fitQatar(); else M.fit(new M.g.LatLngBounds({ lat: 25.2, lng: 51.42 }, { lat: 25.42, lng: 51.6 }), 10); } }
+        if (fit || s.selZone != null) { const b = s.selZone != null ? M.zoneBounds(s.selZone) : null; if (b) M.fit(b, 60); else if (s.view.region === 'qatar') M.fitQatar(); else { const tb = new M.g.LatLngBounds(); Object.keys(scores).filter(no => scores[no].status === 'top').forEach(no => { const zb = M.zoneBounds(+no); if (zb) tb.union(zb); }); M.fit(tb.isEmpty() ? new M.g.LatLngBounds({ lat: 25.2, lng: 51.42 }, { lat: 25.42, lng: 51.6 }) : tb, 30); } } }
       else box.innerHTML = svgMap(G.v.zoneGeo, scores, s, corridors, pins);
       box.querySelectorAll('[data-sz]').forEach(p => { p.onclick = () => s.onZone(+p.dataset.sz); p.onkeydown = e => { if (e.key === 'Enter') s.onZone(+p.dataset.sz); }; });
     });

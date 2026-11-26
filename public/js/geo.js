@@ -76,6 +76,7 @@ PI.tools.geo = async (box, p, a) => {
     if (id !== v.run) return;   // a newer analysis replaced this one
     res.selection = opts.selection || null; res.preflight = opts.preflight || null;   // how the sites were chosen and what the run was told beforehand stay with the result
     if (v.opened && v.opened.kind === 'analysis' && v.refreshing) { v.delta = ST.delta(v.opened.snap, res); v.refreshing = false; }
+    PI.api('GET', 'geo/status').then(st => { v.st = st; PI.geoQuotaPaint(st); }).catch(() => { });
     v.result = res; v.sites = sites; v.layers.inv = false; v.layers.zones = v.layers.zones ?? true;   // results first: the 1,351-face catalogue is opt-in v.ai = null; v.sel = 0; v.places = {}; v.routes = {}; v.cmp = ranked().slice(0, 5).map(x => x.site.id); v.savedId = opts.savedId || null; if (v.afterRun) { v.tab = v.afterRun; v.afterRun = null; } G.show(); G.loadPlaces(); G.banner();
     if (!opts.savedId) { const top = ranked()[0]; G.logBrain({ t: 'analysis', q: sites.length === 1 ? v.q : '', sites: sites.map(s => ({ id: s.id, name: s.name, lat: s.lat, lon: s.lon, zone: s.zone, municipality: (res.results.find(r => r.site.id === s.id) || { site: {} }).site.municipality })), recipe: v.recipe, objective: v.objective, radius: v.radius, competitor: v.competitor, top: top && { id: top.site.id, score: top.score.value } }); }
   };
@@ -168,7 +169,8 @@ PI.tools.geo = async (box, p, a) => {
   G.refreshAll = () => PI.tools.geo(box, p, a);
   PI.geoG = G;
   // The header counter is read from the server ledger, not kept in the page: re-read whenever this tab comes back into view, so two tabs agree.
-  if (!PI.geoQuotaSync) { PI.geoQuotaSync = true; document.addEventListener('visibilitychange', async () => { if (document.hidden) return; const el = document.getElementById('gquota'); if (!el || !PI.geoG) return; try { const st = await PI.api('GET', 'geo/status'); PI.geoG.v.st = st; if (st.quota && st.quota.used != null) { el.textContent = st.quota.used.toLocaleString('en-US') + ' / ' + st.quota.cap.toLocaleString('en-US') + (st.quota.reused ? ' · ' + st.quota.reused.toLocaleString('en-US') + ' reused' : ''); el.title = 'Google units used this billing period (server ledger, read ' + new Date().toLocaleTimeString() + ')'; } } catch (_) { } }); }
+  PI.geoQuotaPaint = st => { const el = document.getElementById('gquota'); if (!el || !st || !st.quota || st.quota.used == null) return; el.textContent = st.quota.used.toLocaleString('en-US') + ' / ' + st.quota.cap.toLocaleString('en-US') + (st.quota.reused ? ' · ' + st.quota.reused.toLocaleString('en-US') + ' reused' : ''); el.title = 'Google units used this billing period (server ledger, read ' + new Date().toLocaleTimeString() + ')'; };
+  PI.geoQuotaSync = PI.geoQuotaSync || (document.addEventListener('visibilitychange', async () => { if (document.hidden || !document.getElementById('gquota') || !PI.geoG) return; try { PI.geoG.v.st = await PI.api('GET', 'geo/status'); PI.geoQuotaPaint(PI.geoG.v.st); } catch (_) { } }), true);
 
   // ---- controls ----
   $$('[data-t]').forEach(b => b.onclick = () => { v.tab = b.dataset.t; v.netAsk = null; G.show(); });   // opening a tab never carries a cost prompt: only an explicit Discover click asks
@@ -326,7 +328,7 @@ PI.tools.geo = async (box, p, a) => {
         v.comp = { ...v.comp, brands: v.comp.brands.map(b => { const n = d.networks.find(x => x.name === b.name); return n && n.provenance === 'observed_in_places' ? { ...b, provenance: 'observed_in_places' } : b; }) }; PI.geoBrief.compUI(G);
         if (v.opened && v.opened.kind === 'network' && v.refreshing) { v.delta = ST.delta(v.opened.snap, v.net); v.refreshing = false; } }
     } catch (e) { v.netErr = e.message; }
-    v.netBusy = false; G.show(); try { v.st = await PI.api('GET', 'geo/status'); } catch (_) { }
+    v.netBusy = false; G.show(); try { v.st = await PI.api('GET', 'geo/status'); PI.geoQuotaPaint(v.st); } catch (_) { }
   };
   G.compareTop = async () => { const rows = filtered(), n = Math.min(10, rows.length), ps = await PI.api('POST', 'geo/prescreen', { assets: rows.map(mini), targets: clients().map(t => ({ lat: t.lat, lon: t.lon })), limit: n }), by = new Map(rows.map(x => [x.id, x])); v.afterRun = 'compare'; return G.run({ sites: ps.selected.map(id => by.get(id)).filter(Boolean).map(asSite), selection: { ...ps, index: undefined, scope: null, inventory: rows.length } }); };
   G.act = async action => {

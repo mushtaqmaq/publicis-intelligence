@@ -727,3 +727,7 @@ a.agent-b{text-decoration:none}
 .gx-tools{margin:8px 0 12px}.gx-tools>summary{cursor:pointer;padding:8px 0}.gx-tools>summary small{color:var(--ink-3,#7C8699);font-weight:400;margin-left:6px}
 .gx-ask .gx-acts{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}.gx-ask .gx-check{flex:1 1 260px}.gx-brief .gx-f select,.gx-brief .gx-f input:not([type=checkbox]){width:100%;min-height:34px}.gx-brief .gx-check{display:flex;gap:6px;align-items:center}.gx-brief .gx-f>span{display:flex;gap:6px;align-items:center}
 #gtmap svg.gx-svg{display:block;width:100%;height:100%}#gtmap path:focus{outline:none;stroke:#2F6BFF;stroke-width:2.5}
+
+.gx-ai{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:99px;background:color-mix(in srgb,#7A5AF8 14%,white);color:#6941C6;vertical-align:middle}.gx-ai svg{width:12px;height:12px}
+.gx-why2{display:block;font-weight:400;color:var(--ink-3,#667085);font-size:12px;margin-top:2px;white-space:normal;text-align:left}#gtzone .gx-li{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+#gtbusy{display:flex;gap:8px;align-items:center;justify-content:center;padding:28px}
