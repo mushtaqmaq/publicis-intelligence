@@ -10,7 +10,7 @@ Run on 26 November 2026, branch `feat/geo-gtm-v2`, implementation commit `14ff34
 | **MOCK-AI** | A fake OpenAI Responses API with a real Postgres token ledger (docker, port 55499). No real OpenAI call was made. |
 | **MOCK-GOOGLE** | Existing tests with a fake Google endpoint and a real Postgres ledger. |
 | **BROWSER-LOCAL** | The real app on `localhost:7861` against a throwaway database, in the in-app browser. No Google browser key is set, so maps render as the SVG fallback. A `fetch` trace was recorded in the page. |
-| **LIVE** | Not run. No paid Google or OpenAI request was made in this session. |
+| **LIVE** | 26 November 2026, production (main `3ceceb4`), the owner's signed-in Chrome session. Real Google Maps browser rendering (one normal map load) and real OpenAI calls (`gpt-6.2-sol`, 3 calls, 5,350 tokens). No Google Places, Routes or Geocoding request. |
 
 ## Commands
 
@@ -49,10 +49,10 @@ Google and AI calls are 0 / 0 for every row unless stated. A PASS cites an execu
 | G13 | "Premium office commuters" | PASS | LOCAL-DATA | detected as office + premium, commuter objective; weights sum to 1; no population field | – |
 | G14 | Multiple audiences | PASS | LOCAL-DATA | averaged normalised weights; scores bounded 0–100 | Map legend shows the combined label only |
 | G15 | Audience-only with empty OOH, no AI | PASS | LOCAL-DATA, MOCK-AI | inventory `[]`; AI disabled, timeout and budget cases all still return zones | – |
-| G16 | Official zone polygons, stable ids | PARTIAL | LOCAL-DATA, BROWSER-LOCAL | 91 features, `zone:N:census-zone-2020-g4m`; SVG choropleth seen | Google Maps Data-layer path written but not seen in a browser |
-| G17 | Top zones only, rest transparent | PASS | LOCAL-DATA, BROWSER-LOCAL | screenshot `c-g-commuter-heatmap-corridors-pins.jpg` | – |
+| G16 | Official zone polygons, stable ids | PASS | LOCAL-DATA, LIVE | 91 features, `zone:N:census-zone-2020-g4m`; live: Google Data layer draws the zones over the basemap (`live-c-g-google-heatmap-corridors-pins.jpg`) | – |
+| G17 | Top zones only, rest transparent | PASS | LOCAL-DATA, LIVE | live Google map: only top zones shaded, the rest is the normal map | – |
 | G18 | Audience switch costs nothing | PASS | BROWSER-LOCAL | trace on switch: only `POST /api/geo/audience/zones` (local engine) | – |
-| G19 | Map / list / drawer agree | PASS | LOCAL-DATA, BROWSER-LOCAL | same `zoneId` in GeoJSON, scores and evidence; browser: drawer, row and outline all zone 38 | – |
+| G19 | Map / list / drawer agree | PASS | LOCAL-DATA, LIVE | live: clicking zone 66 on the Google map outlined it, opened its drawer (Audience Fit 74.7, rank 6), highlighted its table row and zoomed to 13 with roads in view (`live-zone-selected-traffic-layer.jpg`) | – |
 | G20 | Top-only vs all-scored, threshold | PASS | LOCAL-DATA | four distinct statuses; min 95 gives 0 top zones | – |
 | G21 | Nuaija zones 41 / 43 / 44 | PASS | LOCAL-DATA | three ids, three populations | – |
 | G22 | 2019 rows vs 2020 polygons | PASS | LOCAL-DATA | zone 48 `area-differs` (not joined); zone 15 `compatible`; zones 10 and 11 kept as unmatched | – |
@@ -77,7 +77,7 @@ Google and AI calls are 0 / 0 for every row unless stated. A PASS cites an execu
 | G41 | Commuter brief | PASS | LOCAL-DATA, BROWSER-LOCAL | West Bay → zones 60/61, 4 origin scenarios, inbound and outbound | – |
 | G42 | No traffic claims | PASS | LOCAL-DATA | banned-claim scan; tiers listed; `measuredUnits: null` | – |
 | G43 | Inbound ≠ outbound only when justified | PASS | LOCAL-DATA | routed separately on one-way roads; `sameRouteBothWays` reported | – |
-| G44 | Routing bounded, no calls on select | PASS | LOCAL-DATA | corridors are local Dijkstra; no Routes call in the path; Google live traffic added as a visual-only layer (no data read) | Traffic layer not seen on a real Google map |
+| G44 | Routing bounded, no calls on select | PASS | LOCAL-DATA, LIVE | corridors are local Dijkstra; no Routes call in the path; live: Google traffic layer switched on as a visual layer | – |
 | G45 | Corridor OOH facing | PASS | LOCAL-DATA | every linked face is `FACING_UNKNOWN_VENDOR_VERIFY` | Catalogue has no facing field |
 | G46 | Auto catchment by use | PARTIAL | MOCK-GOOGLE | existing G11 catchment test | Strategy view uses zones; circles unchanged |
 | G47 | Bounded expansion 500 m → 3 km | PASS | MOCK-GOOGLE | `geo-expand` G47: only when allowed and within the approved budget, only thin sites (< 5 relevant places), one step at a time, area-normalised, flagged as a wider catchment; the cost check shows the extra lookups first | Not run live |
@@ -88,12 +88,12 @@ Google and AI calls are 0 / 0 for every row unless stated. A PASS cites an execu
 | G52 | SE-009 identity | PASS | LOCAL-DATA | id kept through the shortlist | – |
 | G53 | CSV / XLSX / KML / KMZ import | PASS | MOCK-GOOGLE, BROWSER-LOCAL | existing CSV and KMZ tests; browser: a real .xlsx built with the app's SheetJS gave 4 rows → 2 usable, swapped and missing coordinates reported, only the local check route called | Saved inventories are team-shared by design; per-client server isolation is an owner decision |
 | G54 | Digital-first, no OOH | PASS | LOCAL-DATA | TikTok + Meta proposed, no activation assets, Planning ready | – |
-| G55 | Messy brief | PASS | LOCAL-DATA | original kept; audiences, places and DOOH read | AI reading tested only with a mock |
+| G55 | Messy brief | PASS | LOCAL-DATA, LIVE | live Pass A (`gpt-6.2-sol`, 1,049 tokens, 6.3 s): QNB brief → retail banking, office professionals, banking objective, four registry rivals, three plain assumptions; original text kept | – |
 | G56 | Explicit beats inferred; ambiguity asks | PASS | LOCAL-DATA | user audience survives AI; "premium banking" asks between two industries | – |
 | G57 | Injection and tool abuse | PASS | LOCAL-DATA, MOCK-AI | non-registry values dropped; injection text logged and kept out of instructions | – |
-| G58 | Claim validator | PASS | LOCAL-DATA | rejects invented id, number, zone 777, impressions, busiest, unknown channel, unlabelled hypothesis, swapped index | – |
+| G58 | Claim validator | PASS | LOCAL-DATA, LIVE | unit cases above; live Pass B wording (3,229 tokens) passed the validator on the first attempt, kept Audience Fit and Opportunity Index apart and cited only bundle ids | – |
 | G59 | Deterministic replay | PASS | LOCAL-DATA | identical scores, ranks, OOH and corridors | – |
-| G60 | QNB premium credit | PASS | LOCAL-DATA, BROWSER-LOCAL | client QNB, retail banking, bank landscape, Search and LinkedIn, appendix; screenshot `h-…` | Named rivals need live discovery |
+| G60 | QNB premium credit | PASS | LOCAL-DATA, BROWSER-LOCAL, LIVE | live run with AI: Planning ready, wording `ai-validated`, 25.6 s; screenshot `h-…` (local) | Named rivals need live discovery |
 | G61 | Family entertainment GTM | PASS | LOCAL-DATA | see G05 | – |
 | G62 | Network/competitor-only brief | PASS | LOCAL-DATA | landscape mode without campaign objective or OOH | – |
 | G63 | Same evidence, different objectives | PASS | LOCAL-DATA | see G07 / G37 | – |
@@ -111,12 +111,12 @@ Google and AI calls are 0 / 0 for every row unless stated. A PASS cites an execu
 
 | Result | Count |
 |---|---|
-| PASS | 61 |
-| PARTIAL | 10 |
+| PASS | 62 |
+| PARTIAL | 9 |
 | NOT RUN | 1 |
 | NOT IMPLEMENTED | 0 |
 | FAIL | 0 |
 | **Total** | **72** |
-| Of which LIVE verified | 0 |
+| Of which with a LIVE check | 7 (G16, G17, G19, G44, G55, G58, G60) |
 
 G61 and G63 reuse the assertions of G05 and G07. PASS on MOCK-GOOGLE rows means the existing tests still pass on this branch, not that the provider was exercised live.

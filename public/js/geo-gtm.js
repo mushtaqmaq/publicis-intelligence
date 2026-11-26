@@ -175,7 +175,7 @@ function wireResult(el, G, s) {
   draw(true);
   $$('[data-gl]').forEach(c => c.onchange = () => { s.view[c.dataset.gl] = c.checked; draw(false); });
   $$('[data-rg]').forEach(b => b.onclick = () => { s.view.region = b.dataset.rg; T.strategy(el, G); });
-  const pick = no => { s.selZone = no; T.strategy(el, G); setTimeout(() => { const row = document.querySelector(`tr[data-z="${no}"]`); if (row) row.focus(); }, 30); };
+  const pick = no => { s.selZone = no; T.strategy(el, G); setTimeout(() => { const row = document.querySelector(`tr[data-z="${no}"]`); if (row) row.focus({ preventScroll: true }); }, 30); };
   s.onZone = pick;
   $$('[data-z]').forEach(x => { x.onclick = () => pick(+x.dataset.z); x.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(+x.dataset.z); } }; });
   $$('[data-pin]').forEach(x => { const go = () => { s.selPin = +x.dataset.pin; T.strategy(el, G); }; x.onclick = go; x.onkeydown = e => { if (e.key === 'Enter') go(); }; });

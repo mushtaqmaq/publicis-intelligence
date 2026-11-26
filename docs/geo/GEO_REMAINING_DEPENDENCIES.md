@@ -4,9 +4,9 @@ Only items that code alone cannot close, plus the parts not built.
 
 ## Needs the owner or a credential
 
-1. **OpenAI.** In Vercel (production and preview), set `OPENAI_API_KEY` for a dedicated agency project, set `GEO_OPENAI_ENABLED=1`, and set `GEO_OPENAI_PLANNER_MODEL` (and optionally `GEO_OPENAI_SYNTH_MODEL`) to a model id listed by `GET /api/geo/ai/models`. Set the token caps from current prices. Until then the strategy uses rule wording, and every AI path is mock-tested only.
+1. **OpenAI: done 26 November 2026.** Key, switch, `gpt-6.2-sol` for both passes and an 8,000-token output limit are set in Vercel production; both passes verified live. Watch the monthly token figure in the admin Usage dialog.
 2. **Live Google check.** Named rival discovery (QNB vs banks, QSR chains) has never run against live Google. It needs an approved, bounded spend and an admin running it.
-3. **Google map rendering of the heatmap, corridors, numbered pins and overlap picker.** This needs a browser with the restricted Maps key, on a preview that does not write to the production database. The SVG fallback was verified locally; the Google Data-layer path was not.
+3. **Google map: heatmap, corridors, pins, zone selection and traffic verified live.** Still not seen live: the overlap pick list on stacked markers in Map & Analysis, and the rival-network map (G40), which needs a discovery run.
 4. **Census zone licence.** Confirm reuse terms with Qatar GIS before client-facing exports.
 5. **ODbL.** Decide whether OSM-derived counts may go outside the agency (share-alike applies to a distributed database).
 6. **Traffic counts.** No licensed road volumes exist in the app. Corridors stay MODELLED until Ashghal or MOT counts are licensed.
