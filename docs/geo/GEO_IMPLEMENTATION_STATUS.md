@@ -65,3 +65,11 @@ Revert the merge commit. The new tables `geo_ai_billing` and `geo_ai_log` can st
 - **Tabs.** Three groups: Strategy, Explore (site analysis, compare, opportunities, OOH plan, competitors, official data, audience) and Saved. The location brief shows only under Explore. The status pills are one "Data sources" disclosure.
 - **Second-pass rival search.** An area that hit Google's 60-place cap can be searched again for "<brand> branch" in its four quarters (4 to 12 lookups an area, shown on the button first). A stored second pass is applied for free. Not yet run on live Google.
 - **Checked:** 124 of 124 tests pass on the local database; the screen was checked in the local preview with a mock Google. **Not checked:** the AI wording with the new prompt on the live model, the second pass on live Google, a phone-width pass of the new layout.
+
+## 2026-11-27: after the junior-user walkthrough (PR #78 live, then this change)
+
+- **#78 checked live with AI on.** Brief "QNB premium credit cards for office professionals": audience read as Office professionals only; West Bay first (83) with "Workplaces: 13 offices, 10 cafes, 6 embassies"; the AI headline named West Bay with no zone number; the AI wording took 75 seconds on a cold cache.
+- **Zone names.** Three census zones are "West Bay", so the AI wrote "West Bay (zone 61)" beside a list that said "West Bay". Each zone now has one name (`zoneNames` in the result): the shortest name that is unique, for example "West Bay (Onaiza)", "Al Sadd" and "Al Sadd and nearby"; a zone number is added only where the whole name is shared (13 zones, such as the two "Fereej Bin Mahmoud"). The AI is told not to add zone numbers. Prompt `geo-brain-2026.12.02`.
+- **Layout.** The detail tabs sit under the map, beside the insights, instead of below a 1,300 px side panel. On screens under 1,100 px the order is map, insights, tabs.
+- **Timing card.** A calendar effect under 4% shows the period name without a percentage.
+- **Checked:** 125 of 125 tests; the layout and every tab at 1,512 px and 1,024 px in the local preview with a mock Google. **Not checked:** the AI wording with the new prompt on the live model; a real phone.

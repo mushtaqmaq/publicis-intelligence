@@ -160,7 +160,7 @@ test('G54 digital-first with OOH off or no inventory still gives a complete stra
   // an adjective on the product is not an audience; people described as premium, or as affluent, are
   assert.deepEqual(Aa.detect('premium card for office professionals').audiences, ['office_professionals']); assert.deepEqual(Aa.detect('Premium luxury automotive launch').audiences, ['premium', 'automotive']); assert.deepEqual(Aa.detect('Target premium customers in West Bay').audiences, ['premium']); assert.deepEqual(Aa.detect('affluent families in Lusail').audiences, ['families', 'premium']);
   const qnb = await GTa.run({}, { text: 'QNB premium credit cards for office professionals', inventory: [] }); assert.equal(qnb.zone_opportunities[0].zoneNo, 63, 'office professionals lead with West Bay, the workplace zone'); assert.match(qnb.zone_opportunities[0].why[0], /^Workplaces/);
-  assert.deepEqual(GTa.bundleFor(qnb).payload.timing.on_now, [], 'a 2% calendar effect is not worth a sentence'); assert.equal(GTa.bundleFor(qnb).payload.top_zones[0].label, 'West Bay (zone 63)'); assert.deepEqual(Aa.detect('families and office workers').audiences, ['families', 'office_professionals']);
+  assert.deepEqual(GTa.bundleFor(qnb).payload.timing.on_now, [], 'a 2% calendar effect is not worth a sentence'); assert.equal(GTa.bundleFor(qnb).payload.top_zones[0].label, 'West Bay (Onaiza)'); assert.deepEqual(Aa.detect('families and office workers').audiences, ['families', 'office_professionals']);
   // any official zone name is a place, zones can be handed over by number, and an unknown place is not turned into a strategy
   assert.deepEqual(GTa.readBrief('Understand the commercial context around Najma').destination_zones, [26]); assert.deepEqual(GTa.readBrief('x', { mode: 'area_research', zones: [26, 'nope', 999] }).destination_zones, [26]); assert.deepEqual(GTa.readBrief('families in qatar').destination_zones, []);
   const lost = await GTa.run({}, { text: 'Understand the commercial context around Nowhere Land', known: { mode: 'area_research' }, inventory: [] }); assert.equal(lost.status, 'AREA_PROFILE'); assert.equal(lost.area.zones.length, 0); assert.match(lost.executive_recommendation.headline, /No official zone/); assert.equal(lost.zone_opportunities.length, 0);
@@ -218,6 +218,8 @@ test('step 1 clarity: planner place names, plain reasons, and "asked" only for w
   assert.match(Z.byNo(63).label, /^West Bay · Onaiza \(zone 63\)$/); assert.equal(Z.zoneNear(25.3215, 51.5265).zone.no, 63, 'The Gate Mall is in zone 63');
   assert.equal(Z.zoneNear(25.2600, 51.4430).zone.no, 54, 'Villaggio and Aspire are in zone 54'); assert.deepEqual(GT.PLACES.aspire, [54]);
   const r = await run('QNB premium credit cards for office professionals', { inventory: [] });
+  // one name per zone: the three West Bay zones are told apart, and no two zones share a name
+  const zn = Object.values(r.zoneNames); assert.equal(new Set(zn).size, zn.length); assert.equal(r.zoneNames[63], 'West Bay (Onaiza)'); assert.equal(r.zoneNames[38], 'Al Sadd'); assert.match(r.executive_recommendation.headline, /West Bay, Al Sadd and Al Mansoura/);
   for (const z of r.zone_opportunities) { assert.ok(z.why.length >= 1, z.label); assert.match(z.why[0], /^[A-Z][a-z ]+: \d/); }
   assert.ok(!/\b1 [a-z -]+s\b/.test(r.zone_opportunities.map(z => z.why.join(' ')).join(' ').replace(/1 clothes or electronics shop|1 bus station/g, '')), 'singular nouns for a count of one');
   assert.match(r.claims[0].signal, /ranks 1 for this audience/); assert.ok(GT.bundleFor(r).payload.top_zones[0].why.length);
