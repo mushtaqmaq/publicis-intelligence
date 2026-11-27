@@ -793,3 +793,4 @@ a.agent-b{text-decoration:none}
 .gt-when{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-top:8px}.gt-when label{font-size:12.5px;color:var(--ink-2)}.gt-when input{font:inherit;font-size:13px;border:1px solid var(--hair-2);border-radius:8px;padding:4px 8px;min-height:30px}.gt-ins .gx-bar2 i{background:var(--gt-teal)}
 .gt-near{display:block;color:var(--muted);font-size:11.5px;margin-top:2px;white-space:normal}
 .gt-ver{margin:0;padding-left:18px;font-size:13px;color:var(--ink-2);display:grid;gap:3px}
+.gt-ins .gt-z{grid-template-columns:22px minmax(0,1fr) 60px 26px;align-items:start}.gt-ins .gt-z small{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.gt-ins .gt-z i{margin-top:8px}.gt-ins .gt-z strong{font-size:13.5px;color:var(--ink)}
