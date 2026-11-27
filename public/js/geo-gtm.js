@@ -116,11 +116,12 @@ async function run(el, G, keepAi, opts = {}) {
 }
 const delta = (a, b) => { const top = r => r.zone_opportunities.map(z => z.zoneNo); const A = top(a), B = top(b); return { statusFrom: a.status, statusTo: b.status, entered: B.filter(x => !A.includes(x)), left: A.filter(x => !B.includes(x)), generatedFrom: a.generated_at, generatedTo: b.generated_at }; };
 
-const shortZ = l => String(l || '').replace(/ \(zone \d+\)$/, '').split(' / ')[0].split(' · ')[0];
+let ZN = {};   // zone number to the name a planner would say, from the result on screen
+const shortZ = l => { const m = / \(zone (\d+)\)$/.exec(l || ''); return (m && ZN[m[1]]) || String(l || '').replace(/ \(zone \d+\)$/, '').split(' / ')[0].split(' · ')[0]; };
 const citesOf = ids => (ids || []).length ? `<small class="gx-cite">${ids.slice(0, 4).map(id => `<button class="gx-evb" data-ev="${esc(id)}" title="Show this evidence">${esc(evLabel(id))}</button>`).join('')}</small>` : '';
 // Map first, insights beside it, the detail in tabs underneath.
 function resultHtml(r, s, G) {
-  const aud = r.audience, cites = citesOf, exp = !!s.exporting;
+  const aud = r.audience, cites = citesOf, exp = !!s.exporting; ZN = r.zoneNames || {};
   const zl = no => (aud.zones.find(z => z.zoneNo === no) || {}).label || 'Zone ' + no, sel = !r.area && s.selZone != null ? aud.zones.find(z => z.zoneNo === s.selZone) : null;
   const pin = !sel && r.ooh && s.selPin != null ? r.ooh.recommendations.find(x => x.rank === s.selPin) : null;
   const topZ = aud.zones.filter(z => z.displayStatus === 'top'), tab = TABS2.some(t => t[0] === s.view.tab) ? s.view.tab : 'strategy';
@@ -128,9 +129,8 @@ function resultHtml(r, s, G) {
   const panes = { strategy: () => strategyPane(r, s, topZ), audience: () => audiencePane(r, s, topZ), competitors: () => (g => g ? `<div class="gx-card">${g}</div>` : '')(groupsHtml(r.brief)) + competitorsHtml(r, cites) + landscapeHtml(r, cites) || none, channels: () => (r.channels.length ? `<div class="gx-acts" style="margin:0 0 12px"><button class="btn sm" id="gtfeas">${I('list-checks')}Copy feasibility request</button><small>What the media team and vendors must confirm, as text to paste into an email. Nothing is sent.</small></div>` + channelsHtml(r, cites) : '') + oohHtml(r, s) + corridorHtml(r) || none, evidence: () => claimsHtml(r, cites) + appendixHtml(r).replace('<details class="gx-card"', '<details open class="gx-card"') };
   return `${s.opened ? `<div class="notice info">${I('save')}<div><b dir="auto">${esc(s.opened.name)}</b> · saved ${PI.when(s.opened.savedAt)}${s.opened.refreshed ? ' · showing a fresh run; the saved copy is unchanged' : ''}.${s.opened.intact === false ? ' <b>Warning: the saved content does not match its fingerprint.</b>' : ''} <button class="btn xs" id="gtref">${I('refresh-cw')}Refresh and compare</button></div></div>` : ''}
     ${s.delta ? `<div class="notice info"><div>Refreshed: status ${esc(s.delta.statusFrom)} → ${esc(s.delta.statusTo)}. New top zones: ${s.delta.entered.map(zl).map(esc).join(', ') || 'none'}. Dropped: ${s.delta.left.map(zl).map(esc).join(', ') || 'none'}. The saved snapshot is unchanged until you save again.</div></div>` : ''}
-    <div class="gt-stage">${mapCard(r, s, G)}<aside class="gt-ins" aria-label="${r.area ? 'Area profile' : 'Strategy insights'}">${sel ? `<div class="gx-sitec" id="gtzone">${zoneHtml(sel, r, cites)}</div>` : pin ? pinHtml(pin) : r.area ? areaHtml(r, s) : insightsHtml(r, s, G, topZ)}</aside></div>
-    ${r.area ? appendixHtml(r).replace('<details class="gx-card"', '<details open class="gx-card"') : exp ? TABS2.map(([k, t]) => `<h2 class="gt-exh">${t}</h2>${panes[k]()}`).join('')
-      : `<div class="gt-tabs" role="tablist" id="gttabs" aria-label="Strategy detail">${TABS2.map(([k, t]) => `<button role="tab" aria-selected="${tab === k}" data-gtt="${k}">${t}</button>`).join('')}</div><div class="gt-pane" role="tabpanel">${panes[tab]()}</div>`}`;
+    <div class="gt-stage"><div class="gt-main">${mapCard(r, s, G)}${r.area || exp ? '' : `<div class="gt-tabs" role="tablist" id="gttabs" aria-label="Strategy detail">${TABS2.map(([k, t]) => `<button role="tab" aria-selected="${tab === k}" data-gtt="${k}">${t}</button>`).join('')}</div><div class="gt-pane" role="tabpanel">${panes[tab]()}</div>`}</div><aside class="gt-ins" aria-label="${r.area ? 'Area profile' : 'Strategy insights'}">${sel ? `<div class="gx-sitec" id="gtzone">${zoneHtml(sel, r, cites)}</div>` : pin ? pinHtml(pin) : r.area ? areaHtml(r, s) : insightsHtml(r, s, G, topZ)}</aside></div>
+    ${r.area ? appendixHtml(r).replace('<details class="gx-card"', '<details open class="gx-card"') : exp ? TABS2.map(([k, t]) => `<h2 class="gt-exh">${t}</h2>${panes[k]()}`).join('') : ''}`;
 }
 // The map: layer switches on top, legend and view switch on the map itself.
 function mapCard(r, s, G) {
@@ -301,7 +301,7 @@ function timingHtml(r, s) {
   const se = r.season; if (!se) return '';
   const pct = e => (e > 0 ? '+' : '') + Math.round(e * 100) + '%', d = x => new Date(x + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
   return `<div class="gx-card" style="margin-top:12px"><h4>Timing <small>planning calendar for ${d(se.date)} · rule-based, not measured footfall</small></h4>
-    <p dir="auto">${se.active.length ? se.active.filter((a, i, l) => l.findIndex(x => x.name === a.name) === i).map(a => `<b>${esc(a.name)}</b>${a.effect ? ' (' + pct(a.effect) + ' for this audience)' : ''}`).join(' · ') : 'No seasonal period is on at this date.'}${se.daypart ? ` Best dayparts: ${esc(se.daypart.toLowerCase())}.` : ''}</p>
+    <p dir="auto">${se.active.length ? se.active.filter((a, i, l) => l.findIndex(x => x.name === a.name) === i).map(a => `<b>${esc(a.name)}</b>${Math.abs(a.effect || 0) >= 0.04 ? ' (' + pct(a.effect) + ' for this audience)' : ''}`).join(' · ') : 'No seasonal period is on at this date.'}${se.daypart ? ` Best dayparts: ${esc(se.daypart.toLowerCase())}.` : ''}</p>
     <div class="gt-when"><label for="gtwhen">Plan for another date</label><input type="date" id="gtwhen" value="${esc(s.period || se.date)}">${(se.upcoming || []).slice(0, 4).map(u => `<button class="btn xs" data-when="${esc(u.from)}">${esc(u.name)} · ${d(u.from)}</button>`).join('')}${s.period ? '<button class="btn xs" data-when="">Back to today</button>' : ''}</div>
     <p class="gx-fine">${esc(se.method || '')}${r.brief.occasions.length ? ' Occasions in the brief: ' + r.brief.occasions.map(esc).join(', ') + '.' : ''}</p></div>`;
 }
